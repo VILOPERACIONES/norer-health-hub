@@ -45,9 +45,9 @@ const Patients = () => {
   };
 
   const badgeClass = (m?: string) => {
-    if (m === 'premium') return 'norer-badge-premium';
-    if (m === 'basica') return 'norer-badge-basica';
-    return 'norer-badge-none';
+    if (m === 'premium') return 'norder-badge-premium';
+    if (m === 'basica') return 'norder-badge-basica';
+    return 'norder-badge-none';
   };
 
   const badgeLabel = (m?: string) => {
@@ -79,13 +79,13 @@ const Patients = () => {
             placeholder="Buscar por nombre o teléfono..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="norer-input w-full pl-10"
+            className="norder-input w-full pl-10"
           />
         </div>
         <select
           value={filtro}
           onChange={(e) => setFiltro(e.target.value)}
-          className="norer-input"
+          className="norder-input"
         >
           <option value="todos">Todas las membresías</option>
           <option value="ninguna">Sin membresía</option>
@@ -94,7 +94,7 @@ const Patients = () => {
         </select>
       </div>
 
-      <div className="norer-card p-0 overflow-hidden">
+      <div className="norder-card p-0 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

@@ -32,7 +32,7 @@ const CreateEditPlan = () => {
   const [notas, setNotas] = useState('');
   const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú #1'), emptyMenu('Menú #2')]);
 
-  const pesoUltimo = 65.2; // From last assessment
+  const pesoUltimo = 65.2;
   const cal = parseFloat(calorias) || 0;
   const pPct = parseFloat(proteinas) || 0;
   const cPct = parseFloat(carbohidratos) || 0;
@@ -90,12 +90,12 @@ const CreateEditPlan = () => {
       <h1 className="text-2xl font-bold text-foreground">{isEdit ? 'Editar plan' : 'Nuevo plan nutricional'}</h1>
 
       {/* Header */}
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-4">Configuración del plan</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Tipo de plan</label>
-            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="norer-input w-full">
+            <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="norder-input w-full">
               <option>Balanceada</option>
               <option>Keto</option>
               <option>Vegetariana</option>
@@ -104,30 +104,30 @@ const CreateEditPlan = () => {
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Calorías totales</label>
-            <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="norer-input w-full" />
+            <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Próxima sesión</label>
-            <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="norer-input w-full" />
+            <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Hora</label>
-            <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="norer-input w-full" />
+            <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="norder-input w-full" />
           </div>
         </div>
 
         <div className="grid grid-cols-3 gap-4 mt-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Proteínas %</label>
-            <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="norer-input w-full" />
+            <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Carbohidratos %</label>
-            <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="norer-input w-full" />
+            <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Grasas %</label>
-            <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="norer-input w-full" />
+            <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="norder-input w-full" />
           </div>
         </div>
         {macroSum !== 100 && (
@@ -156,14 +156,14 @@ const CreateEditPlan = () => {
 
         <div className="mt-4">
           <label className="block text-xs text-muted-foreground mb-1">Notas generales</label>
-          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} className="norer-input w-full min-h-[60px] resize-y" />
+          <textarea value={notas} onChange={(e) => setNotas(e.target.value)} className="norder-input w-full min-h-[60px] resize-y" />
         </div>
       </div>
 
       {/* Menus */}
       <div className="grid md:grid-cols-2 gap-4">
         {menus.map((menu, mi) => (
-          <div key={mi} className="norer-card">
+          <div key={mi} className="norder-card">
             <input
               value={menu.nombre}
               onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
@@ -195,7 +195,7 @@ const CreateEditPlan = () => {
                         onChange={(e) => updateTiempo(mi, ti, (t) => ({
                           ...t, ingredientes: t.ingredientes.map((x, i) => i === ii ? { ...x, descripcion: e.target.value } : x)
                         }))}
-                        className="norer-input flex-1 text-xs py-1.5"
+                        className="norder-input flex-1 text-xs py-1.5"
                       />
                       <input
                         type="number"
@@ -204,7 +204,7 @@ const CreateEditPlan = () => {
                         onChange={(e) => updateTiempo(mi, ti, (t) => ({
                           ...t, ingredientes: t.ingredientes.map((x, i) => i === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x)
                         }))}
-                        className="norer-input w-16 text-xs py-1.5"
+                        className="norder-input w-16 text-xs py-1.5"
                       />
                       <input
                         placeholder="Unid"
@@ -212,7 +212,7 @@ const CreateEditPlan = () => {
                         onChange={(e) => updateTiempo(mi, ti, (t) => ({
                           ...t, ingredientes: t.ingredientes.map((x, i) => i === ii ? { ...x, unidad: e.target.value } : x)
                         }))}
-                        className="norer-input w-14 text-xs py-1.5"
+                        className="norder-input w-14 text-xs py-1.5"
                       />
                       <input
                         placeholder="Equiv"
@@ -220,7 +220,7 @@ const CreateEditPlan = () => {
                         onChange={(e) => updateTiempo(mi, ti, (t) => ({
                           ...t, ingredientes: t.ingredientes.map((x, i) => i === ii ? { ...x, equivalentes: e.target.value } : x)
                         }))}
-                        className="norer-input w-24 text-xs py-1.5"
+                        className="norder-input w-24 text-xs py-1.5"
                       />
                       <button
                         onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, i) => i !== ii) }))}
@@ -243,7 +243,7 @@ const CreateEditPlan = () => {
                       placeholder="Nota de pie..."
                       value={tiempo.nota || ''}
                       onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nota: e.target.value }))}
-                      className="norer-input w-full text-xs py-1.5 italic"
+                      className="norder-input w-full text-xs py-1.5 italic"
                     />
                   </div>
                 </div>

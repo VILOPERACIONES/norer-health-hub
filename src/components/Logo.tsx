@@ -13,7 +13,7 @@ const Logo = ({ size = 'md', className = '' }: LogoProps) => {
   return (
     <div className={`flex flex-col items-center ${className}`}>
       <span className={`${sizes[size].title} font-extrabold tracking-wider text-foreground`}>
-        NORER
+        NORDER
       </span>
       <span className={`${sizes[size].sub} text-muted-foreground font-medium uppercase`}>
         Think · Eat · Live

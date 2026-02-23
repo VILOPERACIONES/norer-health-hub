@@ -21,7 +21,7 @@ const SettingsPage = () => {
         </h1>
       </div>
 
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-4">Datos del profesional</h3>
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
@@ -30,7 +30,7 @@ const SettingsPage = () => {
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Email</p>
-            <p className="text-sm text-foreground">eyder@norer.com</p>
+            <p className="text-sm text-foreground">eyder@norder.com</p>
           </div>
           <div>
             <p className="text-xs text-muted-foreground">Teléfono</p>
@@ -43,13 +43,13 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-4">Conexión API</h3>
         <div className="flex gap-2">
           <input
             value={url}
             onChange={(e) => setUrl(e.target.value)}
-            className="norer-input flex-1"
+            className="norder-input flex-1"
             placeholder="http://localhost:3000"
           />
           <button
@@ -61,9 +61,9 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-2">Sistema</h3>
-        <p className="text-sm text-muted-foreground">NORER Health CRM v1.0</p>
+        <p className="text-sm text-muted-foreground">NORDER Health CRM v1.0</p>
         <p className="text-xs text-muted-foreground mt-1">Desarrollado por Antigravity</p>
       </div>
     </div>

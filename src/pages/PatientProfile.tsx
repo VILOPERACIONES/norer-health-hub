@@ -69,7 +69,7 @@ const PatientProfile = () => {
     return Math.floor(diff / 31557600000);
   };
 
-  const badgeClass = (m?: string) => m === 'premium' ? 'norer-badge-premium' : m === 'basica' ? 'norer-badge-basica' : 'norer-badge-none';
+  const badgeClass = (m?: string) => m === 'premium' ? 'norder-badge-premium' : m === 'basica' ? 'norder-badge-basica' : 'norder-badge-none';
   const badgeLabel = (m?: string) => m === 'premium' ? 'Premium' : m === 'basica' ? 'Básica' : 'Sin membresía';
 
   const tabs: { key: Tab; label: string }[] = [
@@ -85,7 +85,7 @@ const PatientProfile = () => {
       </button>
 
       {/* Header */}
-      <div className="norer-card">
+      <div className="norder-card">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -163,12 +163,12 @@ const PatientProfile = () => {
       {tab === 'historial' && (
         <div className="space-y-3">
           {valoraciones.length === 0 ? (
-            <div className="norer-card text-center py-8 text-muted-foreground text-sm">
+            <div className="norder-card text-center py-8 text-muted-foreground text-sm">
               No hay valoraciones registradas
             </div>
           ) : (
             valoraciones.map((v) => (
-              <div key={v._id} className="norer-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div key={v._id} className="norder-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">
                     Valoración #{v.numeracion} — {formatDate(v.fecha)}
@@ -203,7 +203,7 @@ const PatientProfile = () => {
         <div>
           {planActivo ? (
             <div className="space-y-4">
-              <div className="norer-card">
+              <div className="norder-card">
                 <div className="flex items-center justify-between mb-4">
                   <div>
                     <h3 className="font-semibold text-foreground">{planActivo.tipo}</h3>
@@ -217,7 +217,7 @@ const PatientProfile = () => {
               </div>
               <div className="grid md:grid-cols-2 gap-4">
                 {planActivo.menus.map((menu, i) => (
-                  <div key={i} className="norer-card">
+                  <div key={i} className="norder-card">
                     <h4 className="font-semibold text-foreground mb-3">{menu.nombre}</h4>
                     <div className="space-y-3">
                       {menu.tiempos.map((t, j) => (
@@ -239,7 +239,7 @@ const PatientProfile = () => {
               </div>
             </div>
           ) : (
-            <div className="norer-card text-center py-8">
+            <div className="norder-card text-center py-8">
               <p className="text-muted-foreground text-sm mb-3">No hay plan activo</p>
               <button
                 onClick={() => navigate(`/pacientes/${id}/planes/nuevo`)}
@@ -256,7 +256,7 @@ const PatientProfile = () => {
 };
 
 const ExpedienteSection = ({ title, fields }: { title: string; fields: { label: string; value: string }[] }) => (
-  <div className="norer-card">
+  <div className="norder-card">
     <div className="flex items-center justify-between mb-4">
       <h3 className="font-semibold text-foreground">{title}</h3>
       <button className="flex items-center gap-1 text-xs text-primary hover:text-accent font-medium">
