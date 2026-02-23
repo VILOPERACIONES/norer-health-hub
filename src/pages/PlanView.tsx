@@ -85,14 +85,14 @@ const PlanView = () => {
       </div>
 
       {plan.notas && (
-        <div className="norer-card">
+        <div className="norder-card">
           <p className="text-sm text-muted-foreground">{plan.notas}</p>
         </div>
       )}
 
       <div className="grid md:grid-cols-2 gap-4">
         {plan.menus.map((menu, i) => (
-          <div key={i} className="norer-card">
+          <div key={i} className="norder-card">
             <h3 className="text-lg font-semibold text-foreground mb-4">{menu.nombre}</h3>
             <div className="space-y-4">
               {menu.tiempos.map((t, j) => (
@@ -115,7 +115,7 @@ const PlanView = () => {
       </div>
 
       {plan.proximaSesion && (
-        <div className="norer-card bg-muted/50">
+        <div className="norder-card bg-muted/50">
           <p className="text-sm text-muted-foreground">
             Próxima sesión: <strong className="text-foreground">{formatDate(plan.proximaSesion)}</strong>
             {plan.proximaSesionHora && ` a las ${plan.proximaSesionHora}`}

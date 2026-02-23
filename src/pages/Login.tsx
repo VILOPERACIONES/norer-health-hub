@@ -36,7 +36,7 @@ const Login = () => {
           <Logo size="lg" />
         </div>
 
-        <div className="norer-card">
+        <div className="norder-card">
           <h2 className="text-lg font-semibold text-foreground mb-6 text-center">Iniciar sesión</h2>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -46,8 +46,8 @@ const Login = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="norer-input w-full"
-                placeholder="eyder@norer.com"
+                className="norder-input w-full"
+                placeholder="eyder@norder.com"
                 required
               />
             </div>
@@ -59,7 +59,7 @@ const Login = () => {
                   type={showPass ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="norer-input w-full pr-10"
+                  className="norder-input w-full pr-10"
                   placeholder="••••••••"
                   required
                 />
@@ -91,7 +91,7 @@ const Login = () => {
         </div>
 
         <p className="text-center text-xs text-muted-foreground mt-6">
-          NORER Health CRM v1.0
+          NORDER Health CRM v1.0
         </p>
       </div>
     </div>

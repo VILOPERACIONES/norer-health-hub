@@ -31,7 +31,7 @@ const AssessmentDetail = () => {
   }, [pacienteId, valoracionId]);
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
-    <div className="norer-card">
+    <div className="norder-card">
       <h3 className="font-semibold text-foreground mb-3">{title}</h3>
       {children}
     </div>

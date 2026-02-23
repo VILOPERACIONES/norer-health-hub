@@ -34,8 +34,8 @@
     --sidebar-accent-foreground: 0 0% 4%;
     --sidebar-border: 214 20% 92%;
     --sidebar-ring: 163 100% 39%;
-    --norer-green: 163 100% 39%;
-    --norer-dark: 163 100% 28%;
+    --norder-green: 163 100% 39%;
+    --norder-dark: 163 100% 28%;
     --surface: 210 22% 96%;
     --text-secondary: 213 14% 48%;
   }
@@ -81,19 +81,19 @@
 }
 
 @layer components {
-  .norer-card {
+  .norder-card {
     @apply bg-card rounded-xl border border-border p-6 shadow-sm;
   }
-  .norer-input {
+  .norder-input {
     @apply bg-background border border-input rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-colors;
   }
-  .norer-badge-none {
+  .norder-badge-none {
     @apply bg-muted text-muted-foreground text-xs px-2.5 py-0.5 rounded-full font-medium;
   }
-  .norer-badge-basica {
+  .norder-badge-basica {
     @apply bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-medium;
   }
-  .norer-badge-premium {
+  .norder-badge-premium {
     @apply bg-emerald-50 text-emerald-700 text-xs px-2.5 py-0.5 rounded-full font-medium;
   }
 }

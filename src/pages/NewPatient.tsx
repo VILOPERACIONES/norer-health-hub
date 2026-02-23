@@ -39,31 +39,31 @@ const NewPatient = () => {
       </button>
       <h1 className="text-2xl font-bold text-foreground">Nuevo paciente</h1>
 
-      <div className="norer-card">
+      <div className="norder-card">
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Nombre *</label>
-            <input value={form.nombre} onChange={(e) => update('nombre', e.target.value)} className="norer-input w-full" />
+            <input value={form.nombre} onChange={(e) => update('nombre', e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Apellido *</label>
-            <input value={form.apellido} onChange={(e) => update('apellido', e.target.value)} className="norer-input w-full" />
+            <input value={form.apellido} onChange={(e) => update('apellido', e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Teléfono *</label>
-            <input value={form.telefono} onChange={(e) => update('telefono', e.target.value)} className="norer-input w-full" />
+            <input value={form.telefono} onChange={(e) => update('telefono', e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Email</label>
-            <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} className="norer-input w-full" />
+            <input type="email" value={form.email} onChange={(e) => update('email', e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Fecha de nacimiento</label>
-            <input type="date" value={form.fechaNacimiento} onChange={(e) => update('fechaNacimiento', e.target.value)} className="norer-input w-full" />
+            <input type="date" value={form.fechaNacimiento} onChange={(e) => update('fechaNacimiento', e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Sexo</label>
-            <select value={form.sexo} onChange={(e) => update('sexo', e.target.value)} className="norer-input w-full">
+            <select value={form.sexo} onChange={(e) => update('sexo', e.target.value)} className="norder-input w-full">
               <option value="F">Femenino</option>
               <option value="M">Masculino</option>
             </select>

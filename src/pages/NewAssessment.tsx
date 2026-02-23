@@ -14,7 +14,7 @@ interface CollapsibleProps {
 const Collapsible = ({ title, defaultOpen = false, children }: CollapsibleProps) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="norer-card">
+    <div className="norder-card">
       <button onClick={() => setOpen(!open)} className="flex items-center justify-between w-full">
         <h3 className="font-semibold text-foreground">{title}</h3>
         {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
@@ -34,7 +34,7 @@ const Field = ({ label, value, onChange, type = 'number', disabled = false, suff
       value={value}
       onChange={onChange ? (e) => onChange(e.target.value) : undefined}
       disabled={disabled}
-      className={`norer-input w-full ${disabled ? 'bg-muted text-muted-foreground cursor-not-allowed' : ''}`}
+      className={`norder-input w-full ${disabled ? 'bg-muted text-muted-foreground cursor-not-allowed' : ''}`}
       step="0.01"
     />
   </div>
@@ -198,7 +198,7 @@ const NewAssessment = () => {
       <h1 className="text-2xl font-bold text-foreground">Nueva valoración</h1>
 
       {/* Section 1 - Basic */}
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-4">Datos básicos</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
@@ -304,7 +304,7 @@ const NewAssessment = () => {
           <Field label="Frecuencia cardíaca" value={fc} onChange={setFc} suffix="bpm" />
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Presión arterial</label>
-            <input value={pa} onChange={(e) => setPa(e.target.value)} className="norer-input w-full" placeholder="120/80" />
+            <input value={pa} onChange={(e) => setPa(e.target.value)} className="norder-input w-full" placeholder="120/80" />
           </div>
         </div>
       </Collapsible>
@@ -314,30 +314,30 @@ const NewAssessment = () => {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Esquema</label>
-            <input value={esquema} onChange={(e) => setEsquema(e.target.value)} className="norer-input w-full" />
+            <input value={esquema} onChange={(e) => setEsquema(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Etapa</label>
-            <input value={etapa} onChange={(e) => setEtapa(e.target.value)} className="norer-input w-full" />
+            <input value={etapa} onChange={(e) => setEtapa(e.target.value)} className="norder-input w-full" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Tipo de dieta</label>
-            <input value={tipoDieta} onChange={(e) => setTipoDieta(e.target.value)} className="norer-input w-full" />
+            <input value={tipoDieta} onChange={(e) => setTipoDieta(e.target.value)} className="norder-input w-full" />
           </div>
         </div>
       </Collapsible>
 
       {/* Section 10 - Notas */}
-      <div className="norer-card">
+      <div className="norder-card">
         <h3 className="font-semibold text-foreground mb-4">Notas</h3>
         <div className="space-y-4">
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Comentarios</label>
-            <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} className="norer-input w-full min-h-[80px] resize-y" />
+            <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} className="norder-input w-full min-h-[80px] resize-y" />
           </div>
           <div>
             <label className="block text-xs text-muted-foreground mb-1">Suplementación</label>
-            <textarea value={suplementacion} onChange={(e) => setSuplementacion(e.target.value)} className="norer-input w-full min-h-[60px] resize-y" />
+            <textarea value={suplementacion} onChange={(e) => setSuplementacion(e.target.value)} className="norder-input w-full min-h-[60px] resize-y" />
           </div>
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -355,13 +355,13 @@ const NewAssessment = () => {
                   placeholder="Tema"
                   value={t.tema}
                   onChange={(e) => { const n = [...temario]; n[i].tema = e.target.value; setTemario(n); }}
-                  className="norer-input flex-1"
+                  className="norder-input flex-1"
                 />
                 <input
                   placeholder="Detalle"
                   value={t.detalle}
                   onChange={(e) => { const n = [...temario]; n[i].detalle = e.target.value; setTemario(n); }}
-                  className="norer-input flex-1"
+                  className="norder-input flex-1"
                 />
                 <button onClick={() => setTemario(temario.filter((_, j) => j !== i))} className="text-destructive hover:text-destructive/80 p-2">
                   <Trash2 className="h-4 w-4" />

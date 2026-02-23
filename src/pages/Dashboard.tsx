@@ -66,7 +66,7 @@ const Dashboard = () => {
       {/* Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {cards.map((c) => (
-          <div key={c.label} className="norer-card flex items-start gap-4">
+          <div key={c.label} className="norder-card flex items-start gap-4">
             <div className={`p-2.5 rounded-lg bg-muted ${c.color}`}>
               <c.icon className="h-5 w-5" />
             </div>
@@ -80,7 +80,7 @@ const Dashboard = () => {
       </div>
 
       {/* Alerts */}
-      <div className="norer-card">
+      <div className="norder-card">
         <div className="flex items-center gap-2 mb-4">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           <h2 className="font-semibold text-foreground">Pacientes sin visita reciente</h2>
