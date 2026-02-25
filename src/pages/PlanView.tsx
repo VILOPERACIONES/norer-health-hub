@@ -1,124 +1,215 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, MessageCircle, Lock } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, MessageCircle, Lock, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import type { Plan } from '@/types';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
-const mockPlan: Plan = {
-  _id: 'p1', pacienteId: '1', tipo: 'Balanceada', calorias: 1600,
-  macros: { proteinas: 30, carbohidratos: 45, grasas: 25 },
-  menus: [
-    { nombre: 'Menú #1', tiempos: [
-      { nombre: 'Desayuno', ingredientes: [{ descripcion: '2 huevos revueltos', cantidad: 2, unidad: 'pza', equivalentes: '2 eq aoa' }, { descripcion: 'Tortilla de maíz', cantidad: 2, unidad: 'pza', equivalentes: '2 eq cereal' }], nota: 'Tomar con agua natural 250ml' },
-      { nombre: 'Colación mañana', ingredientes: [{ descripcion: 'Manzana', cantidad: 1, unidad: 'pza', equivalentes: '1 eq fruta' }] },
-      { nombre: 'Almuerzo', ingredientes: [{ descripcion: 'Pechuga de pollo', cantidad: 120, unidad: 'gr', equivalentes: '4 eq aoa mb' }, { descripcion: 'Arroz integral', cantidad: 80, unidad: 'gr', equivalentes: '2 eq cereal' }, { descripcion: 'Ensalada mixta', cantidad: 1, unidad: 'taza', equivalentes: '1 eq verdura' }] },
-      { nombre: 'Cena', ingredientes: [{ descripcion: 'Atún en agua', cantidad: 1, unidad: 'lata', equivalentes: '3 eq aoa mb' }, { descripcion: 'Tostadas integrales', cantidad: 2, unidad: 'pza', equivalentes: '2 eq cereal' }] },
-    ]},
-    { nombre: 'Menú #2', tiempos: [
-      { nombre: 'Desayuno', ingredientes: [{ descripcion: 'Avena con leche', cantidad: 40, unidad: 'gr', equivalentes: '2 eq cereal' }, { descripcion: 'Plátano', cantidad: 1, unidad: 'pza', equivalentes: '1 eq fruta' }] },
-      { nombre: 'Almuerzo', ingredientes: [{ descripcion: 'Filete de res', cantidad: 100, unidad: 'gr', equivalentes: '3 eq aoa mb' }, { descripcion: 'Pasta integral', cantidad: 80, unidad: 'gr', equivalentes: '2 eq cereal' }] },
-      { nombre: 'Cena', ingredientes: [{ descripcion: 'Quesadilla con queso panela', cantidad: 2, unidad: 'pza', equivalentes: '2 eq cereal + 2 eq aoa' }] },
-    ]},
-  ],
-  proximaSesion: '2026-03-10', notas: 'Incrementar proteína gradualmente. Hidratación mínima 2L de agua.', activo: true,
-};
-
 const PlanView = () => {
   const { id: pacienteId, planId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [plan, setPlan] = useState<Plan>(mockPlan);
+  const [plan, setPlan] = useState<Plan | null>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetch = async () => {
       try {
         const { data } = await api.get(`/api/pacientes/${pacienteId}/planes/${planId}`);
-        setPlan(data);
-      } catch { /* mock */ }
+        const serverData = data?.data || data;
+        if (serverData) setPlan(serverData);
+      } catch (err) {
+        console.error('Error cargando plan:', err);
+      } finally {
+        setLoading(false);
+      }
     };
     fetch();
   }, [pacienteId, planId]);
 
-  const handlePdf = () => {
-    toast({ title: 'Configuración pendiente', description: 'La generación de PDF estará disponible próximamente.' });
+  const handleDelete = async () => {
+    if (!window.confirm('¿ELIMINAR ESTE PROTOCOLO MAESTRO?')) return;
+    try {
+      await api.delete(`/api/pacientes/${pacienteId}/planes/${planId}`);
+      toast({ title: 'Protocolo eliminado' });
+      navigate(`/pacientes/${pacienteId}`);
+    } catch (err) {
+      toast({ title: 'Error', description: 'No se pudo eliminar el plan', variant: 'destructive' });
+    }
+  };
+
+  const handlePdf = async () => {
+    try {
+      toast({ title: 'GENERANDO REPORTE', description: 'Preparando protocolo clínico maestro...' });
+      const response = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `plan-${planId}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      // Sincronizar estado enviado
+      await api.put(`/api/planes/${planId}/estado`, { estadoEnvio: 'enviado' });
+      toast({ title: 'ESTADO SINCRONIZADO', description: 'El reporte ha sido marcado como enviado.' });
+    } catch (err) {
+      toast({ title: 'Error de Generación', description: 'No se pudo sincronizar el reporte PDF', variant: 'destructive' });
+    }
   };
 
   const handleWhatsApp = () => {
-    toast({ title: 'Configuración pendiente', description: 'El envío por WhatsApp estará disponible próximamente.' });
+    toast({ title: 'Sincronización pendiente', description: 'El envío por canal maestro WhatsApp estará disponible próximamente.' });
   };
 
-  return (
-    <div className="space-y-4 animate-fade-in">
-      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Volver al paciente
-      </button>
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-[400px] animate-pulse h-[60vh] space-y-6">
+      <div className="w-12 h-12 border-[4px] border-foreground/5 border-t-foreground rounded-none animate-spin" />
+      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">SINCRONIZANDO PROTOCOLO...</p>
+    </div>
+  );
+  
+  if (!plan) return (
+     <div className="flex flex-col items-center justify-center min-h-[400px] h-[60vh] space-y-6">
+      <p className="text-xl font-black text-muted-foreground uppercase tracking-[0.3em] opacity-10">PROTOCOLO NO LOCALIZADO</p>
+      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] border-b border-foreground pb-1 hover:opacity-50 transition-all">VOLVER AL EXPEDIENTE</button>
+    </div>
+  );
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Plan nutricional</h1>
-          <p className="text-sm text-muted-foreground">{plan.tipo} · {plan.calorias} kcal · P{plan.macros.proteinas}% C{plan.macros.carbohidratos}% G{plan.macros.grasas}%</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
-            className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
-          >
-            <Edit2 className="h-4 w-4" /> Editar plan
-          </button>
-          <button
-            onClick={handlePdf}
-            className="flex items-center gap-2 bg-card text-muted-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <FileText className="h-4 w-4" /> Generar PDF
-            <Lock className="h-3 w-3 ml-1" />
-          </button>
-          <button
-            onClick={handleWhatsApp}
-            className="flex items-center gap-2 bg-card text-muted-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <MessageCircle className="h-4 w-4" /> Enviar por WhatsApp
-            <Lock className="h-3 w-3 ml-1" />
-          </button>
+  return (
+    <div className="space-y-8 animate-fade-in max-w-7xl pb-20 mx-auto">
+      <div className="flex flex-col gap-6">
+        <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
+          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> VOLVER AL EXPEDIENTE
+        </button>
+        
+        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 animate-slide-up">
+           <div className="space-y-2">
+              <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Plan {plan.tipo}</h1>
+              <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">CONFIGURACIÓN INTEGRAL DE MACRONUTRIENTES Y SUPLEMENTACIÓN</p>
+           </div>
+           
+           <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
+                className="px-6 py-3 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.1em] transition-all flex items-center gap-3 border border-foreground"
+              >
+                <Edit2 className="h-4 w-4" /> EDITAR
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-6 py-3 border border-border/80 text-destructive text-[11px] font-black uppercase tracking-[0.1em] rounded-none hover:bg-destructive/5 transition-all"
+              >
+                ELIMINAR
+              </button>
+              <button
+                onClick={handlePdf}
+                className="px-6 py-3 bg-background border border-border/80 rounded-none text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-3 hover:bg-secondary/10 transition-all"
+              >
+                <FileText className="h-4 w-4" /> PDF
+              </button>
+              <button
+                onClick={handleWhatsApp}
+                className="px-6 py-3 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-none text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-3 hover:bg-emerald-500 hover:text-white transition-all"
+              >
+                <MessageCircle className="h-4 w-4" /> WHATSAPP
+              </button>
+           </div>
         </div>
       </div>
 
+      <div className="bg-foreground text-background p-6 rounded-none animate-slide-up">
+         <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div className="space-y-2">
+               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Masa Térmica Diaria</p>
+               <p className="text-xl font-black tracking-tighter uppercase leading-none">{plan.calorias}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">KCAL</span></p>
+            </div>
+            <div className="space-y-2">
+               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Sintetización Pro</p>
+               <p className="text-xl font-black text-emerald-400 tracking-tighter leading-none">{plan.macros.proteinas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% G/KG</span></p>
+            </div>
+            <div className="space-y-2">
+               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Energía Carbo</p>
+               <p className="text-xl font-black text-amber-400 tracking-tighter leading-none">{plan.macros.carbohidratos}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% CH</span></p>
+            </div>
+            <div className="space-y-2">
+               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Densidad Lípidos</p>
+               <p className="text-xl font-black text-rose-400 tracking-tighter leading-none">{plan.macros.grasas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% GR</span></p>
+            </div>
+         </div>
+      </div>
+
       {plan.notas && (
-        <div className="norder-card">
-          <p className="text-sm text-muted-foreground">{plan.notas}</p>
+        <div className="bg-secondary/10 p-6 rounded-none border border-foreground/5">
+          <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] mb-4 opacity-40 leading-none">{`// RECOMENDACIONES ESTRATÉGICAS`}</h3>
+          <p className="text-sm font-black leading-relaxed uppercase tracking-tighter text-foreground/70">{plan.notas}</p>
         </div>
       )}
 
+      {/* Menus Grid */}
       <div className="grid md:grid-cols-2 gap-4">
         {plan.menus.map((menu, i) => (
-          <div key={i} className="norder-card">
-            <h3 className="text-lg font-semibold text-foreground mb-4">{menu.nombre}</h3>
-            <div className="space-y-4">
+          <div key={i} className="bg-background border border-border/40 p-6 rounded-none hover:border-foreground/20 transition-all flex flex-col h-full">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="w-1.5 h-6 bg-foreground" />
+              <h3 className="text-xl font-black text-foreground tracking-tighter uppercase whitespace-nowrap">{menu.nombre}</h3>
+            </div>
+            
+            <div className="space-y-8 flex-1">
               {menu.tiempos.map((t, j) => (
-                <div key={j}>
-                  <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1.5">{t.nombre}</p>
-                  <ul className="space-y-0.5">
-                    {t.ingredientes.map((ing, k) => (
-                      <li key={k} className="text-sm text-foreground">
-                        — {ing.cantidad} {ing.unidad} {ing.descripcion}
-                        {ing.equivalentes && <span className="text-muted-foreground ml-1">({ing.equivalentes})</span>}
-                      </li>
-                    ))}
-                  </ul>
-                  {t.nota && <p className="text-xs text-muted-foreground mt-1 italic">{t.nota}</p>}
+                <div key={j} className="group/tiempo">
+                  <div className="flex items-center gap-3 mb-4">
+                     <span className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] leading-none">{t.nombre}</span>
+                     <div className="h-[1px] flex-1 bg-foreground/5 group-hover/tiempo:bg-foreground/10 transition-colors" />
+                  </div>
+                   <ul className="space-y-4">
+                     {t.ingredientes.map((ing, k) => (
+                       <li key={k} className="flex items-start gap-3">
+                          <div className="mt-2 w-1 h-1 rounded-full bg-foreground/10" />
+                          <div className="flex-1 space-y-1">
+                             <span className="text-sm font-black text-foreground uppercase tracking-tight leading-loose block">
+                                {ing.cantidad} {ing.unidad} {ing.descripcion}
+                             </span>
+                             <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                {ing.eqCantidad && (
+                                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.1em] opacity-40 leading-none">
+                                      Eq: {ing.eqCantidad} {ing.eqGrupo}
+                                    </p>
+                                )}
+                                {ing.nota && (
+                                   <p className="text-[9px] font-bold text-muted-foreground italic leading-none opacity-30">
+                                      * {ing.nota}
+                                   </p>
+                                )}
+                             </div>
+                          </div>
+                       </li>
+                     ))}
+                   </ul>
+                  {t.nota && <p className="text-[11px] font-black text-foreground/40 mt-4 pl-4 border-l border-foreground/10 uppercase tracking-tighter leading-relaxed font-mono">{t.nota}</p>}
                 </div>
               ))}
             </div>
+            
+            {plan.proximaSesion && plan.menus.length === 1 && (
+               <div className="mt-8 pt-6 border-t border-border/20">
+                  <div className="flex items-center gap-3 p-4 bg-secondary/5 rounded-none border border-foreground/5">
+                     <Lock className="h-4 w-4 opacity-10" />
+                     <p className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] leading-none opacity-40">
+                        SIGUIENTE HIT: {formatDate(plan.proximaSesion)}
+                     </p>
+                  </div>
+               </div>
+            )}
           </div>
         ))}
       </div>
 
-      {plan.proximaSesion && (
-        <div className="norder-card bg-muted/50">
-          <p className="text-sm text-muted-foreground">
-            Próxima sesión: <strong className="text-foreground">{formatDate(plan.proximaSesion)}</strong>
-            {plan.proximaSesionHora && ` a las ${plan.proximaSesionHora}`}
+      {plan.proximaSesion && plan.menus.length > 1 && (
+        <div className="bg-foreground text-background p-6 rounded-none flex items-center justify-center animate-slide-up">
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-center leading-none">
+            PRÓXIMA SESIÓN DE CONTROL MAESTRO · {formatDate(plan.proximaSesion)}
           </p>
         </div>
       )}

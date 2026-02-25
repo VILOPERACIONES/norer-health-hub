@@ -4,6 +4,11 @@ export interface User {
   email: string;
   telefono?: string;
   certificacion?: string;
+  profesion?: string;
+  universidad?: string;
+  cedula?: string;
+  firma?: string;
+  logotipo?: string;
 }
 
 export interface AuthState {
@@ -11,12 +16,13 @@ export interface AuthState {
   user: User | null;
   apiUrl: string;
   setAuth: (token: string, user: User) => void;
+  updateUser: (user: Partial<User>) => void;
   logout: () => void;
   setApiUrl: (url: string) => void;
 }
 
 export interface Paciente {
-  _id: string;
+  id: string;
   nombre: string;
   apellido: string;
   telefono: string;
@@ -27,7 +33,13 @@ export interface Paciente {
   membresiaVencimiento?: string;
   ultimoPeso?: number;
   ultimaVisita?: string;
+  ocupacion?: string;
+  motivoConsulta?: string;
   createdAt?: string;
+  ejercicio?: Ejercicio;
+  antecedentes?: Antecedentes;
+  habitos?: Consumo;
+  ultimaValoracion?: Valoracion;
 }
 
 export interface DashboardMetricas {
@@ -45,14 +57,23 @@ export interface Alerta {
 }
 
 export interface Valoracion {
-  _id: string;
+  id: string;
   pacienteId: string;
   fecha: string;
   hora?: string;
   numeracion?: number;
   peso: number;
   talla: number;
-  imc?: number;
+  imc?: number | string;
+  pctGrasa2comp?: number | string;
+  bioimpedanciaPctGrasa?: number | string;
+  kgGrasa2comp?: number | string;
+  kgMasaMagra2comp?: number | string;
+  pctGrasaCorporal4comp?: number | string;
+  superficieCorporal?: number | string;
+  masaGrasaReal?: number | string;
+  masaOsea?: number | string;
+  masaMuscular?: number | string;
   porcentajeGrasa?: number;
   pliegues?: Record<string, number>;
   perimetros?: Record<string, number>;
@@ -72,7 +93,9 @@ export interface Ingrediente {
   descripcion: string;
   cantidad: number;
   unidad: string;
-  equivalentes?: string;
+  eqCantidad?: number;
+  eqGrupo?: string;
+  nota?: string;
 }
 
 export interface TiempoComida {
@@ -87,7 +110,7 @@ export interface Menu {
 }
 
 export interface Plan {
-  _id: string;
+  id: string;
   pacienteId: string;
   valoracionId?: string;
   tipo: string;
@@ -102,6 +125,7 @@ export interface Plan {
 }
 
 export interface Ejercicio {
+  id?: string;
   tipo?: string;
   frecuencia?: string;
   duracion?: string;
@@ -110,12 +134,16 @@ export interface Ejercicio {
 }
 
 export interface Antecedentes {
+  id?: string;
   personales?: string;
   familiares?: string;
   patologicos?: string;
   quirurgicos?: string;
   alergias?: string;
   medicamentos?: string;
+  alimentosGusta?: string;
+  alimentosNoGusta?: string;
+  patologia?: string;
 }
 
 export interface Consumo {

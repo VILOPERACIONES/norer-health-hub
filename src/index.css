@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -7,67 +7,47 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 0 0% 4%;
+    --foreground: 0 0% 0%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 4%;
+    --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 4%;
-    --primary: 163 100% 39%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 210 22% 96%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 210 22% 96%;
-    --muted-foreground: 213 14% 48%;
-    --accent: 163 100% 28%;
+    --secondary: 0 0% 96%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 20%;
     --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 0% 0%;
     --destructive-foreground: 0 0% 100%;
-    --border: 214 20% 90%;
-    --input: 214 20% 90%;
-    --ring: 163 100% 39%;
-    --radius: 0.5rem;
-    --sidebar-background: 0 0% 100%;
-    --sidebar-foreground: 0 0% 4%;
-    --sidebar-primary: 163 100% 39%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 210 22% 96%;
-    --sidebar-accent-foreground: 0 0% 4%;
-    --sidebar-border: 214 20% 92%;
-    --sidebar-ring: 163 100% 39%;
-    --norder-green: 163 100% 39%;
-    --norder-dark: 163 100% 28%;
-    --surface: 210 22% 96%;
-    --text-secondary: 213 14% 48%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 0 0% 0%;
+    --radius: 1.5rem;
   }
 
   .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 163 100% 39%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
+    --background: 0 0% 0%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 3%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 3%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 8%;
+    --secondary-foreground: 0 0% 100%;
     --muted: 0 0% 12%;
-    --muted-foreground: 213 14% 60%;
-    --accent: 163 100% 28%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 163 100% 39%;
-    --sidebar-background: 0 0% 7%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 163 100% 39%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 12%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 15%;
-    --sidebar-ring: 163 100% 39%;
+    --muted-foreground: 0 0% 60%;
+    --accent: 0 0% 80%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 0% 100%;
+    --destructive-foreground: 0 0% 0%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
+    --ring: 0 0% 100%;
   }
 }
 
@@ -77,23 +57,97 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    letter-spacing: -0.015em;
+    line-height: 1.6;
   }
 }
 
 @layer components {
   .norder-card {
-    @apply bg-card rounded-xl border border-border p-6 shadow-sm;
+    @apply bg-card rounded-3xl border border-border/80 p-8 shadow-sm hover:shadow-md transition-all duration-300 ease-out;
   }
+  
+  .dark .norder-card {
+    @apply border-border/20;
+  }
+
+  .shadow-premium {
+    @apply shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.06)];
+  }
+  
+  .dark .shadow-premium {
+    @apply shadow-none border border-border/30;
+  }
+
+  .norder-glass {
+    @apply bg-white/70 backdrop-blur-2xl border border-white/20 shadow-2xl;
+  }
+  
+  .dark .norder-glass {
+    @apply bg-black/60 backdrop-blur-2xl border border-white/5 shadow-2xl;
+  }
+
   .norder-input {
-    @apply bg-background border border-input rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/30 focus:border-primary transition-colors;
+    @apply bg-secondary border border-transparent rounded-[1.25rem] px-6 py-4 text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-primary/5 focus:bg-background focus:border-primary/20 transition-all duration-300;
   }
-  .norder-badge-none {
-    @apply bg-muted text-muted-foreground text-xs px-2.5 py-0.5 rounded-full font-medium;
+
+  .norder-gradient-primary {
+    @apply bg-foreground text-background font-black uppercase tracking-widest text-[10px];
   }
-  .norder-badge-basica {
-    @apply bg-blue-50 text-blue-700 text-xs px-2.5 py-0.5 rounded-full font-medium;
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 5px;
   }
-  .norder-badge-premium {
-    @apply bg-emerald-50 text-emerald-700 text-xs px-2.5 py-0.5 rounded-full font-medium;
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
   }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted/40 rounded-full hover:bg-muted/60 transition-colors;
+  }
+
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.92); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  .animate-slide-up {
+    animation: slide-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+
+  .animate-fade-in {
+    animation: fade-in 0.6s ease-out forwards;
+  }
+
+  .animate-scale-in {
+    animation: scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  }
+}
+
+/* Recharts Customization */
+.recharts-cartesian-grid-horizontal line {
+  @apply stroke-muted/20;
+}
+
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  @apply !bg-card !border-border !rounded-3xl !shadow-2xl !px-6 !py-4 !text-[10px] font-black uppercase tracking-widest text-foreground !outline-none;
+}
+
+.recharts-text {
+  @apply !fill-muted-foreground !text-[9px] font-black uppercase tracking-[0.1em];
+}
+
+.recharts-bar-rectangle {
+  @apply transition-all duration-500;
 }

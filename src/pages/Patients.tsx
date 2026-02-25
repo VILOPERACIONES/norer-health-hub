@@ -1,147 +1,149 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, UserPlus, ChevronRight } from 'lucide-react';
+import { Search, Plus, Filter, ChevronRight, UserPlus, ShieldCheck, Clock } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente } from '@/types';
 import { formatDate } from '@/lib/format';
 
-const mockPacientes: Paciente[] = [
-  { _id: '1', nombre: 'Ana', apellido: 'García López', telefono: '555-123-4567', sexo: 'F', membresia: 'premium', ultimoPeso: 65.2, ultimaVisita: '2026-02-10' },
-  { _id: '2', nombre: 'Carlos', apellido: 'Ramírez Soto', telefono: '555-987-6543', sexo: 'M', membresia: 'basica', ultimoPeso: 82.5, ultimaVisita: '2026-01-05' },
-  { _id: '3', nombre: 'María', apellido: 'Torres', telefono: '555-456-7890', sexo: 'F', membresia: 'ninguna', ultimoPeso: 58.0, ultimaVisita: '2026-02-20' },
-  { _id: '4', nombre: 'José', apellido: 'Hernández', telefono: '555-321-0987', sexo: 'M', membresia: 'premium', ultimoPeso: 90.1, ultimaVisita: '2025-12-15' },
-  { _id: '5', nombre: 'Laura', apellido: 'Méndez', telefono: '555-111-2222', sexo: 'F', membresia: 'basica', ultimoPeso: 70.3, ultimaVisita: '2026-02-18' },
-];
-
 const Patients = () => {
-  const [pacientes, setPacientes] = useState<Paciente[]>(mockPacientes);
+  const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [search, setSearch] = useState('');
-  const [filtro, setFiltro] = useState('todos');
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetch = async () => {
+    const fetchPacientes = async () => {
+      setLoading(true);
       try {
-        const { data } = await api.get('/api/pacientes', { params: { buscar: search || undefined } });
-        setPacientes(data);
-      } catch { /* use mock */ }
+        const { data } = await api.get(`/api/pacientes${search ? `?buscar=${search}` : ''}`);
+        const p = data?.data || data;
+        if (Array.isArray(p)) setPacientes(p);
+      } catch (err) {
+        console.error('Error cargando pacientes:', err);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetch();
-  }, [search]);
 
-  const filtered = pacientes.filter((p) => {
-    const matchSearch =
-      !search ||
-      `${p.nombre} ${p.apellido}`.toLowerCase().includes(search.toLowerCase()) ||
-      p.telefono.includes(search);
-    const matchFilter = filtro === 'todos' || p.membresia === filtro;
-    return matchSearch && matchFilter;
-  });
+    const timer = setTimeout(() => {
+      fetchPacientes();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [search]);
 
   const diasSinVisita = (fecha?: string) => {
     if (!fecha) return null;
-    const diff = Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000);
+    const cleanStr = fecha.includes('T') ? fecha.split('T')[0] + 'T12:00:00' : fecha;
+    const diff = Math.floor((Date.now() - new Date(cleanStr).getTime()) / 86400000);
     return diff;
   };
 
-  const badgeClass = (m?: string) => {
-    if (m === 'premium') return 'norder-badge-premium';
-    if (m === 'basica') return 'norder-badge-basica';
-    return 'norder-badge-none';
-  };
-
-  const badgeLabel = (m?: string) => {
-    if (m === 'premium') return 'Premium';
-    if (m === 'basica') return 'Básica';
-    return 'Sin membresía';
-  };
+  if (loading && pacientes.length === 0) return <div className="p-8 text-center text-[11px] font-black uppercase tracking-[0.4em] animate-pulse h-[60vh] flex items-center justify-center">Sincronizando Directorio de Pacientes...</div>;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Pacientes</h1>
-          <p className="text-sm text-muted-foreground mt-1">{filtered.length} pacientes encontrados</p>
+    <div className="space-y-8 animate-fade-in pb-20 max-w-7xl mx-auto">
+      {/* Header Estructural */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-border/40 pb-6">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Directorio Clínico</h1>
+          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 leading-none">
+             EXPEDIENTES ACTIVOS: <span className="text-foreground/60">{pacientes.length}</span> · CICLO OPERATIVO {new Date().getFullYear()}
+          </p>
         </div>
         <button
           onClick={() => navigate('/pacientes/nuevo')}
-          className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-accent transition-colors self-start"
+          className="flex items-center gap-3 bg-foreground text-background px-6 py-3 rounded-none text-[12px] font-black uppercase tracking-[0.1em] hover:opacity-90 transition-all shadow-sm"
         >
-          <UserPlus className="h-4 w-4" /> Nuevo paciente
+          <UserPlus className="h-4 w-4" /> NUEVO REGISTRO MAESTRO
         </button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Buscar por nombre o teléfono..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="norder-input w-full pl-10"
-          />
+      {/* Controles y Tabla */}
+      <div className="bg-background border border-border/80 rounded-none overflow-hidden shadow-sm animate-slide-up">
+        {/* Filtros */}
+        <div className="flex flex-col lg:flex-row gap-6 items-center justify-between p-4 border-b border-border/40 bg-secondary/5">
+          <div className="relative w-full lg:w-[400px]">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-30" />
+            <input
+              type="text"
+              placeholder="BUSCAR EXPEDIENTE..."
+              className="w-full bg-background border border-border/80 rounded-none pl-10 pr-4 py-2 text-[12px] font-black uppercase tracking-wider focus:border-foreground/40 transition-all outline-none placeholder:text-muted-foreground/20 shadow-sm"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
-        <select
-          value={filtro}
-          onChange={(e) => setFiltro(e.target.value)}
-          className="norder-input"
-        >
-          <option value="todos">Todas las membresías</option>
-          <option value="ninguna">Sin membresía</option>
-          <option value="basica">Básica</option>
-          <option value="premium">Premium</option>
-        </select>
-      </div>
 
-      <div className="norder-card p-0 overflow-hidden">
+        {/* Tabla Structured */}
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-border bg-muted/50">
-                <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3">Paciente</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3 hidden md:table-cell">Teléfono</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3 hidden lg:table-cell">Último peso</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3">Membresía</th>
-                <th className="text-left text-xs font-medium text-muted-foreground px-6 py-3 hidden sm:table-cell">Última visita</th>
-                <th className="px-6 py-3"></th>
+              <tr className="border-b border-border/40 text-left bg-secondary/10">
+                <th className="px-6 py-4 text-[11px] font-black text-foreground uppercase tracking-[0.3em] leading-none opacity-40">Paciente</th>
+                <th className="px-6 py-4 text-[11px] font-black text-foreground uppercase tracking-[0.3em] leading-none opacity-40">Última Revisión</th>
+                <th className="px-6 py-4 text-right w-16"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {filtered.map((p) => {
-                const dias = diasSinVisita(p.ultimaVisita);
-                return (
-                  <tr key={p._id} className="hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-foreground">{p.nombre} {p.apellido}</p>
-                      <p className="text-xs text-muted-foreground md:hidden">{p.telefono}</p>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground hidden md:table-cell">{p.telefono}</td>
-                    <td className="px-6 py-4 text-sm text-foreground hidden lg:table-cell">
-                      {p.ultimoPeso ? `${p.ultimoPeso.toFixed(1)} kg` : '—'}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={badgeClass(p.membresia)}>{badgeLabel(p.membresia)}</span>
-                    </td>
-                    <td className="px-6 py-4 hidden sm:table-cell">
-                      <div className="flex flex-col">
-                        <span className="text-sm text-foreground">{p.ultimaVisita ? formatDate(p.ultimaVisita) : '—'}</span>
-                        {dias !== null && dias > 30 && (
-                          <span className="text-xs text-destructive font-medium">{dias} días sin visita</span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <button
-                        onClick={() => navigate(`/pacientes/${p._id}`)}
-                        className="text-primary hover:text-accent transition-colors"
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
+            <tbody className="divide-y divide-border/20">
+              {pacientes.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-20 text-center text-muted-foreground text-[12px] font-black uppercase tracking-[0.3em] opacity-20">
+                    No se localizaron registros
+                  </td>
+                </tr>
+              ) : (
+                pacientes.map((p, i) => {
+                  const valArr = (p as any).valoraciones || [];
+                  const lastVal = valArr.length > 0 
+                     ? [...valArr].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0] 
+                     : null;
+                  const ultimaVisitaReal = lastVal ? lastVal.fecha : null;
+                  const patientId = p.id;
+                  const sinVisita = diasSinVisita(ultimaVisitaReal);
+                  return (
+                    <tr 
+                      key={patientId} 
+                      className="group hover:bg-secondary/10 transition-all cursor-pointer"
+                      onClick={() => navigate(`/pacientes/${patientId}`)}
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-6">
+                          <div className="w-10 h-10 rounded-none bg-foreground text-background flex items-center justify-center font-black text-xl">
+                            {p.nombre[0]}
+                          </div>
+                          <div className="space-y-1">
+                            <p className="text-base font-black text-foreground uppercase tracking-tighter leading-none">{p.nombre} {p.apellido}</p>
+                            <p className="text-[11px] font-black text-muted-foreground tracking-[0.05em] leading-none opacity-40 uppercase font-mono">{p.telefono || 'SIN TELÉFONO'}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-4">
+                           <Clock className="h-4 w-4 text-muted-foreground opacity-20" />
+                           <div className="space-y-1">
+                              {ultimaVisitaReal ? (
+                                <>
+                                  <p className="text-[12px] font-black text-foreground uppercase tracking-tight leading-none">{formatDate(ultimaVisitaReal)}</p>
+                                  {sinVisita !== null && sinVisita > 30 && (
+                                    <p className="text-[10px] font-black text-destructive uppercase tracking-widest leading-none font-mono opacity-60">AUSENTE: {sinVisita}D</p>
+                                  )}
+                                </>
+                              ) : (
+                                <p className="text-[12px] font-black text-muted-foreground uppercase opacity-20 tracking-widest leading-none">SIN REGISTRO</p>
+                              )}
+                           </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="w-10 h-10 rounded-none border border-border/80 text-foreground group-hover:bg-foreground group-hover:text-background transition-all inline-flex items-center justify-center shadow-sm">
+                           <ChevronRight className="h-4 w-4" />
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Eye, EyeOff, AlertCircle, ShieldCheck } from 'lucide-react';
 import Logo from '@/components/Logo';
 import { useAuthStore } from '@/store/auth';
 import api from '@/lib/api';
@@ -19,63 +19,86 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/api/auth/login', { email, password });
-      setAuth(data.token, data.user);
-      navigate('/dashboard');
+      const response = await api.post('/api/auth/login', { email, password });
+      if (response.data?.success && response.data?.data?.token) {
+        const token = response.data.data.token;
+        const userData = response.data.data.user;
+        
+        const user = {
+          id: userData?.id || '1',
+          email: userData?.email || email,
+          nombre: userData?.nombre || userData?.name || userData?.fullName || userData?.firstName || 'Especialista',
+          telefono: userData?.telefono || '',
+          certificacion: userData?.certificacion || '',
+        };
+        
+        setAuth(token, user);
+        navigate('/dashboard');
+      } else {
+        setError('Error en la autenticación. Formato no soportado.');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Error al iniciar sesión. Verifica tus credenciales.');
+      setError(err.response?.data?.message || 'Credenciales no válidas.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-surface p-4">
-      <div className="w-full max-w-sm animate-fade-in">
-        <div className="mb-10">
-          <Logo size="lg" />
+    <div className="min-h-screen flex items-center justify-center bg-black relative overflow-hidden p-6 font-sans dark text-white">
+      {/* Background Orbs */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-white/5 rounded-full blur-[150px]" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-white/5 rounded-full blur-[150px]" />
+      
+      <div className="w-full max-w-[400px] relative z-10 space-y-8 animate-slide-up">
+        <div className="flex flex-col items-center">
+           <Logo size="md" className="text-white mb-4" />
+           <div className="mt-4 text-center space-y-2">
+              <h1 className="text-3xl font-black text-white uppercase tracking-tighter leading-none whitespace-nowrap">Norder Master</h1>
+              <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.3em] font-mono leading-none">Clinical Operating System</p>
+           </div>
         </div>
 
-        <div className="norder-card">
-          <h2 className="text-lg font-semibold text-foreground mb-6 text-center">Iniciar sesión</h2>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="norder-input w-full"
-                placeholder="eyder@norder.com"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-foreground mb-1.5">Contraseña</label>
-              <div className="relative">
+        <div className="bg-white/[0.02] backdrop-blur-3xl border border-white/10 p-8 rounded-none">
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] ml-1 leading-none">ID del Especialista</label>
                 <input
-                  type={showPass ? 'text' : 'password'}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="norder-input w-full pr-10"
-                  placeholder="••••••••"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 focus:border-white/30 rounded-none px-4 py-3 text-white text-sm font-black transition-all outline-none placeholder:text-white/10"
+                  placeholder="admin@norder.health"
                   required
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] ml-1 leading-none">Llave de Acceso</label>
+                <div className="relative">
+                  <input
+                    type={showPass ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full bg-white/5 border border-white/10 focus:border-white/30 rounded-none px-4 py-3 text-white text-sm font-black transition-all outline-none pr-12 placeholder:text-white/10 font-mono"
+                    placeholder="••••••••"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPass(!showPass)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-white/20 hover:text-white transition-all p-1 hover:bg-white/5 rounded-none"
+                  >
+                    {showPass ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  </button>
+                </div>
               </div>
             </div>
 
             {error && (
-              <div className="flex items-center gap-2 text-destructive text-sm bg-destructive/5 p-3 rounded-lg">
-                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <div className="flex items-center gap-3 text-white text-[10px] font-black uppercase tracking-[0.1em] bg-destructive/20 p-4 rounded-none border border-destructive/30 animate-fade-in">
+                <AlertCircle className="h-4 w-4 text-destructive" />
                 {error}
               </div>
             )}
@@ -83,16 +106,23 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-primary hover:bg-accent text-primary-foreground font-medium py-2.5 rounded-lg transition-colors disabled:opacity-50"
+              className="w-full bg-white text-black font-black text-[11px] uppercase tracking-[0.3em] py-4 rounded-none hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              {loading ? 'Entrando...' : 'Entrar'}
+              {loading ? (
+                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" /> AUTENTICAR
+                </>
+              )}
             </button>
           </form>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          NORDER Health CRM v1.0
-        </p>
+        <div className="flex flex-col items-center gap-4 pt-4">
+           <div className="h-[1px] w-8 bg-white/5" />
+           <p className="text-[9px] font-black uppercase tracking-[0.4em] text-white/10 leading-none">Norder Health Hub © MMXXVI</p>
+        </div>
       </div>
     </div>
   );

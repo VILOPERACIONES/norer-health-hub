@@ -1,277 +1,374 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Phone, Mail, Calendar, UserCog, Plus, FileText, ArrowLeft, Edit2, Save, X } from 'lucide-react';
+import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash } from 'lucide-react';
 import api from '@/lib/api';
-import type { Paciente, Valoracion, Plan, Ejercicio, Antecedentes, Consumo } from '@/types';
-import { formatDate, formatDecimal } from '@/lib/format';
+import type { Paciente, Valoracion, Plan } from '@/types';
+import { formatDate, formatDateShort, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, LineChart, Line, PieChart, Pie, Cell
+} from 'recharts';
 
-const mockPaciente: Paciente = {
-  _id: '1', nombre: 'Ana', apellido: 'García López', telefono: '555-123-4567',
-  email: 'ana@email.com', fechaNacimiento: '1990-05-15', sexo: 'F',
-  membresia: 'premium', ultimoPeso: 65.2, ultimaVisita: '2026-02-10',
-};
+// --- Sub-componentes Estilo Brutalista Compacto ---
 
-const mockValoraciones: Valoracion[] = [
-  { _id: 'v1', pacienteId: '1', fecha: '2026-02-10', numeracion: 3, peso: 65.2, talla: 1.62, imc: 24.8, porcentajeGrasa: 28.5 },
-  { _id: 'v2', pacienteId: '1', fecha: '2026-01-10', numeracion: 2, peso: 66.8, talla: 1.62, imc: 25.5, porcentajeGrasa: 29.1 },
-  { _id: 'v3', pacienteId: '1', fecha: '2025-12-05', numeracion: 1, peso: 68.0, talla: 1.62, imc: 25.9, porcentajeGrasa: 30.2 },
-];
+const InfoItem = ({ label, value, icon: Icon }: { label: string, value: string | number, icon: any }) => (
+  <div className="flex items-center gap-3 py-2 border-r border-black/5 last:border-r-0 px-4 first:pl-0">
+    <div className="flex-shrink-0 opacity-20">
+      <Icon className="h-4 w-4" />
+    </div>
+    <div className="flex flex-col">
+      <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-30 leading-none mb-1">{label}</span>
+      <span className="text-[11px] font-bold uppercase tracking-tight truncate max-w-[150px]">{value}</span>
+    </div>
+  </div>
+);
 
-const mockPlan: Plan = {
-  _id: 'p1', pacienteId: '1', tipo: 'Balanceada', calorias: 1600,
-  macros: { proteinas: 30, carbohidratos: 45, grasas: 25 },
-  menus: [
-    { nombre: 'Menú #1', tiempos: [
-      { nombre: 'Desayuno', ingredientes: [{ descripcion: '2 huevos revueltos', cantidad: 2, unidad: 'pza', equivalentes: '2 eq aoa' }, { descripcion: 'Tortilla de maíz', cantidad: 2, unidad: 'pza', equivalentes: '2 eq cereal' }], nota: 'Tomar con agua natural 250ml' },
-      { nombre: 'Colación mañana', ingredientes: [{ descripcion: 'Manzana', cantidad: 1, unidad: 'pza', equivalentes: '1 eq fruta' }] },
-      { nombre: 'Almuerzo', ingredientes: [{ descripcion: 'Pechuga de pollo', cantidad: 120, unidad: 'gr', equivalentes: '4 eq aoa mb' }, { descripcion: 'Arroz integral', cantidad: 80, unidad: 'gr', equivalentes: '2 eq cereal' }] },
-    ]},
-    { nombre: 'Menú #2', tiempos: [
-      { nombre: 'Desayuno', ingredientes: [{ descripcion: 'Avena con leche', cantidad: 40, unidad: 'gr', equivalentes: '2 eq cereal' }] },
-      { nombre: 'Almuerzo', ingredientes: [{ descripcion: 'Filete de res', cantidad: 100, unidad: 'gr', equivalentes: '3 eq aoa mb' }] },
-    ]},
-  ],
-  proximaSesion: '2026-03-10', notas: 'Incrementar proteína gradualmente', activo: true,
-};
+const KpiCardCompact = ({ label, value, active }: { label: string, value: any, active?: boolean }) => (
+  <div className={`py-6 px-4 border border-black flex flex-col items-center justify-center text-center transition-all flex-1 ${active ? 'bg-black text-white' : 'bg-white text-black hover:bg-neutral-50'}`}>
+    <span className={`text-[8px] font-black uppercase tracking-[0.3em] mb-2 leading-none ${active ? 'opacity-50' : 'opacity-30'}`}>{label}</span>
+    <span className="text-2xl font-black tracking-tighter leading-none">{value}</span>
+  </div>
+);
 
-type Tab = 'expediente' | 'historial' | 'plan';
+const ChartBox = ({ title, children }: { title: string, children: React.ReactNode }) => (
+  <div className="border border-black p-6 bg-white flex flex-col hover:bg-neutral-50 transition-all rounded-none min-h-[280px]">
+    <h2 className="text-[9px] font-black uppercase tracking-[0.3em] mb-6 text-center opacity-30 leading-none">
+      {title}
+    </h2>
+    <div className="w-full flex-1 min-h-0">
+      {children}
+    </div>
+  </div>
+);
 
-const PatientProfile = () => {
-  const { id } = useParams<{ id: string }>();
-  const navigate = useNavigate();
-  const { toast } = useToast();
-  const [paciente, setPaciente] = useState<Paciente>(mockPaciente);
-  const [valoraciones, setValoraciones] = useState<Valoracion[]>(mockValoraciones);
-  const [planActivo, setPlanActivo] = useState<Plan | null>(mockPlan);
-  const [tab, setTab] = useState<Tab>('expediente');
-  const [editingSection, setEditingSection] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchAll = async () => {
-      try {
-        const [pRes, vRes, plRes] = await Promise.all([
-          api.get(`/api/pacientes/${id}`),
-          api.get(`/api/pacientes/${id}/valoraciones`),
-          api.get(`/api/pacientes/${id}/planes/activo`).catch(() => ({ data: null })),
-        ]);
-        setPaciente(pRes.data);
-        setValoraciones(vRes.data);
-        setPlanActivo(plRes.data);
-      } catch { /* mock */ }
-    };
-    fetchAll();
-  }, [id]);
-
-  const calcAge = (dob?: string) => {
-    if (!dob) return '—';
-    const diff = Date.now() - new Date(dob).getTime();
-    return Math.floor(diff / 31557600000);
-  };
-
-  const badgeClass = (m?: string) => m === 'premium' ? 'norder-badge-premium' : m === 'basica' ? 'norder-badge-basica' : 'norder-badge-none';
-  const badgeLabel = (m?: string) => m === 'premium' ? 'Premium' : m === 'basica' ? 'Básica' : 'Sin membresía';
-
-  const tabs: { key: Tab; label: string }[] = [
-    { key: 'expediente', label: 'Expediente' },
-    { key: 'historial', label: 'Historial' },
-    { key: 'plan', label: 'Plan Activo' },
-  ];
+const AccordionRow = ({ val, index, onVerDetalles, onVerPlan }: { val: Valoracion, index: number, onVerDetalles: (id: string) => void, onVerPlan: (id: string) => void }) => {
+  const [isOpen, setIsOpen] = useState(index === 0);
+  const planId = val.plan?.id || (val as any).planId;
 
   return (
-    <div className="space-y-6 animate-fade-in">
-      <button onClick={() => navigate('/pacientes')} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
-        <ArrowLeft className="h-4 w-4" /> Volver a pacientes
+    <div className="border border-black bg-white mb-[-1px] w-full">
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center justify-between p-4 hover:bg-black hover:text-white transition-all group"
+      >
+        <div className="flex items-center gap-6">
+          <span className="font-black text-[10px] opacity-20 w-8">#{val.medicionNumero || index + 1}</span>
+          <span className="font-black uppercase tracking-widest text-[10px]">{formatDate(val.fecha)}</span>
+        </div>
+        <div className="flex items-center gap-8">
+           <span className="text-[10px] font-bold opacity-30 group-hover:opacity-100 uppercase tracking-tighter">{val.peso} KG · {val.imc} IMC · {val.pctGrasa2comp || (val as any).pctGrasaCorporal4comp || '--'}% GRASA</span>
+           {isOpen ? <X className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+        </div>
       </button>
-
-      {/* Header */}
-      <div className="norder-card">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-xl font-bold text-foreground">{paciente.nombre} {paciente.apellido}</h1>
-              <span className={badgeClass(paciente.membresia)}>{badgeLabel(paciente.membresia)}</span>
+      
+      {isOpen && (
+        <div className="p-8 border-t border-black bg-white text-black animate-slide-down">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8 mb-8">
+            <div className="space-y-1">
+              <p className="text-[8px] font-black opacity-30 uppercase tracking-widest">ESTATURA</p>
+              <p className="text-lg font-black">{val.talla} M</p>
             </div>
-            <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{paciente.telefono}</span>
-              {paciente.email && <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{paciente.email}</span>}
-              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" />{calcAge(paciente.fechaNacimiento)} años · {paciente.sexo === 'F' ? 'Femenino' : 'Masculino'}</span>
+            <div className="space-y-1">
+              <p className="text-[8px] font-black opacity-30 uppercase tracking-widest">GLUCOSA</p>
+              <p className="text-lg font-black">{(val as any).bioquimicoGlucosa || '—'} MG/DL</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[8px] font-black opacity-30 uppercase tracking-widest">PRESIÓN ART.</p>
+              <p className="text-lg font-black">{(val as any).presionArterial || '—'}</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-[8px] font-black opacity-30 uppercase tracking-widest">SUMA PLIEGUES</p>
+              <p className="text-lg font-black">{(val as any).sumaPliegues || '—'} MM</p>
+            </div>
+            <div className="space-y-1 text-right md:text-left">
+              <p className="text-[8px] font-black opacity-30 uppercase tracking-widest">MASA MAGRA</p>
+              <p className="text-lg font-black">{(val as any).kgMasaMagra2comp || '—'} KG</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <button
-              onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
-              className="flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
+          
+          <div className="flex flex-wrap gap-3 pt-6 border-t border-black/5">
+            <button 
+              onClick={() => onVerDetalles(val.id)}
+              className="px-6 py-2 border border-black text-[9px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
             >
-              <Plus className="h-4 w-4" /> Nueva valoración
+              EXPEDIENTE DETALLADO
             </button>
-            {planActivo && (
-              <button
-                onClick={() => navigate(`/pacientes/${id}/planes/${planActivo._id}`)}
-                className="flex items-center gap-2 bg-card text-foreground border border-border px-4 py-2 rounded-lg text-sm font-medium hover:bg-muted transition-colors"
+            {planId && (
+              <button 
+                onClick={() => onVerPlan(planId)}
+                className="px-6 py-2 bg-black text-white text-[9px] font-black uppercase tracking-widest hover:bg-neutral-800 transition-all border border-black"
               >
-                <FileText className="h-4 w-4" /> Ver plan activo
+                VER PLAN ACTIVO
               </button>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="flex border-b border-border">
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.key ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {tab === 'expediente' && (
-        <div className="space-y-4">
-          <ExpedienteSection title="Datos personales" fields={[
-            { label: 'Nombre', value: `${paciente.nombre} ${paciente.apellido}` },
-            { label: 'Teléfono', value: paciente.telefono },
-            { label: 'Email', value: paciente.email || '—' },
-            { label: 'Fecha de nacimiento', value: paciente.fechaNacimiento ? formatDate(paciente.fechaNacimiento) : '—' },
-            { label: 'Sexo', value: paciente.sexo === 'F' ? 'Femenino' : paciente.sexo === 'M' ? 'Masculino' : '—' },
-          ]} />
-          <ExpedienteSection title="Ejercicio" fields={[
-            { label: 'Tipo', value: 'Cardio y pesas' },
-            { label: 'Frecuencia', value: '4 veces por semana' },
-            { label: 'Duración', value: '60 minutos' },
-          ]} />
-          <ExpedienteSection title="Antecedentes clínicos" fields={[
-            { label: 'Personales', value: 'Sin antecedentes relevantes' },
-            { label: 'Familiares', value: 'Diabetes tipo 2 (padre)' },
-            { label: 'Alergias', value: 'Ninguna' },
-          ]} />
-          <ExpedienteSection title="Hábitos alimentarios" fields={[
-            { label: 'Desayuno habitual', value: 'Cereal con leche' },
-            { label: 'Agua', value: '1.5 litros al día' },
-            { label: 'Alcohol', value: 'Ocasional' },
-          ]} />
-        </div>
-      )}
-
-      {tab === 'historial' && (
-        <div className="space-y-3">
-          {valoraciones.length === 0 ? (
-            <div className="norder-card text-center py-8 text-muted-foreground text-sm">
-              No hay valoraciones registradas
-            </div>
-          ) : (
-            valoraciones.map((v) => (
-              <div key={v._id} className="norder-card flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <p className="text-sm font-medium text-foreground">
-                    Valoración #{v.numeracion} — {formatDate(v.fecha)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Peso: {formatDecimal(v.peso)} kg · IMC: {v.imc ? formatDecimal(v.imc) : '—'} · % Grasa: {v.porcentajeGrasa ? formatDecimal(v.porcentajeGrasa) : '—'}%
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => navigate(`/pacientes/${id}/valoraciones/${v._id}`)}
-                    className="text-xs text-primary hover:text-accent font-medium px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
-                  >
-                    Ver detalle
-                  </button>
-                  {v.plan && (
-                    <button
-                      onClick={() => navigate(`/pacientes/${id}/planes/${v.plan!._id}`)}
-                      className="text-xs text-primary hover:text-accent font-medium px-3 py-1.5 border border-border rounded-lg hover:bg-muted transition-colors"
-                    >
-                      Ver plan
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {tab === 'plan' && (
-        <div>
-          {planActivo ? (
-            <div className="space-y-4">
-              <div className="norder-card">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="font-semibold text-foreground">{planActivo.tipo}</h3>
-                    <p className="text-sm text-muted-foreground">{planActivo.calorias} kcal · P{planActivo.macros.proteinas}% C{planActivo.macros.carbohidratos}% G{planActivo.macros.grasas}%</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => navigate(`/pacientes/${id}/planes/${planActivo._id}/editar`)} className="text-xs bg-primary text-primary-foreground px-3 py-1.5 rounded-lg font-medium hover:bg-accent transition-colors">Editar plan</button>
-                  </div>
-                </div>
-                {planActivo.notas && <p className="text-sm text-muted-foreground mb-4">{planActivo.notas}</p>}
-              </div>
-              <div className="grid md:grid-cols-2 gap-4">
-                {planActivo.menus.map((menu, i) => (
-                  <div key={i} className="norder-card">
-                    <h4 className="font-semibold text-foreground mb-3">{menu.nombre}</h4>
-                    <div className="space-y-3">
-                      {menu.tiempos.map((t, j) => (
-                        <div key={j}>
-                          <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">{t.nombre}</p>
-                          <ul className="space-y-0.5">
-                            {t.ingredientes.map((ing, k) => (
-                              <li key={k} className="text-sm text-foreground">
-                                — {ing.cantidad} {ing.unidad} {ing.descripcion} {ing.equivalentes && <span className="text-muted-foreground">({ing.equivalentes})</span>}
-                              </li>
-                            ))}
-                          </ul>
-                          {t.nota && <p className="text-xs text-muted-foreground mt-1 italic">{t.nota}</p>}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="norder-card text-center py-8">
-              <p className="text-muted-foreground text-sm mb-3">No hay plan activo</p>
-              <button
-                onClick={() => navigate(`/pacientes/${id}/planes/nuevo`)}
-                className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-medium hover:bg-accent transition-colors"
-              >
-                Crear plan nutricional
-              </button>
-            </div>
-          )}
         </div>
       )}
     </div>
   );
 };
 
-const ExpedienteSection = ({ title, fields }: { title: string; fields: { label: string; value: string }[] }) => (
-  <div className="norder-card">
-    <div className="flex items-center justify-between mb-4">
-      <h3 className="font-semibold text-foreground">{title}</h3>
-      <button className="flex items-center gap-1 text-xs text-primary hover:text-accent font-medium">
-        <Edit2 className="h-3 w-3" /> Editar
-      </button>
+const PatientProfile = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const [paciente, setPaciente] = useState<Paciente | null>(null);
+  const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const [pacRes, valRes] = await Promise.all([
+          api.get(`/api/pacientes/${id}`),
+          api.get(`/api/pacientes/${id}/valoraciones`)
+        ]);
+        
+        const pData = pacRes.data?.data || pacRes.data;
+        setPaciente(pData);
+
+        const vals = valRes.data?.data || valRes.data || [];
+        if (Array.isArray(vals)) {
+          const processed = vals
+            .filter(v => v && v.fecha)
+            .map(v => ({
+              ...v,
+              // Normalizar claves para evolución
+              grasaEvolucion: parseFloat(v.pctGrasa2comp || v.pctGrasaCorporal4comp || 0),
+              masaMagraEvolucion: parseFloat(v.kgMasaMagra2comp || v.masaMagra || v.kgMasaMagra4comp || 0)
+            }))
+            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+          setValoraciones(processed);
+        }
+      } catch (err) {
+        toast({ title: 'Error', description: 'Error al sincronizar nodo maestro.', variant: 'destructive' });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [id, toast]);
+
+  if (loading || !paciente) return (
+    <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="text-[10px] font-black uppercase tracking-[0.5em] animate-pulse">Sincronizando Nodo Maestro...</div>
     </div>
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {fields.map((f) => (
-        <div key={f.label}>
-          <p className="text-xs text-muted-foreground">{f.label}</p>
-          <p className="text-sm text-foreground">{f.value}</p>
+  );
+
+  const calcAge = (dob?: string) => {
+    if (!dob) return '—';
+    const cleanDob = dob.includes('T') ? dob.split('T')[0] : dob;
+    const diff = Date.now() - new Date(cleanDob).getTime();
+    return Math.floor(diff / 31557600000);
+  };
+
+  const currentVal = valoraciones[0];
+  const historyData = [...valoraciones].reverse();
+
+  return (
+    <div className="min-h-screen bg-white text-black font-sans pb-20 animate-fade-in selection:bg-black selection:text-white">
+      {/* HEADER COMPACTO - No Sticky */}
+      <header className="w-full border-b border-black px-8 py-6 flex flex-col md:flex-row justify-between items-center gap-6 bg-white">
+        <div className="flex flex-col">
+          <h1 className="text-3xl md:text-5xl font-black text-black tracking-[-0.04em] uppercase leading-none">
+            {paciente.nombre} {paciente.apellido}
+          </h1>
+          <div className="text-[9px] font-black opacity-30 uppercase tracking-[0.3em] mt-2">Expediente Clínico Maestro</div>
         </div>
-      ))}
+        <div className="flex gap-3 w-full md:w-auto">
+          <button
+            onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 border border-black bg-black text-white px-8 py-3 text-[9px] font-black uppercase tracking-widest hover:bg-white hover:text-black transition-all"
+          >
+            <Plus className="h-4 w-4" /> CONSULTA
+          </button>
+          <button
+            onClick={() => navigate(`/pacientes/${id}/editar`)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 border border-black bg-white text-black px-8 py-3 text-[9px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
+          >
+            <Edit className="h-3 w-3" /> EDITAR
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-full px-8 py-6 space-y-10">
+        {/* FILA DE DATOS PERSONALES REORGANIZADA & COMPACTA - Espaciado Reducido */}
+        <section className="grid grid-cols-2 md:grid-cols-4 lg:flex lg:flex-row lg:justify-between border-b border-black pb-4 gap-y-4">
+          <InfoItem label="EDAD" value={`${calcAge(paciente.fechaNacimiento)} AÑOS`} icon={Clock} />
+          <InfoItem label="SEXO" value={paciente.sexo === 'F' ? 'FEMENINO' : 'MASCULINO'} icon={User} />
+          <InfoItem label="TELÉFONO" value={paciente.telefono} icon={Phone} />
+          <InfoItem label="E-MAIL" value={paciente.email || '—'} icon={Mail} />
+          <InfoItem label="MEMBRESÍA" value={(paciente as any).nivelMembresia || 'NINGUNA'} icon={Shield} />
+          <InfoItem label="REGISTRO" value={formatDate((paciente as any).fechaRegistro)} icon={Calendar} />
+          <InfoItem label="REF ID" value={id?.slice(-8).toUpperCase() || ''} icon={Hash} />
+        </section>
+
+        {/* KPIs COMPACTOS - USAN EL ÚLTIMO VALOR REGISTRADO */}
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <KpiCardCompact label="PESO ACTUAL" value={`${currentVal?.peso || '--'} KG`} />
+          <KpiCardCompact label="MASA MAGRA (MLG)" value={`${currentVal?.kgMasaMagra2comp || (currentVal as any)?.masaMagra || '--'} KG`} active />
+          <KpiCardCompact label="GRASA %" value={`${currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasaCorporal4comp || '--'}%`} />
+          <KpiCardCompact label="VALORACIONES" value={valoraciones.length} />
+        </section>
+
+        {/* PROGRESS CHARTS (HISTÓRICOS) */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <ChartBox title="EVOLUCIÓN DE PESO (KG)">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData} margin={{ top: 20, right: 10, left: -20, bottom: 40 }}>
+                <defs>
+                  <linearGradient id="weightGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#000" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#000" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="0" stroke="#000" opacity={0.06} vertical={true} horizontal={true} />
+                <XAxis 
+                  dataKey="fecha" 
+                  tickFormatter={(val) => formatDateShort(val)}
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  stroke="#000"
+                />
+                <YAxis 
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  stroke="#000"
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '0', border: '1px solid #000', background: '#fff', fontSize: '9px', fontWeight: '900', padding: '10px' }}
+                  itemStyle={{ color: '#000', textTransform: 'uppercase' }}
+                  labelStyle={{ display: 'none' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="peso" 
+                  stroke="#000" 
+                  strokeWidth={3} 
+                  fillOpacity={1} 
+                  fill="url(#weightGradient)" 
+                  dot={{ r: 4, fill: '#fff', stroke: '#000', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#000', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartBox>
+
+          <ChartBox title="VOLUMEN GRASA (%)">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData} margin={{ top: 20, right: 10, left: -20, bottom: 40 }}>
+                <defs>
+                  <linearGradient id="fatGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#000" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#000" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#000" opacity={0.1} vertical={false} />
+                <XAxis 
+                  dataKey="fecha" 
+                  tickFormatter={(val) => formatDateShort(val)}
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  stroke="#000"
+                />
+                <YAxis 
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  stroke="#000"
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '0', border: '1px solid #000', background: '#fff', fontSize: '9px', fontWeight: '900' }}
+                  itemStyle={{ color: '#000', textTransform: 'uppercase' }}
+                  labelStyle={{ display: 'none' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="grasaEvolucion" 
+                  stroke="#000" 
+                  strokeWidth={4} 
+                  fillOpacity={1}
+                  fill="url(#fatGradient)"
+                  dot={{ r: 4, fill: '#fff', stroke: '#000', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#000', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartBox>
+
+          <ChartBox title="MASA MAGRA HISTÓRICA (KG)">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData} margin={{ top: 20, right: 10, left: -20, bottom: 40 }}>
+                <defs>
+                  <linearGradient id="leanMassGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#666" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#666" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="0" stroke="#000" opacity={0.06} vertical={true} horizontal={true} />
+                <XAxis 
+                  dataKey="fecha" 
+                  tickFormatter={(val) => formatDateShort(val)}
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  stroke="#000"
+                />
+                <YAxis 
+                  tick={{ fontSize: 8, fontWeight: 'bold' }}
+                  stroke="#000"
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '0', border: '1px solid #000', background: '#fff', fontSize: '9px', fontWeight: '900', padding: '10px' }}
+                  itemStyle={{ color: '#000', textTransform: 'uppercase' }}
+                  labelStyle={{ display: 'none' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="masaMagraEvolucion" 
+                  stroke="#666" 
+                  strokeWidth={3} 
+                  fillOpacity={1} 
+                  fill="url(#leanMassGradient)" 
+                  dot={{ r: 4, fill: '#fff', stroke: '#666', strokeWidth: 2 }}
+                  activeDot={{ r: 6, fill: '#666', stroke: '#fff', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartBox>
+        </section>
+
+        {/* BITÁCORA COMPACTA */}
+        <section className="space-y-4">
+          <h2 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">LOG DE VALORACIONES</h2>
+          {valoraciones.length > 0 ? (
+            <div className="border border-black">
+              {valoraciones.map((v, i) => (
+                <AccordionRow 
+                  key={v.id} 
+                  val={v} 
+                  index={i} 
+                  onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
+                  onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="py-12 text-center border border-black border-dashed opacity-20">
+              <p className="text-[9px] font-black uppercase tracking-[0.4em]">Sin registros históricos</p>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 export default PatientProfile;
