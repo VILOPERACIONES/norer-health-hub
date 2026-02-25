@@ -117,7 +117,7 @@ const Layout = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-6 md:p-8 lg:p-10 custom-scrollbar scroll-smooth bg-white text-black">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-6 md:px-8 lg:px-10 pt-2 md:pt-2 lg:pt-2 pb-10 custom-scrollbar scroll-smooth bg-white text-black">
           <div className="w-full h-full max-w-none mx-auto">
             <Outlet />
           </div>

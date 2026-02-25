@@ -170,7 +170,7 @@ const PatientProfile = () => {
   return (
     <div className="min-h-screen bg-white text-black font-sans pb-20 animate-fade-in selection:bg-black selection:text-white">
       {/* HEADER COMPACTO - No Sticky */}
-      <header className="w-full border-b border-black px-8 py-6 flex flex-col md:flex-row justify-between items-center gap-6 bg-white">
+      <header className="w-full border-b border-black px-8 pt-1 pb-5 flex flex-col md:flex-row justify-between items-center gap-6 bg-white">
         <div className="flex flex-col">
           <h1 className="text-3xl md:text-5xl font-black text-black tracking-[-0.04em] uppercase leading-none">
             {paciente.nombre} {paciente.apellido}
