@@ -17,8 +17,23 @@ const PlanView = () => {
     const fetch = async () => {
       try {
         const { data } = await api.get(`/api/pacientes/${pacienteId}/planes/${planId}`);
-        const serverData = data?.data || data;
-        if (serverData) setPlan(serverData);
+        let serverData = data?.data || data;
+        if (serverData) {
+          // Normalización para visualización
+          serverData.menus = serverData.menus?.map((m: any) => ({
+            ...m,
+            tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => ({
+              ...t,
+              nota: t.nota || t.notaPie || '',
+              ingredientes: (t.ingredientes || []).map((i: any) => ({
+                ...i,
+                cantidad: parseFloat(i.cantidad) || i.cantidad,
+                eqCantidad: parseFloat(i.eqCantidad) || i.eqCantidad
+              }))
+            }))
+          })) || [];
+          setPlan(serverData);
+        }
       } catch (err) {
         console.error('Error cargando plan:', err);
       } finally {
@@ -127,23 +142,23 @@ const PlanView = () => {
             </div>
             <div className="space-y-2">
                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Sintetización Pro</p>
-               <p className="text-xl font-black text-emerald-400 tracking-tighter leading-none">{plan.macros.proteinas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% G/KG</span></p>
+               <p className="text-xl font-black text-emerald-400 tracking-tighter leading-none">{plan.proteinasPct}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% PRO</span></p>
             </div>
             <div className="space-y-2">
                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Energía Carbo</p>
-               <p className="text-xl font-black text-amber-400 tracking-tighter leading-none">{plan.macros.carbohidratos}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% CH</span></p>
+               <p className="text-xl font-black text-amber-400 tracking-tighter leading-none">{plan.carbohidratosPct}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% CHO</span></p>
             </div>
             <div className="space-y-2">
                <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Densidad Lípidos</p>
-               <p className="text-xl font-black text-rose-400 tracking-tighter leading-none">{plan.macros.grasas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% GR</span></p>
+               <p className="text-xl font-black text-rose-400 tracking-tighter leading-none">{plan.grasasPct}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% LIPS</span></p>
             </div>
          </div>
       </div>
 
-      {plan.notas && (
+      {(plan.notasGenerales || plan.notas) && (
         <div className="bg-secondary/10 p-6 rounded-none border border-foreground/5">
           <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] mb-4 opacity-40 leading-none">{`// RECOMENDACIONES ESTRATÉGICAS`}</h3>
-          <p className="text-sm font-black leading-relaxed uppercase tracking-tighter text-foreground/70">{plan.notas}</p>
+          <p className="text-sm font-black leading-relaxed uppercase tracking-tighter text-foreground/70">{plan.notasGenerales || plan.notas}</p>
         </div>
       )}
 

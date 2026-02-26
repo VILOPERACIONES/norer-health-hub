@@ -52,7 +52,7 @@ const AssessmentDetail = () => {
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-background">
        <Activity className="h-10 w-10 text-slate-900 animate-pulse mb-6" />
-       <p className="text-[11px] font-bold uppercase tracking-[0.5em] text-slate-400">Desencriptando BioData Maestro...</p>
+       <p className="text-[11px] font-bold uppercase tracking-[0.5em] text-slate-400">Cargando...</p>
     </div>
   );
   
@@ -66,18 +66,25 @@ const AssessmentDetail = () => {
   return (
     <div className="min-h-screen bg-background pb-32">
       {/* HEADER TIPO REPORTE */}
-      <header className="bg-slate-900 text-white px-10 py-12 md:py-16">
-        <div className="w-full flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
-          <div className="space-y-6">
-            <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 hover:text-white transition-all group">
-              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> Regresar al Perfil
+      <header className="bg-slate-900 text-white px-10 py-12 md:py-16 relative overflow-hidden">
+        {/* Decoración estratégica de fondo */}
+        <div className="absolute top-0 right-0 w-1/3 h-full bg-slate-800/10 -skew-x-12 translate-x-32" />
+        
+        <div className="w-full flex flex-col md:flex-row justify-between items-start md:items-end gap-10 relative z-10">
+          <div className="flex items-start gap-8">
+            <button 
+              onClick={() => navigate(`/pacientes/${pacienteId}`)} 
+              className="mt-2 w-12 h-12 flex items-center justify-center border border-white/10 text-white/40 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all group"
+              title="Volver al Expediente"
+            >
+              <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
             </button>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex items-center gap-3">
-                 <span className="px-2 py-0.5 bg-emerald-500 text-[9px] font-black uppercase tracking-widest">Corte Maestro</span>
-                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Protocolo #{val.numeroValoracion || '—'}</span>
+                 <span className="px-2 py-0.5 bg-emerald-500 text-[9px] font-black uppercase tracking-widest text-slate-900">Detalles de consulta</span>
+                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Consulta #{val.numeroValoracion || '—'}</span>
               </div>
-              <h1 className="text-4xl md:text-6xl font-black tracking-[-0.04em] uppercase leading-none italic">BioData Analytica</h1>
+              <h1 className="text-4xl md:text-5xl font-black tracking-[-0.04em] uppercase leading-none italic">Detalles de consulta</h1>
               <p className="text-slate-400 font-bold text-[11px] uppercase tracking-[0.5em] ml-1">{formatDate(val.fecha)} · ID: {val.id.slice(-12).toUpperCase()}</p>
             </div>
           </div>

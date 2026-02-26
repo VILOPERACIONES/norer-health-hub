@@ -49,6 +49,21 @@ const CreateEditPlan = () => {
   const [availableTemplates, setAvailableTemplates] = useState<Plan[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
 
+  const mapMenusFromBackend = (backendMenus: any[]) => {
+    return backendMenus?.map((m: any) => ({
+      nombre: m.nombre,
+      tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => ({
+        nombre: t.nombre,
+        nota: t.notaPie || t.nota || '',
+        ingredientes: (t.ingredientes || []).map((i: any) => ({
+          ...i,
+          cantidad: parseFloat(i.cantidad) || 0,
+          eqCantidad: parseFloat(i.eqCantidad) || 0
+        }))
+      }))
+    })) || [emptyMenu('Menú 1'), emptyMenu('Menú 2')];
+  };
+
   useEffect(() => {
     // Si estamos editando un plan existente
     if (isEdit) {
@@ -69,7 +84,9 @@ const CreateEditPlan = () => {
             setProximaSesion(p.proximaSesion || '');
             setProximaSesionHora(p.proximaSesionHora || '');
             setNotas(p.notasGenerales || p.notas || '');
-            setMenus(p.menus && p.menus.length > 0 ? p.menus : [emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
+            
+            // USAR MAPEO ROBUSTO
+            setMenus(mapMenusFromBackend(p.menus));
           }
         } catch (err) {
           console.error('Error cargando plan:', err);
@@ -104,12 +121,15 @@ const CreateEditPlan = () => {
 
   const loadTemplate = (template: Plan) => {
     setNombrePlan(template.nombre || '');
-    setTipo(template.tipo || 'Balanceada');
-    setCalorias(template.calorias.toString());
-    setProteinas((template.macros?.proteinas || 30).toString());
-    setCarbohidratos((template.macros?.carbohidratos || 40).toString());
-    setGrasas((template.macros?.grasas || 30).toString());
-    setMenus(template.menus || [emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
+    setTipo(template.tipoPlan || template.tipo || 'Balanceada');
+    setCalorias((template.calorias || 1800).toString());
+    setProteinas((template.proteinasPct || template.macros?.proteinas || 30).toString());
+    setCarbohidratos((template.carbohidratosPct || template.macros?.carbohidratos || 40).toString());
+    setGrasas((template.grasasPct || template.macros?.grasas || 30).toString());
+    
+    // IMPORTANTE: Mapear los menús de la plantilla antes de setearlos
+    setMenus(mapMenusFromBackend(template.menus));
+    
     setShowTemplates(false);
     toast({ title: 'PLAN BASE CARGADO', description: 'Ahora puedes personalizarlo para este paciente.' });
   };
@@ -146,11 +166,22 @@ const CreateEditPlan = () => {
     const body: any = {
       nombre: nombrePlan,
       tipoPlan: tipo, 
-      calorias: cal,
-      proteinasPct: pPct, 
-      carbohidratosPct: cPct, 
-      grasasPct: gPct,
-      menus, 
+      calorias: parseFloat(calorias),
+      proteinasPct: parseFloat(proteinas), 
+      carbohidratosPct: parseFloat(carbohidratos), 
+      grasasPct: parseFloat(grasas),
+      menus: menus.map(m => ({
+        nombre: m.nombre,
+        tiemposComida: m.tiempos.map(t => ({
+          nombre: t.nombre,
+          notaPie: t.nota,
+          ingredientes: t.ingredientes.map(i => ({
+            ...i,
+            cantidad: i.cantidad.toString(), // El backend parece enviarlas como string en el JSON
+            eqCantidad: i.eqCantidad?.toString()
+          }))
+        }))
+      })), 
       notasGenerales: notas,
     };
 
@@ -180,6 +211,17 @@ const CreateEditPlan = () => {
     }
   };
 
+  const handleDelete = async () => {
+    if (!window.confirm('¿ELIMINAR ESTA PLANTILLA PERMANENTEMENTE?')) return;
+    try {
+      await api.delete(`/api/planes/${planId}`);
+      toast({ title: 'PLANTILLA ELIMINADA' });
+      navigate('/planes');
+    } catch (err) {
+      toast({ title: 'Error al eliminar', variant: 'destructive' });
+    }
+  };
+
   return (
     <div className="space-y-8 animate-fade-in pb-20 max-w-none">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
@@ -205,7 +247,6 @@ const CreateEditPlan = () => {
             >
               <ClipboardList className="h-4 w-4" /> USAR PLANTILLA BASE
             </button>
-            
             {showTemplates && (
               <div className="absolute top-full right-0 mt-4 w-80 bg-background border-2 border-foreground shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
                 <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Seleccionar de Biblioteca</p>
@@ -225,6 +266,15 @@ const CreateEditPlan = () => {
               </div>
             )}
           </div>
+        )}
+
+        {isBasePlan && isEdit && (
+          <button 
+            onClick={handleDelete}
+            className="px-8 py-4 bg-red-50 text-red-600 border-2 border-red-200 text-[11px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center gap-3"
+          >
+            <Trash2 className="h-4 w-4" /> ELIMINAR PLANTILLA
+          </button>
         )}
       </div>
 
@@ -451,13 +501,15 @@ const CreateEditPlan = () => {
             <div className="bg-secondary/10 p-6 rounded-none space-y-8 border border-border/20">
               <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] opacity-20 leading-none">ADMINISTRACIÓN DE PROTOCOLO</h3>
               <div className="space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2 leading-none opacity-40">Próximo Seguimiento</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
-                    <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
+                {!isBasePlan && (
+                  <div className="space-y-2">
+                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2 leading-none opacity-40">Próximo Seguimiento</label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
+                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
+                    </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="space-y-2">
                   <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2 leading-none opacity-40">Anotaciones Estratégicas</label>

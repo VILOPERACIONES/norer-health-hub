@@ -4,7 +4,6 @@ import { Users, UserPlus, ClipboardList, Activity, CheckCircle2, MessageSquare, 
 import api from '@/lib/api';
 import type { DashboardMetricas, Alerta } from '@/types';
 import { useAuthStore } from '@/store/auth';
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const Dashboard = () => {
   const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
@@ -96,121 +95,105 @@ const Dashboard = () => {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-10">
-        {/* CHART SECTION */}
-        <div className="lg:col-span-8 space-y-10">
-           <div className="lg:col-span-4 bg-slate-900 p-10 rounded-none border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[600px]">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
-                <div className="space-y-2">
-                  <h2 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.4em] flex items-center gap-4 whitespace-nowrap">
-                    Evolución del Flujo Maestre
-                  </h2>
-                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Análisis predictivo de 6 meses</p>
-                </div>
-                <div className="flex gap-6">
-                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-none bg-slate-900" /><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pacientes</span></div>
-                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-none bg-slate-200" /><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Planes</span></div>
-                </div>
-              </div>
-              <div className="h-[320px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metricas?.tendenciaMaestre || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="mes" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: '#cbd5e1' }} 
-                      dy={10}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 700, fill: '#cbd5e1' }} 
-                    />
-                    <Tooltip 
-                      cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '0', border: 'none', background: '#0f172a', color: '#fff', padding: '16px', fontSize: '11px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
-                    />
-                    <Bar dataKey="pacientes" fill="#0f172a" radius={0} barSize={24} />
-                    <Bar dataKey="planes" fill="#e2e8f0" radius={0} barSize={24} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
+      {/* SECCIÓN DE PRIORIDADES Y ENTREGAS PENDIENTES */}
+      <div className="grid grid-cols-1 gap-10">
+        <div className="bg-background border border-slate-100 shadow-sm hover:border-slate-300 transition-all p-10 flex flex-col">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+            <div className="space-y-2">
+              <h2 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.4em] flex items-center gap-4">
+                <div className="w-2 h-2 bg-amber-500 rounded-none animate-pulse" />
+                Pendientes de Envío
+              </h2>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Protocolos de alimentación generados sin entrega finalizada</p>
+            </div>
+            <div className="flex items-center gap-3 px-4 py-2 bg-slate-50 border border-slate-100">
+              <AlertCircle className="h-4 w-4 text-amber-500" />
+              <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest">Vigilancia Activa</span>
+            </div>
+          </div>
 
+          <div className="overflow-hidden border border-slate-50">
+            <div className="max-h-[480px] overflow-y-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Paciente</th>
+                    <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Motivo de Alerta</th>
+                    <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.3em]">Fecha de Creación</th>
+                    <th className="px-8 py-5 text-[9px] font-black text-slate-400 uppercase tracking-[0.3em] text-right">Prioridad</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {alertas.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-20 text-center">
+                        <div className="flex flex-col items-center opacity-30">
+                          <ShieldCheck className="h-10 w-10 mb-4 text-emerald-500" />
+                          <p className="text-[10px] font-bold uppercase tracking-[0.4em]">Flujo operativo al día</p>
+                        </div>
+                      </td>
+                    </tr>
+                  ) : (
+                    alertas.map((a) => (
+                      <tr 
+                        key={a.pacienteId} 
+                        className="hover:bg-slate-50 transition-colors cursor-pointer group"
+                        onClick={() => navigate(`/pacientes/${a.pacienteId}#historial`)}
+                      >
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-4">
+                            <div className="w-8 h-8 bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover:bg-slate-900 group-hover:text-white transition-all uppercase">
+                              {a.nombre.charAt(0)}
+                            </div>
+                            <span className="text-sm font-black text-slate-800 uppercase tracking-tight">{a.nombre}</span>
+                          </div>
+                        </td>
+                        <td className="px-8 py-6">
+                          <div className="flex items-center gap-2">
+                            {a.tipoRiesgo === 'Sin Plan Asignado' ? (
+                              <span className="px-2 py-0.5 bg-rose-50 text-rose-600 text-[9px] font-black uppercase tracking-widest border border-rose-100">
+                                {a.tipoRiesgo}
+                              </span>
+                            ) : a.tipoRiesgo === 'Plan Sin Enviar' ? (
+                              <span className="px-2 py-0.5 bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest border border-amber-100">
+                                {a.tipoRiesgo}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                                {a.tipoRiesgo}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-8 py-6 text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          {a.fechaPlan ? new Date(a.fechaPlan).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' }).toUpperCase() : '—'}
+                        </td>
+                        <td className="px-8 py-6 text-right">
+                          <span className={`text-[9px] font-black px-4 py-1.5 rounded-none uppercase tracking-widest ${
+                            a.prioridad === 'Alta' ? 'bg-rose-500 text-white shadow-lg shadow-rose-100' : 'bg-slate-100 text-slate-400'
+                          }`}>
+                            {a.prioridad}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-        </div>
-
-        {/* SIDEBAR MONITOR */}
-        <div className="lg:col-span-4 h-full">
-           <div className="bg-slate-900 p-10 rounded-none text-white flex flex-col h-full shadow-2xl shadow-slate-200 border border-slate-800">
-              <div className="flex items-center justify-between mb-10">
-                <div className="space-y-1">
-                  <h2 className="text-[12px] font-bold uppercase tracking-[0.4em] flex items-center gap-4 leading-none">
-                    <div className="w-1.5 h-1.5 rounded-none bg-emerald-500 animate-pulse" /> Vigilancia Activa
-                  </h2>
-                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-2">Protocolo de seguridad Eyder</p>
-                </div>
-              </div>
-
-              <div className="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
-                {alertas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800 rounded-none opacity-40 text-center">
-                    <CheckCircle2 className="h-10 w-10 mb-4 text-emerald-500" />
-                    <p className="text-[11px] font-bold uppercase tracking-[0.4em]">Sin alertas críticas</p>
-                  </div>
-                ) : (
-                  alertas.slice(0, 5).map((a, i) => (
-                    <div 
-                      key={a.pacienteId || i} 
-                      className={`group flex flex-col p-6 rounded-none bg-white/5 border border-white/5 hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer relative overflow-hidden`}
-                      onClick={() => navigate(`/pacientes/${a.pacienteId}`)}
-                    >
-                      <div className="flex items-center justify-between mb-3 relative z-10">
-                        <p className="text-[13px] font-bold uppercase tracking-tight truncate text-white">{a.nombre}</p>
-                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded-none uppercase tracking-widest ${a.prioridad === 'Alta' ? 'bg-rose-500' : 'bg-slate-700'}`}>
-                           {a.prioridad}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center relative z-10">
-                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                           {a.tipoRiesgo || `${a.diasSinVisita}d AUSENCIA`}
-                        </p>
-                        <ArrowRight className="h-4 w-4 text-slate-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              
-              <div className="mt-10 p-8 rounded-none bg-slate-800 border border-slate-700">
-                <div className="flex items-center gap-4 mb-4">
-                   <AlertCircle className="h-5 w-5 text-rose-500" />
-                   <div className="flex flex-col">
-                     <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500 leading-none">Prioridad del Sistema</p>
-                     <p className="text-[14px] font-bold text-white mt-1 uppercase tracking-tight">Kpis Críticos</p>
-                   </div>
-                </div>
-                <div className="grid grid-cols-2 gap-8 pt-6 border-t border-slate-700">
-                   <div className="space-y-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Riesgo Clin.</p>
-                      <p className="text-2xl font-bold text-white leading-none">{metricas?.kpisClave.riesgoClinico || 0}%</p>
-                   </div>
-                   <div className="space-y-1">
-                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Abandono</p>
-                      <p className="text-2xl font-bold text-rose-500 leading-none">{metricas?.kpisClave.riesgoAbandono}</p>
-                   </div>
-                </div>
-              </div>
-
-              <button 
-                onClick={() => navigate('/pacientes')}
-                className="w-full mt-8 py-5 bg-background text-slate-900 rounded-none text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-secondary transition-all flex items-center justify-center gap-3"
-              >
-                Director de Expedientes <ArrowRight className="h-4 w-4" />
-              </button>
-           </div>
+          <div className="mt-8 flex justify-between items-center border-t border-slate-50 pt-8">
+            <p className="text-[9px] font-bold text-slate-300 uppercase tracking-[0.3em]">
+              Sincronizado con Central de Operaciones · Vigilancia 24/7
+            </p>
+            <button 
+              onClick={() => navigate('/pacientes')}
+              className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 transition-colors"
+            >
+              Ver todos los expedientes <ArrowRight className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

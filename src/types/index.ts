@@ -145,38 +145,61 @@ export interface Valoracion {
 
 export interface Plan {
   id: string;
-  nombre?: string; // Nombre de la plantilla o plan
-  pacienteId: string;
-  valoracionId?: string;
-  tipo: string;
+  nombre?: string;
+  pacienteId: string | null;
+  valoracionId?: string | null;
+  fechaCreacion?: string;
+  tipoPlan: string;
+  tipo?: string; 
   calorias: number;
-  macros: { proteinas: number; carbohidratos: number; grasas: number };
+  proteinasPct: number;
+  carbohidratosPct: number;
+  grasasPct: number;
+  proteinasKcal?: number;
+  carbohidratosKcal?: number;
+  grasasKcal?: number;
+  proteinasGr?: number;
+  carbohidratosGr?: number;
+  grasasGr?: number;
+  getSedentario?: number;
+  getLeve?: number;
+  getModerado?: number;
+  getIntenso?: number;
   menus: Menu[];
   proximaSesion?: string;
   proximaSesionHora?: string;
+  notasGenerales?: string;
   notas?: string;
-  activo?: boolean;
-  createdAt?: string;
+  estado?: 'activo' | 'archivado' | 'pendiente';
+  estadoEnvio?: 'pendiente' | 'enviado';
 }
 
 export interface Menu {
+  id?: string;
   nombre: string;
+  orden?: number;
   tiempos: TiempoComida[];
+  tiemposComida?: TiempoComida[]; // Soporte para data bruta de backend
 }
 
 export interface TiempoComida {
+  id?: string;
   nombre: string;
-  ingredientes: Ingrediente[];
+  orden?: number;
   nota?: string;
+  notaPie?: string; // Soporte para data bruta de backend
+  ingredientes: Ingrediente[];
 }
 
 export interface Ingrediente {
+  id?: string;
   descripcion: string;
-  cantidad: number;
+  cantidad: number | string;
   unidad: string;
-  eqCantidad?: number;
+  eqCantidad?: number | string;
   eqGrupo?: string;
   nota?: string;
+  orden?: number;
 }
 
 export interface DashboardMetricas {
@@ -213,4 +236,5 @@ export interface Alerta {
   diasSinVisita: number;
   prioridad: 'Alta' | 'Baja';
   tipoRiesgo?: string;
+  fechaPlan?: string;
 }

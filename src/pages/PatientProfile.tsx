@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, Ruler, ClipboardList, Trash2 } from 'lucide-react';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, Ruler, ClipboardList, Trash2, ArrowLeft } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal } from '@/lib/format';
@@ -45,7 +45,13 @@ const ChartBox = ({ title, children }: { title: string, children: React.ReactNod
   </div>
 );
 
-const AccordionRow = ({ val, index, onVerDetalles, onVerPlan }: { val: Valoracion, index: number, onVerDetalles: (id: string) => void, onVerPlan: (id: string) => void }) => {
+const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan }: { 
+  val: Valoracion, 
+  index: number, 
+  onVerDetalles: (id: string) => void, 
+  onVerPlan: (id: string) => void,
+  onAsignarPlan: (valId: string) => void
+}) => {
   const [isOpen, setIsOpen] = useState(index === 0);
   const planId = val.plan?.id || (val as any).planId;
 
@@ -105,14 +111,21 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan }: { val: Valoracio
               onClick={() => onVerDetalles(val.id)}
               className="flex items-center gap-2 px-6 py-2.5 border border-slate-200 text-[10px] font-bold uppercase tracking-[0.15em] rounded-none hover:bg-slate-900 hover:text-white transition-all shadow-sm"
             >
-              <ClipboardList className="h-4 w-4" /> REPORTE DETALLADO
+              <ClipboardList className="h-4 w-4" /> VER DETALLES
             </button>
-            {planId && (
+            {planId ? (
               <button 
                 onClick={() => onVerPlan(planId)}
                 className="flex items-center gap-2 px-6 py-2.5 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-[0.15em] rounded-none hover:bg-slate-800 transition-all border border-slate-900 shadow-md shadow-slate-200"
               >
                 <Activity className="h-4 w-4" /> VER PLAN ACTIVO
+              </button>
+            ) : (
+              <button 
+                onClick={() => onAsignarPlan(val.id)}
+                className="flex items-center gap-2 px-6 py-3 bg-amber-500 text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-none hover:bg-amber-600 transition-all border border-amber-500 shadow-xl shadow-amber-100 animate-pulse"
+              >
+                <Plus className="h-4 w-4" /> ASIGNAR PLAN PENDIENTE
               </button>
             )}
           </div>
@@ -149,6 +162,7 @@ const ClinicalSection = ({ title, data, icon: Icon }: { title: string, data: Rec
 const PatientProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
@@ -188,6 +202,17 @@ const PatientProfile = () => {
     fetchData();
   }, [id, toast]);
 
+  useEffect(() => {
+    if (location.hash === '#historial' && !loading) {
+      const el = document.getElementById('historial');
+      if (el) {
+        setTimeout(() => {
+          el.scrollIntoView({ behavior: 'smooth' });
+        }, 500);
+      }
+    }
+  }, [location.hash, loading]);
+
   const handleDelete = async () => {
     if (!window.confirm('¿ESTÁ SEGURO DE PURGAR ESTE PACIENTE? ESTA ACCIÓN ELIMINARÁ TODO EL HISTORIAL CLÍNICO Y VALORACIONES.')) return;
     try {
@@ -222,20 +247,29 @@ const PatientProfile = () => {
     <div className="min-h-screen bg-background text-slate-900 font-sans pb-24 animate-fade-in selection:bg-slate-900 selection:text-white">
       {/* HEADER PREMIUM */}
       <header className="w-full border-b border-slate-100 px-10 pt-4 pb-8 flex flex-col md:flex-row justify-between items-center gap-8 bg-background">
-        <div className="flex flex-col">
-          <div className="flex items-center gap-4 mb-2">
-            <span className="px-3 py-1 bg-slate-100 text-slate-600 text-[9px] font-bold rounded-none tracking-widest uppercase">Paciente Activo</span>
-            <div className="flex py-1 px-3 border border-slate-200 rounded-none gap-2 items-center">
-              <Hash className="h-3 w-3 text-slate-300" />
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{id?.slice(-8).toUpperCase()}</span>
+        <div className="flex items-start gap-8">
+          <button 
+            onClick={() => navigate('/pacientes')} 
+            className="mt-1 w-12 h-12 flex items-center justify-center border border-slate-100 text-slate-300 hover:text-slate-900 hover:border-slate-300 hover:bg-slate-50 transition-all group"
+            title="Volver a la Lista"
+          >
+            <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-transform" />
+          </button>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-4 mb-2">
+              <span className="px-3 py-1 bg-slate-100 text-slate-600 text-[9px] font-bold rounded-none tracking-widest uppercase">Paciente</span>
+              <div className="flex py-1 px-3 border border-slate-200 rounded-none gap-2 items-center">
+                <Hash className="h-3 w-3 text-slate-300" />
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">{id?.slice(-8).toUpperCase()}</span>
+              </div>
             </div>
+            <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-[-0.04em] uppercase leading-none">
+              {paciente.nombre} <span className="text-slate-400">{paciente.apellido}</span>
+            </h1>
+            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.35em] mt-3 ml-1 flex items-center gap-2">
+               EXPEDIENTE CLÍNICO  · <Activity className="h-3 w-3" /> NORDER HEALTH CRM
+            </p>
           </div>
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-[-0.04em] uppercase leading-none">
-            {paciente.nombre} <span className="text-slate-400">{paciente.apellido}</span>
-          </h1>
-          <p className="text-[10px] font-bold text-slate-300 uppercase tracking-[0.35em] mt-3 ml-1 flex items-center gap-2">
-             EXPEDIENTE CLÍNICO MAESTRO · <Activity className="h-3 w-3" /> NORDER HEALTH HUB
-          </p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
           <button
@@ -243,7 +277,7 @@ const PatientProfile = () => {
             className={`flex-1 md:flex-none flex items-center justify-center gap-3 px-8 py-3.5 text-[10px] font-bold uppercase tracking-[0.15em] transition-all rounded-none border border-slate-200 ${showFullExpediente ? 'bg-slate-900 text-white border-slate-900 shadow-xl shadow-slate-200' : 'bg-background text-slate-700 hover:bg-secondary'}`}
           >
             {showFullExpediente ? <X className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
-            {showFullExpediente ? 'Cerrar Detalles' : 'Ver Expediente Maestro'}
+            {showFullExpediente ? 'Cerrar Detalles' : 'Ver Expediente Completo'}
           </button>
           <button
             onClick={() => navigate(`/pacientes/${id}/editar`)}
@@ -389,7 +423,7 @@ const PatientProfile = () => {
                 onClick={() => navigate(`/pacientes/${id}/editar`)}
                 className="w-full md:w-auto px-10 py-4 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-[0.2em] rounded-none hover:bg-slate-800 transition-all shadow-lg shadow-slate-200"
               >
-                MODIFICAR EXPEDIENTE MAESTRO
+                Editar datos generales
               </button>
             </div>
           </div>
@@ -525,9 +559,9 @@ const PatientProfile = () => {
         </section>
 
         {/* LOG DE CONSULTAS PREMIUM */}
-        <section className="space-y-8">
+        <section className="space-y-8" id="historial">
           <div className="flex items-center gap-4">
-            <h2 className="text-[12px] font-bold text-slate-400 uppercase tracking-[0.4em] opacity-80">Cronología de Intervenciones</h2>
+            <h2 className="text-[12px] font-bold text-slate-400 uppercase tracking-[0.4em] opacity-80">Historial de consultas</h2>
             <div className="flex-1 h-[1px] bg-slate-100" />
           </div>
           
@@ -540,6 +574,7 @@ const PatientProfile = () => {
                   index={i} 
                   onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
                   onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
+                  onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
                 />
               ))}
             </div>

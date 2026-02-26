@@ -391,8 +391,8 @@ const NewAssessment = () => {
              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> Regresar al Expediente
            </button>
            <div className="animate-slide-up space-y-2">
-              <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Digitalización BioData</h1>
-              <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">Análisis Antropométrico Maestro y Seguimiento Táctico</p>
+              <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Formulario de consulta</h1>
+              <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">Análisis nutricional - NORDER HEALTH</p>
            </div>
         </div>
       </div>

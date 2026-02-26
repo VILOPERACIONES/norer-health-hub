@@ -56,8 +56,8 @@ const Layout = () => {
           </NavLink>
         ))}
 
-        <div className={`pt-6 pb-2 border-t border-border/10 mt-6 ${collapsed ? 'px-0' : 'px-7'}`}>
-          {!collapsed && <p className="text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.4em] mb-4">Accesos Externos</p>}
+        <div className={`pt-8 border-t border-border/10 mt-6 ${collapsed ? 'px-0' : ''}`}>
+          {!collapsed && <p className="text-[8px] font-black text-muted-foreground/30 uppercase tracking-[0.4em] mb-4 px-12">Accesos Externos</p>}
           <div className="space-y-1">
             {[
               { label: collapsed ? '' : 'Calendario', icon: Calendar, color: 'text-blue-500', title: 'Google Calendar' },
@@ -67,7 +67,7 @@ const Layout = () => {
               <button
                 key={ext.title}
                 title={ext.title}
-                className={`flex items-center gap-5 px-7 py-3 rounded-none text-[9px] font-black tracking-[0.2em] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all w-full text-left uppercase ${collapsed ? 'px-4 justify-center w-14' : ''}`}
+                className={`flex items-center gap-5 px-12 py-4 rounded-none text-[11px] font-black tracking-[0.4em] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all w-full text-left uppercase ${collapsed ? 'px-4 justify-center w-14' : ''}`}
               >
                 <ext.icon className={`h-4 w-4 shrink-0 ${ext.color}`} />
                 {!collapsed && ext.label}
@@ -77,7 +77,7 @@ const Layout = () => {
             <button
               onClick={toggleTheme}
               title="Cambiar Tema"
-              className={`flex items-center gap-5 px-7 py-3 rounded-none text-[9px] font-black tracking-[0.2em] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all w-full text-left uppercase ${collapsed ? 'px-4 justify-center w-14' : ''}`}
+              className={`flex items-center gap-5 px-12 py-4 rounded-none text-[11px] font-black tracking-[0.4em] text-muted-foreground hover:text-foreground hover:bg-secondary/30 transition-all w-full text-left uppercase ${collapsed ? 'px-4 justify-center w-14' : ''}`}
             >
               {theme === 'dark' ? <Sun className="h-4 w-4 shrink-0 text-amber-500" /> : <Moon className="h-4 w-4 shrink-0 text-slate-500" />}
               {!collapsed && 'TEMA'}
