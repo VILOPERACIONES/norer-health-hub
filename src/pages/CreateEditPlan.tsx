@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown, ClipboardList } from 'lucide-react';
 import api from '@/lib/api';
-import type { Menu, TiempoComida, Ingrediente } from '@/types';
+import { Menu, TiempoComida, Ingrediente, Plan } from '@/types';
 import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,9 +31,11 @@ const CreateEditPlan = () => {
   const valoracionId = searchParams.get('valoracionId');
   
   const isEdit = !!planId;
+  const isBasePlan = !pacienteId; // Si no hay pacienteId, es una plantilla base
   const [saving, setSaving] = useState(false);
   const [pesoUltimo, setPesoUltimo] = useState(0);
 
+  const [nombrePlan, setNombrePlan] = useState('');
   const [tipo, setTipo] = useState('Balanceada');
   const [calorias, setCalorias] = useState('1800');
   const [proteinas, setProteinas] = useState('30');
@@ -42,43 +44,75 @@ const CreateEditPlan = () => {
   const [proximaSesion, setProximaSesion] = useState('');
   const [proximaSesionHora, setProximaSesionHora] = useState('');
   const [notas, setNotas] = useState('');
-  const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú Principal')]);
+  const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
+  const [valData, setValData] = useState<any>(null);
+  const [availableTemplates, setAvailableTemplates] = useState<Plan[]>([]);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   useEffect(() => {
+    // Si estamos editando un plan existente
     if (isEdit) {
       const fetchPlan = async () => {
         try {
-          const { data } = await api.get(`/api/pacientes/${pacienteId}/planes/${planId}`);
+          const url = isBasePlan 
+            ? `/api/planes/${planId}` 
+            : `/api/pacientes/${pacienteId}/planes/${planId}`;
+          const { data } = await api.get(url);
           const p = data?.data || data;
           if (p) {
-            setTipo(p.tipoPlan);
+            setNombrePlan(p.nombre || '');
+            setTipo(p.tipoPlan || p.tipo || 'Balanceada');
             setCalorias(p.calorias.toString());
-            setProteinas(p.proteinasPct.toString());
-            setCarbohidratos(p.carbohidratosPct.toString());
-            setGrasas(p.grasasPct.toString());
+            setProteinas((p.proteinasPct || p.macros?.proteinas || 30).toString());
+            setCarbohidratos((p.carbohidratosPct || p.macros?.carbohidratos || 40).toString());
+            setGrasas((p.grasasPct || p.macros?.grasas || 30).toString());
             setProximaSesion(p.proximaSesion || '');
             setProximaSesionHora(p.proximaSesionHora || '');
-            setNotas(p.notasGenerales || '');
-            setMenus(p.menus);
+            setNotas(p.notasGenerales || p.notas || '');
+            setMenus(p.menus && p.menus.length > 0 ? p.menus : [emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
           }
         } catch (err) {
           console.error('Error cargando plan:', err);
         }
       };
       fetchPlan();
-    } else if (valoracionId) {
-      const fetchVal = async () => {
+    } 
+    // Si estamos creando uno nuevo para un paciente, intentar cargar última valoración y plantillas
+    else if (pacienteId) {
+      const fetchPatientData = async () => {
         try {
-          const { data } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-          const v = data?.data || data;
-          if (v) setPesoUltimo(v.peso || 0);
+          // Cargar valoración si existe ID
+          if (valoracionId) {
+            const { data: vData } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
+            const v = vData?.data || vData;
+            if (v) {
+              setPesoUltimo(v.peso || 0);
+              setValData(v);
+              if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
+            }
+          }
+          // Cargar plantillas disponibles
+          const { data: tData } = await api.get('/api/planes?tipo=base');
+          setAvailableTemplates(tData?.data || tData || []);
         } catch (err) {
-          console.error('Error cargando valoración:', err);
+          console.error('Error cargando datos del paciente/plantillas:', err);
         }
       };
-      fetchVal();
+      fetchPatientData();
     }
-  }, [planId, isEdit, pacienteId, valoracionId]);
+  }, [planId, isEdit, pacienteId, valoracionId, isBasePlan]);
+
+  const loadTemplate = (template: Plan) => {
+    setNombrePlan(template.nombre || '');
+    setTipo(template.tipo || 'Balanceada');
+    setCalorias(template.calorias.toString());
+    setProteinas((template.macros?.proteinas || 30).toString());
+    setCarbohidratos((template.macros?.carbohidratos || 40).toString());
+    setGrasas((template.macros?.grasas || 30).toString());
+    setMenus(template.menus || [emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
+    setShowTemplates(false);
+    toast({ title: 'PLAN BASE CARGADO', description: 'Ahora puedes personalizarlo para este paciente.' });
+  };
 
   const cal = parseFloat(calorias) || 0;
   const pPct = parseFloat(proteinas) || 0;
@@ -109,25 +143,36 @@ const CreateEditPlan = () => {
       return;
     }
     setSaving(true);
-    const body = {
+    const body: any = {
+      nombre: nombrePlan,
       tipoPlan: tipo, 
       calorias: cal,
       proteinasPct: pPct, 
       carbohidratosPct: cPct, 
       grasasPct: gPct,
       menus, 
-      proximaSesion: proximaSesion ? new Date(`${proximaSesion}T${proximaSesionHora || '00:00'}`) : undefined, 
       notasGenerales: notas,
-      valoracionId: valoracionId || undefined,
     };
+
+    if (!isBasePlan) {
+      body.valoracionId = valoracionId || undefined;
+      body.getSeleccionado = cal;
+      body.getSedentario = valData?.getSedentario || 0;
+      body.getLeve = valData?.getLeve || 0;
+      body.getModerado = valData?.getModerado || 0;
+      body.getIntenso = valData?.getIntenso || 0;
+    }
+
     try {
       if (isEdit) {
-        await api.put(`/api/pacientes/${pacienteId}/planes/${planId}`, body);
+        const url = isBasePlan ? `/api/planes/${planId}` : `/api/pacientes/${pacienteId}/planes/${planId}`;
+        await api.put(url, body);
       } else {
-        await api.post(`/api/pacientes/${pacienteId}/planes`, body);
+        const url = isBasePlan ? `/api/planes` : `/api/pacientes/${pacienteId}/planes`;
+        await api.post(url, body);
       }
-      toast({ title: 'PROTOCOLO CLÍNICO PERSISTIDO' });
-      navigate(`/pacientes/${pacienteId}`);
+      toast({ title: isBasePlan ? 'PLANTILLA PERSISTIDA' : 'PROTOCOLO CLÍNICO PERSISTIDO' });
+      navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`);
     } catch (err: any) {
       toast({ title: 'Error de Persistencia', description: 'No se pudo sincronizar el plan maestro.', variant: 'destructive' });
     } finally {
@@ -136,15 +181,51 @@ const CreateEditPlan = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-7xl mx-auto">
-      <div className="flex flex-col gap-6">
-        <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> VOLVER AL EXPEDIENTE
-        </button>
-        <div className="animate-slide-up space-y-2">
-          <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">{isEdit ? 'Actualizar Protocolo' : 'Nuevo Plan Maestro'}</h1>
-          <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">DEFINICIÓN DE REQUERIMIENTOS CLÍNICOS Y DISTRIBUCIÓN DE MACRONUTRIENTES</p>
+    <div className="space-y-8 animate-fade-in pb-20 max-w-none">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+        <div className="space-y-4">
+          <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
+            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> VOLVER
+          </button>
+          <div className="animate-slide-up space-y-2">
+            <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase leading-none">
+              {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Maestro') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Maestro')}
+            </h1>
+            <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">
+              {isBasePlan ? 'DEFINICIÓN DE PROTOCOLO ESTÁNDAR PARA LA BIBLIOTECA' : 'AJUSTE DE REQUERIMIENTOS Y PERSONALIZACIÓN DE TIEMPOS'}
+            </p>
+          </div>
         </div>
+
+        {!isBasePlan && !isEdit && (
+          <div className="relative">
+            <button 
+              onClick={() => setShowTemplates(!showTemplates)}
+              className="px-8 py-4 bg-secondary/50 border-2 border-dashed border-foreground/10 text-[11px] font-black uppercase tracking-widest hover:border-foreground/30 transition-all flex items-center gap-3"
+            >
+              <ClipboardList className="h-4 w-4" /> USAR PLANTILLA BASE
+            </button>
+            
+            {showTemplates && (
+              <div className="absolute top-full right-0 mt-4 w-80 bg-background border-2 border-foreground shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Seleccionar de Biblioteca</p>
+                <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar">
+                  {availableTemplates.map(t => (
+                    <button 
+                      key={t.id} 
+                      onClick={() => loadTemplate(t)}
+                      className="w-full text-left p-4 hover:bg-secondary border border-transparent hover:border-foreground/10 transition-all group"
+                    >
+                      <p className="text-xs font-black uppercase tracking-tight group-hover:text-black">{t.nombre || 'Protocolo Sin Nombre'}</p>
+                      <p className="text-[9px] font-bold opacity-30 uppercase mt-1">{t.calorias} KCAL · {t.tipo}</p>
+                    </button>
+                  ))}
+                  {availableTemplates.length === 0 && <p className="p-4 text-center text-[10px] font-bold opacity-30 uppercase">Sin plantillas disponibles</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid lg:grid-cols-12 gap-8">
@@ -157,6 +238,15 @@ const CreateEditPlan = () => {
             
             <div className="grid sm:grid-cols-2 gap-6">
               <div className="space-y-2">
+                <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Identificador del Plan / Objetivo</label>
+                <input 
+                  value={nombrePlan} 
+                  onChange={(e) => setNombrePlan(e.target.value)} 
+                  placeholder="EJ: DEFINICIÓN 1800 KCAL / CROSSFIT"
+                  className="w-full bg-background rounded-none px-4 py-3 text-base font-black uppercase tracking-tight outline-none border border-foreground/5 focus:border-foreground/20 transition-all"
+                />
+              </div>
+              <div className="space-y-2">
                 <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Modelo de Enfoque</label>
                 <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 text-base font-black uppercase tracking-tight outline-none border border-foreground/5 transition-all">
                   <option>Balanceada</option>
@@ -167,9 +257,34 @@ const CreateEditPlan = () => {
                   <option>Personalizada</option>
                 </select>
               </div>
-              <div className="space-y-2">
+            </div>
+
+            <div className="grid sm:grid-cols-1 gap-6 mt-6">
+               <div className="space-y-2">
                 <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Energía Total (KCAL)</label>
-                <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 text-2xl font-black text-foreground tracking-tighter outline-none border border-foreground/5 transition-all" />
+                <div className="flex flex-col gap-2">
+                  <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 text-2xl font-black text-foreground tracking-tighter outline-none border border-foreground/5 transition-all" />
+                  
+                  {valData && (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
+                      {[
+                        { key: 'getSedentario', label: 'SED' },
+                        { key: 'getLeve', label: 'LEV' },
+                        { key: 'getModerado', label: 'MOD' },
+                        { key: 'getIntenso', label: 'INT' }
+                      ].map(g => (
+                        <button
+                          key={g.key}
+                          type="button"
+                          onClick={() => setCalorias(Math.round(valData[g.key]).toString())}
+                          className="bg-white/50 hover:bg-black hover:text-white px-2 py-1 text-[8px] font-black uppercase tracking-widest transition-all border border-black/5"
+                        >
+                          {g.label}: {Math.round(valData[g.key])}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -198,15 +313,15 @@ const CreateEditPlan = () => {
           </div>
 
           {/* Menús Personalizados */}
-          <div className="space-y-8">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-8 items-start">
             {menus.map((menu, mi) => (
               <div key={mi} className="bg-secondary/10 rounded-none animate-slide-up border border-border/40 overflow-hidden" style={{ animationDelay: `${mi * 0.1}s` }}>
                 <div className="bg-foreground text-background px-6 py-4 flex items-center justify-between">
                   <input
                     value={menu.nombre}
-                    onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
-                    className="text-xl font-black bg-transparent border-none outline-none w-full uppercase tracking-tighter selection:bg-background/20"
-                    placeholder="IDENTIFICADOR DEL MENÚ"
+                    onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value.toUpperCase() }))}
+                    className="text-lg font-black bg-transparent border-none outline-none w-full uppercase tracking-tighter selection:bg-background/20"
+                    placeholder="NOMBRE DEL MENÚ"
                   />
                   <button
                      onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
@@ -216,129 +331,86 @@ const CreateEditPlan = () => {
                   </button>
                 </div>
 
-                <div className="p-6 space-y-12">
-                  <div className="grid md:grid-cols-2 gap-8">
-                    {menu.tiempos.map((tiempo, ti) => (
-                      <div key={ti} className="relative p-6 border-2 border-black/5 bg-white group hover:border-black/20 transition-all">
-                        <div className="flex items-center justify-between mb-6">
-                           <div className="flex items-center gap-3">
-                              <span className="text-[10px] bg-black text-white w-5 h-5 flex items-center justify-center font-bold">{ti + 1}</span>
-                              <input
-                                value={tiempo.nombre}
-                                onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value.toUpperCase() }))}
-                                className="text-[14px] font-black text-foreground bg-transparent border-none outline-none uppercase tracking-widest w-fit"
-                              />
-                           </div>
-                           <div className="flex items-center gap-1">
-                              <button 
-                                onClick={() => {
-                                   if (ti === 0) return;
-                                   const nt = [...menu.tiempos];
-                                   [nt[ti-1], nt[ti]] = [nt[ti], nt[ti-1]];
-                                   updateMenu(mi, m => ({ ...m, tiempos: nt }));
-                                }}
-                                className="p-1 hover:bg-black hover:text-white border border-transparent hover:border-black transition-all"
-                              >
-                                <ArrowUp className="w-3 h-3" />
-                              </button>
-                              <button 
-                                onClick={() => {
-                                   if (ti === menu.tiempos.length - 1) return;
-                                   const nt = [...menu.tiempos];
-                                   [nt[ti], nt[ti+1]] = [nt[ti+1], nt[ti]];
-                                   updateMenu(mi, m => ({ ...m, tiempos: nt }));
-                                }}
-                                className="p-1 hover:bg-black hover:text-white border border-transparent hover:border-black transition-all"
-                              >
-                                <ArrowDown className="w-3 h-3" />
-                              </button>
-                              <button
-                                onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))}
-                                className="p-1 text-muted-foreground hover:text-destructive transition-all"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
-                           </div>
-                        </div>
-
-                        <div className="space-y-4">
-                          {tiempo.ingredientes.map((ing, ii) => (
-                            <div key={ii} className="space-y-2 pb-4 border-b border-black/5 last:border-0">
-                               <div className="flex gap-2">
-                                  <input
-                                    placeholder="ALIMENTO..."
-                                    value={ing.descripcion}
-                                    onChange={(e) => updateTiempo(mi, ti, (t) => ({
-                                      ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, descripcion: e.target.value } : x)
-                                    }))}
-                                    className="flex-1 bg-slate-50 px-3 py-2 text-xs font-bold uppercase outline-none border-b-2 border-transparent focus:border-black transition-all"
-                                  />
-                                  <button onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, j) => j !== ii) }))} className="text-red-500 opacity-20 hover:opacity-100"><X className="w-4 h-4" /></button>
-                               </div>
-                               <div className="grid grid-cols-4 gap-2">
-                                  <div className="space-y-1">
-                                     <p className="text-[8px] font-bold opacity-30 text-center">Cant.</p>
-                                     <input type="number" value={ing.cantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" />
-                                  </div>
-                                  <div className="space-y-1">
-                                     <p className="text-[8px] font-bold opacity-30 text-center">Unid.</p>
-                                     <input value={ing.unidad} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, unidad: e.target.value.toUpperCase() } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" />
-                                  </div>
-                                  <div className="space-y-1">
-                                     <p className="text-[8px] font-bold opacity-30 text-center">Eq. Q.</p>
-                                     <input type="number" value={ing.eqCantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqCantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" />
-                                  </div>
-                                  <div className="space-y-1">
-                                     <p className="text-[8px] font-bold opacity-30 text-center">Eq. G.</p>
-                                     <input value={ing.eqGrupo} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqGrupo: e.target.value } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" />
-                                  </div>
-                               </div>
-                               <input 
-                                 placeholder="Nota adicional (opcional)..." 
-                                 value={ing.nota} 
-                                 onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, nota: e.target.value } : x) }))}
-                                 className="w-full text-[9px] font-bold opacity-50 bg-transparent outline-none italic"
-                               />
-                            </div>
-                          ))}
-                          
-                          <button
-                            onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, emptyIngrediente()] }))}
-                            className="w-full py-2 border border-black text-[9px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all"
-                          >
-                            + AGREGAR INSUMO
-                          </button>
-
-                          <div className="pt-4 border-t border-black/10 mt-4">
-                            <textarea
-                               placeholder="NOTAS DE PIE PARA ESTE TIEMPO..."
-                               value={tiempo.nota || ''}
-                               onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nota: e.target.value }))}
-                               className="w-full bg-slate-50 p-3 text-[10px] font-bold resize-none min-h-[60px] outline-none uppercase tracking-tighter"
-                            />
-                          </div>
-                        </div>
+                <div className="p-4 space-y-6">
+                  {menu.tiempos.map((tiempo, ti) => (
+                    <div key={ti} className="relative p-5 border border-black/5 bg-white group hover:border-black/20 transition-all">
+                      <div className="flex items-center justify-between mb-4">
+                         <input
+                           value={tiempo.nombre}
+                           onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value.toUpperCase() }))}
+                           className="text-[12px] font-black text-foreground bg-transparent border-none outline-none uppercase tracking-widest w-fit"
+                         />
+                         <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1 text-muted-foreground hover:text-destructive transition-all">
+                              <Trash2 className="h-3 w-3" />
+                            </button>
+                         </div>
                       </div>
-                    ))}
-                  </div>
 
+                      <div className="space-y-3">
+                        {tiempo.ingredientes.map((ing, ii) => (
+                          <div key={ii} className="space-y-2 pb-3 border-b border-black/5 last:border-0 text-[11px]">
+                             <div className="flex gap-2">
+                                <input
+                                  placeholder="ALIMENTO..."
+                                  value={ing.descripcion}
+                                  onChange={(e) => updateTiempo(mi, ti, (t) => ({
+                                    ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, descripcion: e.target.value } : x)
+                                  }))}
+                                  className="flex-1 bg-slate-50 px-2 py-1.5 font-bold uppercase outline-none border-b border-transparent focus:border-black transition-all"
+                                />
+                                <button onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, j) => j !== ii) }))} className="text-red-500 opacity-20 hover:opacity-100"><X className="w-3 h-3" /></button>
+                             </div>
+                             <div className="grid grid-cols-4 gap-1.5">
+                                <div className="space-y-1">
+                                   <input type="number" value={ing.cantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="CANT" />
+                                </div>
+                                <div className="space-y-1">
+                                   <input value={ing.unidad} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, unidad: e.target.value.toUpperCase() } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="UNID" />
+                                </div>
+                                <div className="space-y-1">
+                                   <input type="number" value={ing.eqCantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqCantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="EQ" />
+                                </div>
+                                <div className="space-y-1">
+                                   <input value={ing.eqGrupo} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqGrupo: e.target.value } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="GRUPO" />
+                                </div>
+                             </div>
+                             {ing.eqCantidad ? (
+                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
+                                 {ing.cantidad}{ing.unidad} {ing.descripcion} — {ing.eqCantidad} EQ {ing.eqGrupo}
+                               </p>
+                             ) : null}
+                          </div>
+                        ))}
+                        
+                        <button
+                          onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, emptyIngrediente()] }))}
+                          className="w-full py-1.5 border border-black/10 text-[8px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all opacity-40 hover:opacity-100"
+                        >
+                          + AGREGAR ITEM
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  
                   <button
                     onClick={() => updateMenu(mi, (m) => ({
                       ...m, tiempos: [...m.tiempos, { nombre: 'NUEVO TIEMPO', ingredientes: [], nota: '' }]
                     }))}
-                    className="w-full py-6 border-2 border-dashed border-border/40 rounded-none text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em] hover:border-foreground/30 hover:text-foreground hover:bg-foreground/5 transition-all duration-200"
+                    className="w-full py-4 border-2 border-dashed border-border/40 rounded-none text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em] hover:bg-foreground/5 transition-all"
                   >
-                    + INSERTAR BLOQUE HORARIO
+                    + AGREGAR COMIDA
                   </button>
                 </div>
               </div>
             ))}
-
+            
             <button
-               onClick={() => setMenus([...menus, emptyMenu(`Menú #${menus.length + 1}`)])}
-               className="w-full py-8 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.3em] transition-all"
+               onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
+               className="h-full min-h-[400px] border-4 border-dashed border-foreground/5 p-10 flex flex-col items-center justify-center gap-4 text-muted-foreground hover:text-foreground hover:bg-foreground/5 hover:border-foreground/20 transition-all group"
             >
-              + GENERAR VARIANTE ALTERNATIVA
+              <Plus className="w-12 h-12 group-hover:rotate-90 transition-transform duration-500" />
+              <span className="text-[11px] font-black uppercase tracking-[0.4em]">AGREGAR OPCIÓN</span>
             </button>
           </div>
         </div>

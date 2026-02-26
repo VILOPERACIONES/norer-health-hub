@@ -145,7 +145,7 @@ const Requirements = () => {
 
   return (
     <div className="min-h-screen bg-white text-black font-sans pb-20 p-6 md:p-10">
-      <div className="max-w-6xl mx-auto space-y-12">
+      <div className="max-w-none space-y-12">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-4 border-black pb-8">
            <div className="space-y-4">
              <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">

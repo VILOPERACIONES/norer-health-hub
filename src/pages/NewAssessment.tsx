@@ -1,9 +1,41 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Activity, Beaker, Clipboard, ChevronDown, Trash2, MoreHorizontal } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Activity, Beaker, Clipboard, ChevronDown, Trash2, MoreHorizontal, Clock } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const TABLA_2COMP = {
+  Hombres: [
+    { rango: '17-19', densidad: 1.0739, pctGrasa: 10.9, kgGrasa: 8.8,  kgMagra: 71.4 },
+    { rango: '20-29', densidad: 1.0748, pctGrasa: 10.6, kgGrasa: 8.5,  kgMagra: 71.7 },
+    { rango: '30-39', densidad: 1.0662, pctGrasa: 14.3, kgGrasa: 11.5, kgMagra: 68.7 },
+    { rango: '40-49', densidad: 1.0641, pctGrasa: 15.2, kgGrasa: 12.2, kgMagra: 68.0 },
+    { rango: '50+',   densidad: 1.0626, pctGrasa: 15.8, kgGrasa: 12.7, kgMagra: 67.5 },
+  ],
+  Mujeres: [
+    { rango: '17-19', densidad: 1.0601, pctGrasa: 16.9, kgGrasa: 13.6, kgMagra: 66.6 },
+    { rango: '20-29', densidad: 1.0597, pctGrasa: 17.1, kgGrasa: 13.7, kgMagra: 66.5 },
+    { rango: '30-39', densidad: 1.0540, pctGrasa: 19.7, kgGrasa: 15.8, kgMagra: 64.4 },
+    { rango: '40-49', densidad: 1.0477, pctGrasa: 22.4, kgGrasa: 18.0, kgMagra: 62.2 },
+    { rango: '50+',   densidad: 1.0437, pctGrasa: 24.3, kgGrasa: 19.5, kgMagra: 60.7 },
+  ]
+};
+
+const TABLA_FAO_OMS = {
+  Hombres: { '10-18': 2054.5, '19-30': 1906.06, '31-60': 1809.32, '60+': 1569.7 },
+  Mujeres: { '10-18': 1724.44, '19-30': 1674.94, '31-60': 1526.74, '60+': 1438.1 }
+};
 
 const Collapsible = ({ title, icon: Icon, defaultOpen = false, children }: { title: string; icon?: any; defaultOpen?: boolean; children: React.ReactNode }) => {
   const [open, setOpen] = useState(defaultOpen);
@@ -105,16 +137,140 @@ const NewAssessment = () => {
 
     const sumaPliegues = tricep + bicep + subes + cresta + supra + abdo + muslo + panto;
 
-    const perBrazo = parseFloat(perimetros['Brazo']) || 0;
-    const perMuslo = parseFloat(perimetros['Muslo']) || 0;
-    const perPanto = parseFloat(perimetros['Pantorrilla']) || 0;
+    const perBrazo = parseFloat(perimetros['Brazo Contraído']) || 0;
+    const perPantorrilla = parseFloat(perimetros['Pantorrilla']) || 0;
     const perMuneca = parseFloat(perimetros['Muñeca']) || 0;
+    const perCintura = parseFloat(perimetros['Cintura']) || 0;
+    const perCadera = parseFloat(perimetros['Cadera']) || 0;
 
-    const brazoCor = perBrazo - (Math.PI * tricep / 10);
-    const piernaCor = perMuslo - (Math.PI * muslo / 10);
-    const pantoCor = perPanto - (Math.PI * panto / 10);
+    const brazoCor = perBrazo - (tricep / 10);
+    const piernaCor = perPantorrilla - (panto / 10);
+    const pantoCor = perPantorrilla - (panto / 10); // Pantorrilla corregida es la misma que pierna corregida en este contexto
 
-    let complexion = null;
+    const get2Comp = (edad: number, sexo: string) => {
+      const tabla = sexo === 'M' ? TABLA_2COMP.Hombres : TABLA_2COMP.Mujeres;
+      if (edad <= 19) return tabla[0];
+      if (edad <= 29) return tabla[1];
+      if (edad <= 39) return tabla[2];
+      if (edad <= 49) return tabla[3];
+      return tabla[4];
+    };
+
+    const comp2 = get2Comp(edad, sexo);
+    const pctGrasa2comp = comp2.pctGrasa;
+    const kgGrasa2comp = comp2.kgGrasa;
+    const kgMasaMagra2comp = comp2.kgMagra;
+
+    let superficieCorp = 0;
+    let pctGrasaCorp = 0, masaGrasaReal = 0, pctGrasaIdeal = 0, masaGrasaIdeal = 0;
+    let masaOsea = 0, pctMasaOsea = 0, masaVisceral = 0, pctMasaVisceral = 0;
+    let masaMuscular = 0, pctMasaMuscular = 0, pctMusculoIdeal = 0, musculoIdeal = 0, deficitMuscular = 0;
+    let masaMagra = 0, ptMin = 0, ptMax = 0, pesoIdeal = 0, sobrepeso = 0, pesoAjustado = 0, pesoIdeal4comp = 0;
+
+    const sumaPliegues6 = supra + tricep + subes + muslo + abdo + panto;
+
+    if (p > 0 && tCm > 0) {
+      superficieCorp = 0.007184 * Math.pow(p, 0.425) * Math.pow(tCm, 0.725);
+      
+      pctGrasaCorp = sumaPliegues6 > 0 ? (sumaPliegues6 * 0.153) + 5.8 : 0;
+      masaGrasaReal = (pctGrasaCorp * p) / 100;
+      
+      pctGrasaIdeal = sexo === 'M' ? 15 : 23;
+      masaGrasaIdeal = (pctGrasaIdeal * p) / 100;
+
+      masaVisceral = p * 0.24;
+      pctMasaVisceral = p * 0.241;
+
+      if (perMuneca > 0 && perPantorrilla > 0) {
+        masaOsea = Math.pow(
+          Math.pow(tCm, 2) * (perMuneca / 1000) * (perPantorrilla / 1000) * 400,
+          0.712
+        ) * 3.02;
+        pctMasaOsea = (masaOsea * 100) / p;
+      }
+
+      masaMuscular = p - (masaGrasaReal + masaVisceral + masaOsea);
+      pctMasaMuscular = (masaMuscular * 100) / p;
+
+      pctMusculoIdeal = sexo === 'M' ? 45 : 36;
+      musculoIdeal = (pctMusculoIdeal * p) / 100;
+      deficitMuscular = Math.max(0, musculoIdeal - masaMuscular);
+
+      masaMagra = p - masaGrasaReal;
+
+      // Peso Teórico (Lorentz adaptadas)
+      const basePT = (tCm - 100) * 0.85;
+      if (sexo === 'M') {
+        pesoIdeal = basePT * 1.00;
+        ptMin = basePT * 0.95;
+        ptMax = basePT * 1.05;
+      } else {
+        pesoIdeal = basePT * 0.95;
+        ptMin = basePT * 0.90;
+        ptMax = basePT * 1.00;
+      }
+
+      pesoIdeal4comp = masaMagra + masaGrasaIdeal;
+      sobrepeso = p - pesoIdeal4comp;
+      pesoAjustado = ((p - pesoIdeal) * 0.25) + pesoIdeal;
+    }
+
+    // Harris-Benedict con ETA 10%
+    let tmb = 0;
+    if (sexo === 'M') {
+      tmb = 66.5 + (13.75 * p) + (5.003 * tCm) - (6.775 * edad);
+    } else {
+      tmb = 655.1 + (9.563 * p) + (1.850 * tCm) - (4.676 * edad);
+    }
+
+    const calcGET = (tmbVal: number, factorPct: number) => {
+      const subtotal = tmbVal + (tmbVal * factorPct);
+      const eta = subtotal * 0.10;
+      return subtotal + eta;
+    };
+
+    const getFAOOMS = (edadVal: number, sexoVal: string) => {
+      const tabla = sexoVal === 'M' ? TABLA_FAO_OMS.Hombres : TABLA_FAO_OMS.Mujeres;
+      if (edadVal <= 18) return (tabla as any)['10-18'];
+      if (edadVal <= 30) return (tabla as any)['19-30'];
+      if (edadVal <= 60) return (tabla as any)['31-60'];
+      return (tabla as any)['60+'];
+    };
+
+    const hbeSedentario = calcGET(tmb, 0.10);
+    const hbeLeve = calcGET(tmb, 0.20);
+    const hbeModerado = calcGET(tmb, 0.30);
+    const hbeIntenso = calcGET(tmb, 0.40);
+    const faoomsBase = getFAOOMS(edad, sexo);
+
+    // IP corregido
+    const x1 = tCm / (perMuneca || 1);
+    const x2 = x1 * x1;
+    const IP = x2 * 0.418;
+
+    let endomorfico = null, mesomorfico = null, ectomorfico = null;
+    const S4 = tricep + subes + supra + panto;
+    if (S4 > 0) {
+      endomorfico = -0.7182 + (0.1451 * S4) - (0.00068 * Math.pow(S4, 2)) + (0.0000014 * Math.pow(S4, 3));
+    }
+    
+    if (perCintura > 0 && perCadera > 0 && tCm > 0) {
+      mesomorfico = (0.858 * perCintura) + (0.601 * perCadera) + (0.188 * brazoCor) + (0.161 * piernaCor) - (0.131 * tCm) + 4.5;
+    }
+
+    if (IP >= 40.75) ectomorfico = 0.732 * IP - 28.58;
+    else if (IP > 38.25) ectomorfico = 0.463 * IP - 17.63;
+    else if (IP > 0) ectomorfico = 0.1;
+
+    let clasificacionIp = '';
+    if (IP > 0) {
+      if (IP < 38.25) clasificacionIp = 'Pícnico';
+      else if (IP <= 40.75) clasificacionIp = 'Normotipo';
+      else clasificacionIp = 'Leptosómico';
+    }
+
+    // Complexión (se mantiene para el JSX)
+    let complexion = 0;
     let clasifComplexion = '';
     if (tCm > 0 && perMuneca > 0) {
       complexion = (perMuneca / tCm) * 100;
@@ -129,109 +285,18 @@ const NewAssessment = () => {
       }
     }
 
-    const coefs: any = {
-      M: { '17-19': { a: 1.1620, b: 0.0630 }, '20-29': { a: 1.1631, b: 0.0632 }, '30-39': { a: 1.1422, b: 0.0544 }, '40-49': { a: 1.1620, b: 0.0700 }, '50+': { a: 1.1715, b: 0.0779 } },
-      F: { '17-19': { a: 1.1549, b: 0.0678 }, '20-29': { a: 1.1599, b: 0.0717 }, '30-39': { a: 1.1423, b: 0.0632 }, '40-49': { a: 1.1333, b: 0.0612 }, '50+': { a: 1.1339, b: 0.0645 } }
-    };
-
-    let rango = '50+';
-    if (edad <= 19) rango = '17-19';
-    else if (edad <= 29) rango = '20-29';
-    else if (edad <= 39) rango = '30-39';
-    else if (edad <= 49) rango = '40-49';
-
-    const suma4 = tricep + bicep + subes + cresta;
-    let densidad2comp = null, pctGrasa2comp = null, kgGrasa2comp = null, kgMasaMagra2comp = null;
-
-    if (suma4 > 0 && p > 0) {
-      const { a, b } = coefs[sexo][rango];
-      densidad2comp = a - (b * Math.log10(suma4));
-      pctGrasa2comp = ((4.95 / densidad2comp) - 4.5) * 100;
-      kgGrasa2comp = (pctGrasa2comp / 100) * p;
-      kgMasaMagra2comp = p - kgGrasa2comp;
-    }
-
-    let superficieCorp = null, pctGrasaCorp = null, masaGrasaReal = null, pctGrasaIdeal = null, masaGrasaIdeal = null;
-    let masaOsea = null, pctMasaOsea = null, masaVisceral = null, pctMasaVisceral = null;
-    let masaMuscular = null, pctMasaMuscular = null, pctMusculoIdeal = null, musculoIdeal = null, deficitMuscular = null;
-    let masaMagra = null, ptMin = null, ptMax = null, pesoIdeal = null, sobrepeso = null;
-
-    const diamBiest = parseFloat(diametros['Biestiloideo (Muñeca)']) || 0;
-    const diamHumero = parseFloat(diametros['Biepicondilar Húmero']) || 0;
-    const diamFemur = parseFloat(diametros['Biepicondilar Fémur']) || 0;
-    const bioVisceral = parseFloat(bio['Masa Visceral']) || 0;
-
-    if (p > 0 && tCm > 0) {
-      superficieCorp = 0.007184 * Math.pow(p, 0.425) * Math.pow(tCm, 0.725);
-      if (pctGrasa2comp !== null) {
-        pctGrasaCorp = pctGrasa2comp;
-        masaGrasaReal = kgGrasa2comp;
-        pctGrasaIdeal = sexo === 'M' ? 15 : 23;
-        masaGrasaIdeal = (pctGrasaIdeal / 100) * p;
-        masaMagra = p - (masaGrasaReal || 0);
-
-        if (diamBiest > 0 && diamHumero > 0) {
-          masaOsea = 3.02 * Math.pow((Math.pow(t, 2) * diamBiest * diamHumero * 400), 0.712);
-          pctMasaOsea = (masaOsea / p) * 100;
-          
-          masaMuscular = p - (masaGrasaReal || 0) - masaOsea;
-          pctMasaMuscular = (masaMuscular / p) * 100;
-
-          pctMusculoIdeal = sexo === 'M' ? 45 : 36;
-          musculoIdeal = (pctMusculoIdeal / 100) * p;
-          deficitMuscular = Math.max(0, musculoIdeal - masaMuscular);
-        }
-      }
-
-      if (bioVisceral > 0) {
-        masaVisceral = bioVisceral;
-        pctMasaVisceral = (masaVisceral / p) * 100;
-      }
-
-      if (sexo === 'M') {
-        ptMin = (tCm - 100) - ((tCm - 150) / 4);
-        ptMax = (tCm - 100) - ((tCm - 150) / 2.5);
-      } else {
-        ptMin = (tCm - 100) - ((tCm - 150) / 2.5);
-        ptMax = (tCm - 100) - ((tCm - 150) / 2);
-      }
-      pesoIdeal = (ptMin + ptMax) / 2;
-      sobrepeso = Math.max(0, p - ptMax);
-    }
-
-    let endomorfico = null, mesomorfico = null, ectomorfico = null;
-    const S3 = tricep + subes + supra;
-    if (S3 > 0) {
-      endomorfico = -0.7182 + (0.1451 * S3) - (0.00068 * Math.pow(S3, 2)) + (0.0000014 * Math.pow(S3, 3));
-    }
-    if (diamHumero > 0 && diamFemur > 0 && tCm > 0) {
-      mesomorfico = (0.858 * diamHumero) + (0.601 * diamFemur) + (0.188 * brazoCor) + (0.161 * piernaCor) - (0.131 * tCm) + 4.5;
-    }
-    const IP = p > 0 ? tCm / Math.pow(p, 1/3) : 0;
-    if (IP >= 40.75) ectomorfico = 0.732 * IP - 28.58;
-    else if (IP >= 38.25) ectomorfico = 0.463 * IP - 17.63;
-    else if (IP > 0) ectomorfico = 0.1;
-
-    let clasificacionIp = '';
-    if (IP > 0) {
-      if (IP < 38.25) clasificacionIp = 'Pícnico';
-      else if (IP <= 40.75) clasificacionIp = 'Normotipo';
-      else clasificacionIp = 'Leptosómico';
-    }
-
     return {
       imc: imcVal, 
       sumaPliegues, 
-      brazoCorregido: brazoCor, 
-      piernaCorregida: piernaCor, 
-      pantorrillaCorregida: pantoCor, 
-      complexion, 
-      clasifComplexion,
-      densidad2comp, 
+      brazoCor: brazoCor, 
+      piernaCor: piernaCor, 
+      pantoCor: pantoCor, 
+      densidad2comp: comp2.densidad, 
       pctGrasa2comp, 
       kgGrasa2comp, 
       kgMasaMagra2comp, 
-      superficieCorporal: superficieCorp,
+      superficieCorp: superficieCorp,
+      pctGrasaCorp: pctGrasaCorp,
       pctGrasaCorporal4comp: pctGrasaCorp, 
       masaGrasaReal, 
       pctGrasaIdeal, 
@@ -243,26 +308,51 @@ const NewAssessment = () => {
       masaMuscular, 
       pctMasaMuscular, 
       pctMusculoIdeal, 
-      musculoIdeal, 
-      deficitMuscular, 
+      musculoIdeal,
+      deficitMuscular: deficitMuscular, 
       masaMagra,
       pesoTeoricoMin: ptMin, 
       pesoTeoricoMax: ptMax, 
       pesoIdeal, 
       sobrepeso,
+      pesoAjustado,
+      pesoIdeal4comp,
+      tmb,
+      getSedentario: hbeSedentario,
+      getLeve: hbeLeve,
+      getModerado: hbeModerado,
+      getIntenso: hbeIntenso,
+      faoOmsRequerimiento: faoomsBase,
+      calcRapidoNormal: p * 30, // Valores base por defecto
+      calcRapidoObeso: p * 25,
+      calcRapidoDesnutricion: p * 35,
       endomorfico, 
       mesomorfico, 
       ectomorfico, 
       indicePonderal: IP, 
-      clasificacionIp
+      clasificacionIp,
+      complexion,
+      clasifComplexion
     };
   }, [pliegues, perimetros, diametros, peso, talla, sexo, edad, bio]);
+
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const handleSave = async (redirectAPlan: boolean = false) => {
     if (!peso || !talla) {
       toast({ title: 'Datos Faltantes', description: 'Peso y Talla son obligatorios para el protocolo.', variant: 'destructive' });
       return;
     }
+
+    // Ajuste 6: Verificar campos incompletos
+    const plieguesVacios = ['Trícep', 'Bícep', 'Subescapular', 'Cresta Ilíaca', 'Supraespinal', 'Abdominal', 'Muslo', 'Pantorrilla'].some(p => !pliegues[p]);
+    const perimetrosVacios = ['Brazo', 'Muñeca', 'Muslo', 'Pantorrilla'].some(p => !perimetros[p]);
+
+    if ((plieguesVacios || perimetrosVacios) && !showConfirm) {
+      setShowConfirm(true);
+      return;
+    }
+
     setSaving(true);
     const pesoNum = parseFloat(peso) || 0;
     const tallaNum = parseFloat(talla) || 0;
@@ -271,10 +361,7 @@ const NewAssessment = () => {
       pliegues: Object.fromEntries(Object.entries(pliegues).map(([k, v]) => [k, parseFloat(v) || 0])),
       perimetros: Object.fromEntries(Object.entries(perimetros).map(([k, v]) => [k, parseFloat(v) || 0])),
       diametros: Object.fromEntries(Object.entries(diametros).map(([k, v]) => [k, parseFloat(v) || 0])),
-      bioimpedancia: bio, bioquimicos: bioq, signosVitales: { fc, pa }, comentarios, suplementacion, temario,
-      esquemaCompetencia: esquema.competencia,
-      etapaCompetitiva: esquema.etapa,
-      tipoDietaCompetencia: esquema.tipoDieta,
+      bioimpedancia: bio, bioquimicos: bioq, comentarios, suplementacion, temario,
       ...calcData
     };
     try {
@@ -292,6 +379,7 @@ const NewAssessment = () => {
       toast({ title: 'Fallo de Red', description: 'No se pudo digitalizar la consulta', variant: 'destructive' });
     } finally {
       setSaving(false);
+      setShowConfirm(false);
     }
   };
 
@@ -352,7 +440,12 @@ const NewAssessment = () => {
             <Collapsible title="Perimetría Muscular (cm)" icon={Plus}>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 {['Brazo', 'Brazo Contraído', 'Muñeca', 'Pectoral', 'Cintura', 'Abdomen', 'Cadera', 'Muslo', 'Pantorrilla'].map((n) => (
-                  <Field key={n} label={n} value={perimetros[n] || ''} onChange={(v) => setPerimetros({ ...perimetros, [n]: v })} />
+                  <Field 
+                    key={n} 
+                    label={n} 
+                    value={n === 'Muñeca' && !peso ? '-' : (perimetros[n] || '')} 
+                    onChange={(v) => setPerimetros({ ...perimetros, [n]: v })} 
+                  />
                 ))}
               </div>
               <div className="grid grid-cols-3 gap-4 border-t border-foreground/5 pt-6">
@@ -385,10 +478,8 @@ const NewAssessment = () => {
               )}
             </Collapsible>
 
-            <Collapsible title="Signos Vitales & Bioquímicos" icon={Plus}>
+            <Collapsible title="Bioquímicos" icon={Plus}>
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                <Field label="Frecuencia BPM" value={fc} onChange={setFc} suffix="BPM" />
-                <Field label="Presión Arterial" value={pa} onChange={setPa} type="text" placeholder="120/80" />
                 <Field label="Glucosa" value={bioq['Glu'] || ''} onChange={(v) => setBioq({...bioq, Glu: v})} suffix="mg/dL" />
                 <Field label="Triglicéridos" value={bioq['Tag'] || ''} onChange={(v) => setBioq({...bioq, Tag: v})} suffix="mg/dL" />
                 <Field label="Colesterol" value={bioq['Col'] || ''} onChange={(v) => setBioq({...bioq, Col: v})} suffix="mg/dL" />
@@ -397,11 +488,11 @@ const NewAssessment = () => {
               </div>
             </Collapsible>
 
-            <Collapsible title="Esquema Competitivo" icon={Plus}>
-              <div className="grid sm:grid-cols-3 gap-6">
-                <Field type="text" label="Competencia" value={esquema.competencia} onChange={(v) => setEsquema({...esquema, competencia: v})} />
-                <Field type="text" label="Etapa" value={esquema.etapa} onChange={(v) => setEsquema({...esquema, etapa: v})} />
-                <Field type="text" label="Dieta" value={esquema.tipoDieta} onChange={(v) => setEsquema({...esquema, tipoDieta: v})} />
+            <Collapsible title="Bioimpedancia (Opcional)" icon={Clipboard}>
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {['Grasa %', 'Músculo %', 'Agua %', 'Grasa Visceral', 'Edad Metabólica'].map(n => (
+                  <Field key={n} label={n} value={bio[n] || ''} onChange={v => setBio({...bio, [n]: v})} />
+                ))}
               </div>
             </Collapsible>
 
@@ -477,46 +568,96 @@ const NewAssessment = () => {
                 </div>
 
                 <div className="border-t border-background/20 pt-6 mt-6 space-y-4">
-                    <h4 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">Métricas Biotipológicas</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <p className="text-[8px] uppercase tracking-widest opacity-40">Ponderal (IP)</p>
-                         <p className="text-sm font-black">{formatDecimal(calcData.indicePonderal)} — {calcData.clasificacionIp}</p>
-                       </div>
-                       <div>
-                         <p className="text-[8px] uppercase tracking-widest opacity-40">Lorentz (Peso Ideal)</p>
-                         <p className="text-sm font-black">{formatDecimal(calcData.pesoIdeal)} kg | Obj: {formatDecimal(calcData.sobrepeso)} kg OFF</p>
-                       </div>
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">Métricas Biotipológicas</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">Ponderal (IP)</p>
+                      <p className="text-sm font-black">{formatDecimal(calcData.indicePonderal)}</p>
                     </div>
+                    <div>
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">Lorentz (Peso Ideal)</p>
+                      <p className="text-sm font-black">{formatDecimal(calcData.pesoIdeal)} kg</p>
+                    </div>
+                    <div className="col-span-1">
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">Peso Ajustado</p>
+                      <p className="text-sm font-black">{formatDecimal(calcData.pesoAjustado)} kg</p>
+                    </div>
+                    <div className="col-span-1">
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">Sobrepeso (Exceso)</p>
+                      <p className="text-sm font-black text-rose-500">+{formatDecimal(calcData.sobrepeso)} kg</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border-t border-background/20 pt-6 mt-6 space-y-4">
+                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">Cálculo de Energía (TMB/GET)</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">TMB Base (H-B)</p>
+                      <p className="text-sm font-black">{formatDecimal(calcData.tmb)} kcal</p>
+                    </div>
+                       <div>
+                          <p className="text-[8px] uppercase tracking-widest opacity-40">FAO/OMS</p>
+                          <p className="text-sm font-black">{formatDecimal(calcData.faoOmsRequerimiento)} kcal</p>
+                       </div>
+                       <div className="col-span-2 space-y-2 pt-2">
+                          <p className="text-[8px] uppercase tracking-widest opacity-30">H-B (GET con ETA 10%)</p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="text-[10px] font-bold opacity-60 uppercase">SEDENTARIO: {formatDecimal(calcData.getSedentario)}</div>
+                            <div className="text-[10px] font-bold opacity-60 uppercase">LIGERO: {formatDecimal(calcData.getLeve)}</div>
+                            <div className="text-[10px] font-bold opacity-60 uppercase">MODERADO: {formatDecimal(calcData.getModerado)}</div>
+                            <div className="text-[10px] font-bold opacity-60 uppercase">INTENSO: {formatDecimal(calcData.getIntenso)}</div>
+                          </div>
+                       </div>
+                  </div>
                 </div>
               </div>
             )}
 
-            <div className="flex flex-col gap-2">
-               <button
-                  onClick={() => handleSave(true)}
-                  disabled={saving}
-                  className="w-full py-6 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.3em] transition-all disabled:opacity-50 flex items-center justify-center gap-4"
-                >
-                  {saving ? (
-                    <div className="w-4 h-4 border-2 border-background/20 border-t-background rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" /> PERSISTIR & DISEÑAR PLAN
-                    </>
-                  )}
-                </button>
+             <div className="flex flex-col gap-2">
                 <button
-                  onClick={() => handleSave(false)}
-                  disabled={saving}
-                  className="w-full py-4 bg-background border border-foreground/10 text-foreground rounded-none text-[10px] font-black uppercase tracking-[0.2em] hover:bg-secondary/20 transition-all opacity-40 hover:opacity-100"
-                >
-                   Guardar Registro
-                </button>
-            </div>
+                   onClick={() => handleSave(true)}
+                   disabled={saving}
+                   className="w-full py-6 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.3em] transition-all disabled:opacity-50 flex items-center justify-center gap-4 hover:shadow-[0_0_20px_rgba(0,0,0,0.1)] active:scale-[0.98]"
+                 >
+                   {saving ? (
+                     <div className="w-4 h-4 border-2 border-background/20 border-t-background rounded-full animate-spin" />
+                   ) : (
+                     <>
+                       <Save className="h-4 w-4" /> PERSISTIR & DISEÑAR PLAN
+                     </>
+                   )}
+                 </button>
+                 <button
+                   onClick={() => handleSave(false)}
+                   disabled={saving}
+                   className="w-full py-4 bg-background border border-foreground/10 text-foreground rounded-none text-[10px] font-black uppercase tracking-[0.2em] hover:bg-secondary/20 transition-all opacity-40 hover:opacity-100 flex items-center justify-center gap-2"
+                 >
+                    <Clock className="h-3 w-3" /> SOLO GUARDAR VALORACIÓN (QUEDA PENDIENTE)
+                 </button>
+             </div>
           </div>
         </div>
       </div>
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent className="rounded-none border-2 border-black">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-sm font-black uppercase tracking-widest">Protocolo Incompleto</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs font-bold leading-relaxed">
+              No todos los campos han sido completados. ¿Está seguro de que desea persistir la consulta con datos parciales?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel className="rounded-none border-black text-[10px] font-black uppercase tracking-widest">No, completar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => handleSave()}
+              className="rounded-none bg-black text-white hover:bg-neutral-800 text-[10px] font-black uppercase tracking-widest"
+            >
+              Sí, guardar así
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

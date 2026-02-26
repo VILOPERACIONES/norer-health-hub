@@ -1,8 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, Trash2, Printer, Activity } from 'lucide-react';
+import { ArrowLeft, FileText, Printer, Activity, Shield, Heart, Ruler, Droplets, Zap, Beaker, Thermometer, Brain } from 'lucide-react';
 import api from '@/lib/api';
-import type { Valoracion } from '@/types';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
@@ -10,7 +9,7 @@ const AssessmentDetail = () => {
   const { id: pacienteId, valoracionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [val, setVal] = useState<Valoracion | null>(null);
+  const [val, setVal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -28,165 +27,260 @@ const AssessmentDetail = () => {
     fetch();
   }, [pacienteId, valoracionId]);
 
-  const Section = ({ title, children, icon: Icon }: { title: string; children: React.ReactNode; icon?: any }) => (
-  <div className="bg-background border-2 border-border/40 p-10 rounded-2xl shadow-sm animate-slide-up hover:border-foreground/30 transition-all ring-1 ring-foreground/5">
-    <div className="flex items-center gap-6 mb-10">
-      {Icon && <Icon className="h-6 w-6 text-muted-foreground/30" />}
-      <h3 className="text-[12px] font-black text-foreground uppercase tracking-[0.4em] opacity-40 leading-none">{title}</h3>
+  const Section = ({ title, children, icon: Icon, active = false }: { title: string; children: React.ReactNode; icon?: any; active?: boolean }) => (
+    <div className={`p-8 md:p-10 border-b border-slate-100 ${active ? 'bg-slate-50/50' : 'bg-background'}`}>
+      <div className="flex items-center gap-4 mb-10">
+        <div className={`p-2 rounded-none ${active ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-400'}`}>
+          {Icon && <Icon className="h-4 w-4" />}
+        </div>
+        <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.3em] leading-none">{title}</h3>
+      </div>
+      {children}
     </div>
-    {children}
-  </div>
-);
+  );
 
-const DataValue = ({ label, value, unit = '' }: { label: string; value: string | number; unit?: string }) => (
-  <div className="space-y-4">
-    <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.3em] ml-1 leading-none opacity-40">{label}</p>
-    <p className="text-3xl font-black text-foreground tracking-tighter leading-none whitespace-nowrap">
-      {typeof value === 'number' ? formatDecimal(value) : value || '—'}
-      {unit && <span className="text-[12px] ml-3 opacity-30 uppercase tracking-[0.2em] font-mono leading-none">{unit}</span>}
-    </p>
-  </div>
-);
+  const DataItem = ({ label, value, unit = '', highlight = false, alert = false }: { label: string; value: any; unit?: string; highlight?: boolean; alert?: boolean }) => (
+    <div className="space-y-1">
+      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest leading-none">{label}</p>
+      <p className={`text-[16px] font-bold tracking-tight ${highlight ? 'text-slate-900' : 'text-slate-600'} ${alert ? 'text-rose-600' : ''}`}>
+        {formatDecimal(value)}
+        {value !== null && value !== undefined && value !== '' && unit && <span className="text-[10px] ml-1 opacity-40 font-bold">{unit}</span>}
+      </p>
+    </div>
+  );
 
   if (loading) return (
-    <div className="p-16 flex flex-col items-center justify-center space-y-10 h-[70vh]">
-       <div className="w-20 h-20 border-[8px] border-foreground/5 border-t-foreground rounded-full animate-spin" />
-       <p className="text-[12px] font-black uppercase tracking-[0.5em] animate-pulse text-muted-foreground">SINCRONIZANDO BIODATA ANALYTICA...</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background">
+       <Activity className="h-10 w-10 text-slate-900 animate-pulse mb-6" />
+       <p className="text-[11px] font-bold uppercase tracking-[0.5em] text-slate-400">Desencriptando BioData Maestro...</p>
     </div>
   );
   
   if (!val) return (
-    <div className="p-16 text-center space-y-10 h-[60vh] flex flex-col items-center justify-center">
-      <p className="text-3xl font-black text-muted-foreground uppercase tracking-[0.5em] opacity-10">PROTOCOLO NO LOCALIZADO</p>
-      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[12px] font-black text-foreground uppercase tracking-[0.4em] border-b-2 border-foreground pb-2 hover:opacity-70 transition-all leading-none">REGRESAR AL DIRECTORIO</button>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background p-10 text-center">
+      <h1 className="text-2xl font-bold text-slate-300 uppercase tracking-widest mb-6">Registro no localizado</h1>
+      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="px-8 py-3 bg-slate-900 text-white text-[10px] font-bold uppercase tracking-widest">Volver al expediente</button>
     </div>
   );
 
-  const handleDelete = async () => {
-    if (!window.confirm('¿ELIMINAR ESTE REGISTRO DE BIODATA?')) return;
-    try {
-      await api.delete(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-      toast({ title: 'PROTOCOLO ELIMINADO', description: 'El registro ha sido purgado de la infraestructura.' });
-      navigate(`/pacientes/${pacienteId}`);
-    } catch (err) {
-      toast({ title: 'Fallo de Persistencia', description: 'No se pudo purgar el registro del sistema.', variant: 'destructive' });
-    }
-  };
-
   return (
-    <div className="space-y-16 animate-fade-in max-w-7xl pb-40 mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-12 border-b border-border/40 pb-12">
-        <div className="space-y-10">
-           <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-4 text-[12px] font-black uppercase tracking-[0.3em] text-muted-foreground hover:text-foreground transition-all group leading-none">
-             <ArrowLeft className="h-5 w-5 group-hover:-translate-x-1 transition-all" /> VOLVER AL EXPEDIENTE
-           </button>
-           <div className="animate-slide-up space-y-4">
-              <h1 className="text-5xl font-black text-foreground tracking-tighter uppercase leading-none whitespace-nowrap">BioData Analytica</h1>
-              <p className="text-muted-foreground font-black text-[12px] uppercase tracking-[0.4em] opacity-40 leading-none">CONSULTA GLOBAL #{val.numeracion || '—'} · {formatDate(val.fecha)}</p>
-           </div>
-        </div>
-        <div className="flex gap-6">
-           <button 
-             onClick={handleDelete}
-             className="px-10 py-5 border-2 border-border/40 text-destructive text-[12px] font-black uppercase tracking-[0.3em] rounded-2xl hover:bg-destructive/5 transition-all shadow-sm leading-none"
-           >
-             PURGAR REGISTRO
-           </button>
-           <button 
-             className="px-10 py-5 bg-foreground text-background rounded-2xl text-[12px] font-black uppercase tracking-[0.4em] flex items-center gap-6 hover:scale-[1.03] transition-all shadow-lg leading-none"
-           >
-             <Printer className="h-5 w-5" /> DESCARGAR MASTER PDF
-           </button>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-12 gap-12">
-        <div className="lg:col-span-8 space-y-12">
-          <Section title="CONTROL ANTROPOMÉTRICO MAESTRO" icon={Activity}>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
-              <DataValue label="Masa Corporal" value={val.peso} unit="kg" />
-              <DataValue label="Estatura" value={val.talla} unit="m" />
-              <DataValue label="IMC Protocolo" value={val.imc} />
-              <DataValue label="Grasa Corporal" value={val.porcentajeGrasa} unit="%" />
-            </div>
-          </Section>
-
-          {val.composicion && (
-            <div className="bg-foreground text-background p-12 rounded-[2.5rem] shadow-xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-12 opacity-5 translate-x-10 translate-y-[-2rem] rotate-12 transition-transform group-hover:rotate-0 duration-1000">
-                <FileText className="w-64 h-64" />
+    <div className="min-h-screen bg-background pb-32">
+      {/* HEADER TIPO REPORTE */}
+      <header className="bg-slate-900 text-white px-10 py-12 md:py-16">
+        <div className="w-full flex flex-col md:flex-row justify-between items-start md:items-end gap-10">
+          <div className="space-y-6">
+            <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400 hover:text-white transition-all group">
+              <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> Regresar al Perfil
+            </button>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                 <span className="px-2 py-0.5 bg-emerald-500 text-[9px] font-black uppercase tracking-widest">Corte Maestro</span>
+                 <span className="text-slate-500 text-[10px] font-bold uppercase tracking-widest">Protocolo #{val.numeroValoracion || '—'}</span>
               </div>
-              <h3 className="text-[12px] font-black uppercase tracking-[0.5em] mb-12 opacity-30 leading-none">COMPOSICIÓN ESTRUCTURAL PROACTIVA</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-12 relative z-10">
-                <div className="space-y-4">
-                   <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.4em] leading-none">Tejido Adiposo</p>
-                   <p className="text-6xl font-black tracking-tighter leading-none text-emerald-400">{formatDecimal(val.composicion.pctGrasa || 0)}%</p>
-                   <p className="text-[12px] font-black opacity-40 uppercase tracking-[0.2em] font-mono leading-none">{formatDecimal(val.composicion.kgGrasa || 0)} KG TOTAL</p>
-                </div>
-                <div className="space-y-4">
-                   <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.4em] leading-none">Masa Libre Grasa</p>
-                   <p className="text-6xl font-black tracking-tighter leading-none">{formatDecimal(val.composicion.kgMagra || 0)}<span className="text-xl ml-3 opacity-30 uppercase tracking-widest font-mono">kg</span></p>
-                </div>
-                {val.composicion.densidad && (
-                  <div className="space-y-4">
-                    <p className="text-[11px] font-black opacity-30 uppercase tracking-[0.4em] leading-none">Densidad Corporal</p>
-                    <p className="text-6xl font-black tracking-tighter leading-none opacity-50">{formatDecimal(val.composicion.densidad, 4)}</p>
-                  </div>
-                )}
-              </div>
+              <h1 className="text-4xl md:text-6xl font-black tracking-[-0.04em] uppercase leading-none italic">BioData Analytica</h1>
+              <p className="text-slate-400 font-bold text-[11px] uppercase tracking-[0.5em] ml-1">{formatDate(val.fecha)} · ID: {val.id.slice(-12).toUpperCase()}</p>
             </div>
-          )}
-
-          <div className="grid md:grid-cols-2 gap-12">
-            {val.pliegues && Object.keys(val.pliegues).length > 0 && (
-              <Section title="ESTRATIGRAFÍA TÁCTIL (PLIEGUES)">
-                <div className="grid grid-cols-2 gap-x-10 gap-y-12">
-                  {Object.entries(val.pliegues).map(([k, v]) => (
-                    <DataValue key={k} label={k} value={v as number} unit="mm" />
-                  ))}
-                </div>
-              </Section>
-            )}
-
-            {val.perimetros && Object.keys(val.perimetros).length > 0 && (
-              <Section title="PERIMETRÍA MUSCULAR SOMÁTICA">
-                <div className="grid grid-cols-2 gap-x-10 gap-y-12">
-                  {Object.entries(val.perimetros).map(([k, v]) => (
-                    <DataValue key={k} label={k} value={v as number} unit="cm" />
-                  ))}
-                </div>
-              </Section>
-            )}
+          </div>
+          <div className="flex gap-4">
+            <button className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white border border-white/10 text-[10px] font-bold uppercase tracking-[0.2em] transition-all flex items-center gap-3">
+              <Printer className="h-4 w-4" /> Exportar PDF
+            </button>
           </div>
         </div>
+      </header>
 
-        <div className="lg:col-span-4 space-y-12">
-          <Section title="PROTOCOLO TERAPÉUTICO" icon={Activity}>
-            <div className="space-y-12">
-              {val.comentarios ? (
-                <div className="space-y-6">
-                  <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.4em] font-mono leading-none opacity-30">{`// OBSERVACIONES CLÍNICAS`}</p>
-                  <p className="text-lg font-black leading-relaxed border-l-4 border-foreground/10 pl-6 text-foreground uppercase tracking-tight">{val.comentarios}</p>
-                </div>
-              ) : (
-                <p className="text-[12px] font-black text-muted-foreground uppercase tracking-[0.4em] opacity-20 leading-none">SIN NOTAS REGISTRADAS</p>
-              )}
+      <div className="w-full px-10 -translate-y-6 md:-translate-y-8">
+        <div className="grid lg:grid-cols-12 gap-8">
+          
+          {/* COLUMNA PRINCIPAL */}
+          <div className="lg:col-span-8 space-y-8">
+            <div className="bg-white border border-slate-100 shadow-2xl shadow-slate-200/50 overflow-hidden">
               
-              {val.suplementacion && (
-                <div className="space-y-6 pt-10 border-t border-border/40">
-                  <p className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.4em] font-mono leading-none opacity-30">{`// SUPLEMENTACIÓN SINCRÓNICA`}</p>
-                  <p className="text-base font-black leading-relaxed border-l-4 border-foreground/5 pl-6 text-foreground/40 uppercase tracking-tight">{val.suplementacion}</p>
+              {/* RESUMEN CRÍTICO */}
+              <div className="grid grid-cols-2 md:grid-cols-4 bg-slate-50/50 border-b border-slate-100 p-8 md:p-10 gap-8">
+                <DataItem label="Masa Corporal" value={val.pesoActual || val.peso} unit="kg" highlight />
+                <DataItem label="IMC Protocolo" value={val.imc} highlight alert={parseFloat(val.imc) > 25} />
+                <DataItem label="Grasa Real" value={val.pctGrasaCorp || val.pctGrasa2comp} unit="%" highlight />
+                <DataItem label="Masa Muscular" value={val.masaMuscular} unit="kg" highlight />
+              </div>
+
+              {/* ANTROPOMETRÍA PLIEGUES */}
+              <Section title="Estratigrafía Táctil (Pliegues)" icon={Ruler}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-y-12">
+                   <DataItem label="Tríceps" value={val.pliegeTricep} unit="mm" />
+                   <DataItem label="Bíceps" value={val.pliegeBicep} unit="mm" />
+                   <DataItem label="Subescapular" value={val.pliegueSubescapular} unit="mm" />
+                   <DataItem label="Cresta Iliaca" value={val.pliegueCrestaIliaca} unit="mm" />
+                   <DataItem label="Supraespinal" value={val.pliegueSupraespinal} unit="mm" />
+                   <DataItem label="Abdominal" value={val.pliegueAbdominal} unit="mm" />
+                   <DataItem label="Muslo Frontal" value={val.pliegueMusloFrontal} unit="mm" />
+                   <DataItem label="Pantorrilla" value={val.plieguePantorrilla} unit="mm" />
+                   <div className="col-span-full pt-4">
+                     <div className="inline-block px-6 py-3 bg-slate-900 text-white">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.3em] opacity-50 mb-1">Suma 8 Pliegues</p>
+                        <p className="text-2xl font-black leading-none">{val.sumaPliegues || '—'} <span className="text-xs opacity-30">MM</span></p>
+                     </div>
+                   </div>
+                </div>
+              </Section>
+
+              {/* PERÍMETROS */}
+              <Section title="Perimetría Muscular Somática" icon={Activity}>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-8 md:gap-y-12">
+                   <DataItem label="Muñeca" value={val.perimetroMuneca} unit="cm" />
+                   <DataItem label="Brazo Relajado" value={val.perimetroBrazoRelajado} unit="cm" />
+                   <DataItem label="Brazo Contraído" value={val.perimetroBrazoContraido} unit="cm" />
+                   <DataItem label="Pectoral" value={val.perimetroPectoral} unit="cm" />
+                   <DataItem label="Cintura" value={val.perimetroCintura} unit="cm" />
+                   <DataItem label="Abdomen" value={val.perimetroAbdomen} unit="cm" />
+                   <DataItem label="Cadera" value={val.perimetroCadera} unit="cm" />
+                   <DataItem label="Muslo Frontal" value={val.perimetroMusloFrontal} unit="cm" />
+                   <DataItem label="Pantorrilla" value={val.perimetroPantorrilla} unit="cm" />
+                </div>
+              </Section>
+
+              {/* DIÁMETROS Y BIOTIPO */}
+              <Section title="Estructura Ósea y Biotipo" icon={Zap}>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+                   <DataItem label="Biestiloideo" value={val.diametroBiestiloideo} unit="cm" />
+                   <DataItem label="Biepicond. Humero" value={val.diametroBiepicondHumero} unit="cm" />
+                   <DataItem label="Biepicond. Femur" value={val.diametroBiepicondFemur} unit="cm" />
+                   <DataItem label="Complexión" value={val.complexion} unit={val.clasifComplexion} />
+                </div>
+              </Section>
+
+              {/* BIOQUÍMICOS */}
+              <Section title="Analítica de Bioquímicos" icon={Beaker}>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                   <DataItem label="Glucosa" value={val.glucosa} unit="mg/dl" />
+                   <DataItem label="Triglicéridos" value={val.trigliceridos} unit="mg/dl" />
+                   <DataItem label="Colesterol" value={val.colesterol} unit="mg/dl" />
+                   <DataItem label="Creatinina" value={val.creatinina} unit="mg/dl" />
+                   <DataItem label="Ácido Úrico" value={val.acidoUrico} unit="mg/dl" />
+                   <DataItem label="Presión Arterial" value={val.presionArterial || '—/—'} />
+                </div>
+              </Section>
+
+              {/* TEMARIO */}
+              {val.temarioConsulta && val.temarioConsulta.length > 0 && (
+                <Section title="Acuerdos y Temario" icon={Brain} active>
+                  <div className="space-y-6">
+                    {val.temarioConsulta.map((tema: any) => (
+                      <div key={tema.id} className="border-l-2 border-slate-900 pl-6 py-1">
+                        <h4 className="text-[11px] font-bold text-slate-900 uppercase tracking-widest mb-2">{tema.tema}</h4>
+                        <p className="text-[13px] text-slate-600 leading-relaxed italic">"{tema.detalle}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </Section>
+              )}
+
+              {/* NOTAS FINALES */}
+              {(val.comentarios || val.suplementacion) && (
+                <div className="p-10 bg-slate-900 text-white">
+                   <div className="grid md:grid-cols-2 gap-12">
+                      {val.comentarios && (
+                        <div className="space-y-4">
+                           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em]">Observaciones Clínicas</p>
+                           <p className="text-[14px] leading-relaxed text-slate-300 font-medium italic">"{val.comentarios}"</p>
+                        </div>
+                      )}
+                      {val.suplementacion && (
+                        <div className="space-y-4">
+                           <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.3em]">Protocolo de Suplementos</p>
+                           <p className="text-[14px] leading-relaxed text-slate-300 font-medium italic">"{val.suplementacion}"</p>
+                        </div>
+                      )}
+                   </div>
                 </div>
               )}
             </div>
-          </Section>
-          
-          <button
-             onClick={() => navigate(`/pacientes/${pacienteId}/planes/nuevo?valoracionId=${valoracionId}`)}
-             className="w-full py-8 bg-background border-2 border-foreground/10 rounded-[3rem] text-[12px] font-black uppercase tracking-[0.5em] hover:bg-foreground hover:text-background transition-all duration-500 shadow-sm hover:scale-[1.02] leading-none active:scale-95"
-          >
-             ACTUALIZAR PROTOCOLO MAESTRO
-          </button>
+          </div>
+
+          {/* SIDEBAR DE MÉTRICAS AVANZADAS */}
+          <div className="lg:col-span-4 space-y-8">
+            
+            {/* CARD 4 COMPONENTES */}
+            <div className="bg-white border border-slate-100 p-8 shadow-xl shadow-slate-200/50 space-y-10">
+               <div className="flex items-center gap-3 border-b border-slate-50 pb-4">
+                  <Shield className="h-4 w-4 text-emerald-500" />
+                  <h4 className="text-[10px] font-black text-slate-800 uppercase tracking-[0.3em]">Algoritmo 4 Componentes</h4>
+               </div>
+               
+               <div className="space-y-8">
+                  <div className="flex justify-between items-end border-b border-slate-50 pb-4">
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Masa Ósea</p>
+                     <div className="text-right">
+                        <p className="text-xl font-black text-slate-900 leading-none">{formatDecimal(val.masaOsea)} <span className="text-[10px] opacity-30">KG</span></p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">{formatDecimal(val.pctMasaOsea)}%</p>
+                     </div>
+                  </div>
+                  <div className="flex justify-between items-end border-b border-slate-100 pb-4">
+                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Masa Visceral</p>
+                     <div className="text-right">
+                        <p className="text-xl font-black text-slate-900 leading-none">{formatDecimal(val.masaVisceral)} <span className="text-[10px] opacity-30">KG</span></p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">{formatDecimal(val.pctMasaVisceral)}%</p>
+                     </div>
+                  </div>
+                  <div className="flex justify-between items-end border-b border-slate-50 pb-4">
+                     <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Masa Magra (MLG)</p>
+                     <div className="text-right">
+                        <p className="text-xl font-black text-emerald-600 leading-none">{formatDecimal(val.masaMagra)} <span className="text-[10px] opacity-30">KG</span></p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">S.C. {formatDecimal(val.superficieCorp)} M²</p>
+                     </div>
+                  </div>
+                  <div className="flex justify-between items-end">
+                     <p className="text-[9px] font-bold text-rose-600 uppercase tracking-widest">Déficit Muscular</p>
+                     <div className="text-right">
+                        <p className="text-2xl font-black text-rose-600 leading-none">-{formatDecimal(val.deficitMusculo)} <span className="text-[10px] opacity-30">KG</span></p>
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            {/* CARD BIOTIPOLOGÍA */}
+            <div className="bg-slate-900 text-white p-8 space-y-10">
+               <div className="flex items-center gap-3 border-b border-white/5 pb-4">
+                  <Zap className="h-4 w-4 text-amber-400" />
+                  <h4 className="text-[10px] font-black text-white/50 uppercase tracking-[0.3em]">Somatotipo & Biotipología</h4>
+               </div>
+               <div className="grid grid-cols-2 gap-8">
+                  <div>
+                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Endomorfia</p>
+                    <p className="text-lg font-black">{formatDecimal(val.endomorfico)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Mesomorfia</p>
+                    <p className="text-lg font-black">{formatDecimal(val.mesomorfico)}</p>
+                  </div>
+                  <div className="col-span-full">
+                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Clasificación Somática</p>
+                    <p className="text-xl font-black text-amber-400 uppercase tracking-tighter">{val.clasificacionIp || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-bold text-white/30 uppercase tracking-[0.2em] mb-1">Edad Metabólica</p>
+                    <p className="text-lg font-black">{val.edadMetabolica || val.edad || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[8px] font-bold text-emerald-400/50 uppercase tracking-[0.2em] mb-1">Peso Ideal</p>
+                    <p className="text-lg font-black text-emerald-400">{formatDecimal(val.pesoIdeal)} <span className="text-[10px] opacity-30">KG</span></p>
+                  </div>
+               </div>
+            </div>
+
+            {/* CARD BIOIMPEDANCIA (SI EXISTE) */}
+            {(val.bioGrasa || val.bioMusculo) && (
+              <div className="bg-white border border-slate-100 p-8 shadow-sm space-y-6">
+                 <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em]">Referencia Bioimpedancia</h4>
+                 <div className="grid grid-cols-3 gap-4">
+                    <DataItem label="Grasa BIA" value={val.bioGrasa} unit="%" />
+                    <DataItem label="Músculo BIA" value={val.bioMusculo} unit="%" />
+                    <DataItem label="Agua" value={val.bioAgua} unit="%" />
+                 </div>
+              </div>
+            )}
+
+          </div>
         </div>
       </div>
     </div>

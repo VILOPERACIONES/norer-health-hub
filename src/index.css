@@ -6,23 +6,23 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    --background: 32 20% 98%;
     --foreground: 0 0% 0%;
-    --card: 0 0% 100%;
+    --card: 32 20% 98%;
     --card-foreground: 0 0% 0%;
-    --popover: 0 0% 100%;
+    --popover: 32 20% 98%;
     --popover-foreground: 0 0% 0%;
     --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
+    --secondary: 32 15% 96%;
     --secondary-foreground: 0 0% 0%;
-    --muted: 0 0% 94%;
+    --muted: 32 15% 94%;
     --muted-foreground: 0 0% 45%;
     --accent: 0 0% 20%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 0% 0%;
     --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 90%;
+    --border: 32 10% 90%;
     --input: 0 0% 90%;
     --ring: 0 0% 0%;
     --radius: 1.5rem;
@@ -57,7 +57,7 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-    font-family: 'Outfit', sans-serif;
+    font-family: "Outfit", sans-serif;
     font-size: 18px;
     letter-spacing: -0.015em;
     line-height: 1.6;
@@ -68,7 +68,7 @@
   .norder-card {
     @apply bg-card rounded-3xl border border-border/80 p-8 shadow-sm hover:shadow-md transition-all duration-300 ease-out;
   }
-  
+
   .dark .norder-card {
     @apply border-border/20;
   }
@@ -76,7 +76,7 @@
   .shadow-premium {
     @apply shadow-[0_1px_3px_0_rgba(0,0,0,0.1),0_1px_2px_0_rgba(0,0,0,0.06)];
   }
-  
+
   .dark .shadow-premium {
     @apply shadow-none border border-border/30;
   }
@@ -84,7 +84,7 @@
   .norder-glass {
     @apply bg-white/70 backdrop-blur-2xl border border-white/20 shadow-2xl;
   }
-  
+
   .dark .norder-glass {
     @apply bg-black/60 backdrop-blur-2xl border border-white/5 shadow-2xl;
   }
@@ -108,18 +108,34 @@
   }
 
   @keyframes slide-up {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @keyframes fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes scale-in {
-    from { opacity: 0; transform: scale(0.92); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   .animate-slide-up {

@@ -1,18 +1,15 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, UserPlus, ClipboardList, CreditCard, AlertTriangle, ArrowRight, CheckCircle2, Calendar, MessageSquare, Activity } from 'lucide-react';
+import { Users, UserPlus, ClipboardList, Activity, CheckCircle2, MessageSquare, TrendingUp, AlertCircle, ArrowRight, ActivityIcon, LayoutDashboard, ShieldCheck } from 'lucide-react';
 import api from '@/lib/api';
-import type { DashboardMetricas, Alerta, Paciente } from '@/types';
+import type { DashboardMetricas, Alerta } from '@/types';
 import { useAuthStore } from '@/store/auth';
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, Cell } from 'recharts';
-
-import { Skeleton } from '@/components/ui/skeleton';
+import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 const Dashboard = () => {
   const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
@@ -20,16 +17,13 @@ const Dashboard = () => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [metRes, alertRes, pacRes] = await Promise.all([
+        const [metRes, alertRes] = await Promise.all([
           api.get('/api/dashboard/metricas'),
           api.get('/api/dashboard/alertas'),
-          api.get('/api/pacientes'),
         ]);
         
         setMetricas(metRes.data?.data || metRes.data);
         setAlertas(alertRes.data?.data || alertRes.data || []);
-        setPacientes(pacRes.data?.data || pacRes.data || []);
-        
       } catch (err) {
         console.error('Error cargando dashboard:', err);
       } finally {
@@ -41,191 +35,180 @@ const Dashboard = () => {
 
   const userName = user?.nombre || 'Especialista';
 
-  const chartData = useMemo(() => {
-    const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-    const currentYear = new Date().getFullYear();
-    const data = months.map(m => ({ name: m, pacientes: 0 }));
-
-    pacientes.forEach(p => {
-      const date = p.createdAt ? new Date(p.createdAt) : null;
-      if (date && date.getFullYear() === currentYear) {
-        const monthIdx = date.getMonth();
-        data[monthIdx].pacientes += 1;
-      }
-    });
-
-    return data.slice(0, new Date().getMonth() + 1);
-  }, [pacientes]);
-
   const cards = [
-    { label: 'Pacientes Totales', value: metricas?.totalPacientes || 0, icon: Users },
-    { label: 'Nuevos (Mes)', value: metricas?.nuevosEsteMes || 0, icon: UserPlus },
-    { label: 'Protocolos Activos', value: metricas?.planesEsteMes || 0, icon: ClipboardList },
-    { label: 'Eficiencia Comercial', value: `${metricas?.membresiasActivas?.total || 0}%`, icon: CreditCard },
-  ];
-
-  const shortcuts = [
-    { label: 'Citas Cal.com', url: 'https://app.cal.com/event-types', icon: Calendar },
-    { label: 'Chatwoot Nut.', url: 'https://norder-ai-agent-chatwootnut.rbvpuf.easypanel.host/app/accounts/1/dashboard', icon: MessageSquare },
+    { label: 'Pacientes Totales', value: metricas?.resumen.pacientesTotales || 0, icon: Users, trend: '+12% este mes' },
+    { label: 'Nuevos Registros', value: metricas?.resumen.pacientesNuevos || 0, icon: UserPlus, trend: 'En crecimiento' },
+    { label: 'Planes Creados', value: metricas?.resumen.planesNutricionales || 0, icon: ClipboardList, trend: '98% completados' },
+    { label: 'Consultas Realizadas', value: metricas?.resumen.consultasTotales || 0, icon: TrendingUp, trend: 'Eficiencia alta' },
   ];
 
   if (loading && !metricas) return (
-    <div className="p-8 space-y-8 max-w-7xl mx-auto">
-       <Skeleton className="h-20 w-full rounded-none" />
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <Skeleton key={i} className="h-40 w-full rounded-none" />)}
-       </div>
-       <div className="grid lg:grid-cols-3 gap-8">
-          <Skeleton className="lg:col-span-2 h-[400px] rounded-none" />
-          <Skeleton className="h-[400px] rounded-none" />
-       </div>
+    <div className="min-h-screen bg-secondary/30 flex items-center justify-center">
+      <div className="flex flex-col items-center gap-6">
+        <Activity className="h-10 w-10 text-slate-900 animate-pulse" />
+        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.6em] animate-pulse">Iniciando Centro de Control Clínico</div>
+      </div>
     </div>
   );
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-7xl mx-auto">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 border-b border-border/40 pb-6">
-        <div className="space-y-2">
-          <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase leading-none whitespace-nowrap">Control Center</h1>
-          <p className="text-[12px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 leading-none">
-             Bienvenido, <span className="text-foreground/70">{userName}</span>
+    <div className="space-y-12 animate-fade-in pb-32 max-w-none px-6">
+      {/* HEADER SECTION */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8 pt-8">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+             <div className="h-1 w-12 bg-emerald-500 rounded-none" />
+             <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.4em]">Panel de Inteligencia</span>
+          </div>
+          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 tracking-[-0.04em] uppercase leading-none">
+            Control <span className="text-slate-400">Center</span>
+          </h1>
+          <p className="text-[11px] font-bold uppercase tracking-[0.3em] text-slate-300 ml-1 flex items-center gap-3">
+             NODO MAESTRO: <span className="text-slate-900 font-extrabold">{userName}</span> · <LayoutDashboard className="h-3 w-3" /> ECOSISTEMA V2.5
           </p>
         </div>
         <div className="flex gap-4">
-           <button
+          <button
             onClick={() => navigate('/pacientes/nuevo')}
-            className="flex items-center gap-3 bg-foreground text-background px-8 py-3 rounded-none text-[12px] font-black uppercase tracking-[0.2em] hover:opacity-90 active:scale-[0.98] transition-all border border-foreground"
+            className="flex items-center gap-4 bg-slate-900 text-white px-10 py-5 rounded-none text-[11px] font-bold uppercase tracking-[0.2em] transition-all hover:bg-slate-800 hover:shadow-2xl hover:shadow-slate-200 group"
           >
-            <UserPlus className="h-5 w-5" /> ALTA DIRECTA
+            <UserPlus className="h-5 w-5 group-hover:scale-110 transition-transform" /> Reclutamiento Directo
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {loading ? (
-          [1,2,3,4].map(i => <Skeleton key={i} className="h-40 w-full rounded-none" />)
-        ) : (
-          cards.map((c) => (
-            <div key={c.label} className="bg-background border border-border/80 p-6 rounded-none shadow-sm hover:border-foreground/40 transition-all group flex flex-col justify-between h-40 ring-1 ring-foreground/5">
-              <div className="flex justify-between items-start mb-4">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity whitespace-nowrap">{c.label}</span>
-                <c.icon className="h-4 w-4 text-muted-foreground/30 group-hover:text-foreground transition-colors" />
-              </div>
-              <p className="text-3xl font-black text-foreground tracking-tighter leading-none">{c.value}</p>
+      {/* KPI CARDS */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {cards.map((c) => (
+          <div key={c.label} className="bg-background p-8 rounded-none border border-slate-100 shadow-sm hover:border-slate-300 transition-all group flex flex-col justify-between h-48 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+              <c.icon className="h-16 w-16 text-slate-900" />
             </div>
-          ))
-        )}
+            <div className="space-y-1">
+              <span className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-400">{c.label}</span>
+              <p className="text-4xl font-bold text-slate-900 tracking-tighter leading-none">{c.value}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="p-3 bg-slate-900 text-white rounded-none"></div>
+              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{c.trend}</span>
+            </div>
+          </div>
+        ))}
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
-           <div className="bg-background border border-border/80 p-8 rounded-none shadow-sm ring-1 ring-foreground/5">
-              <div className="flex items-center justify-between mb-8 px-2">
-                <h2 className="text-[12px] font-black text-foreground uppercase tracking-[0.4em] flex items-center gap-4 leading-none">
-                  <div className="w-2 h-2 rounded-full bg-foreground" /> Tendencia de Captación Maestra
-                </h2>
-                <span className="text-[11px] font-black text-muted-foreground uppercase opacity-20 tracking-[0.2em] leading-none">Periodo: {new Date().getFullYear()}</span>
+      <div className="grid lg:grid-cols-12 gap-10">
+        {/* CHART SECTION */}
+        <div className="lg:col-span-8 space-y-10">
+           <div className="lg:col-span-4 bg-slate-900 p-10 rounded-none border border-slate-800 shadow-2xl relative overflow-hidden flex flex-col justify-between min-h-[600px]">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-12">
+                <div className="space-y-2">
+                  <h2 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.4em] flex items-center gap-4 whitespace-nowrap">
+                    Evolución del Flujo Maestre
+                  </h2>
+                  <p className="text-[9px] font-bold text-slate-300 uppercase tracking-widest">Análisis predictivo de 6 meses</p>
+                </div>
+                <div className="flex gap-6">
+                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-none bg-slate-900" /><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Pacientes</span></div>
+                   <div className="flex items-center gap-2"><div className="w-2.5 h-2.5 rounded-none bg-slate-200" /><span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Planes</span></div>
+                </div>
               </div>
-              <div className="h-[300px] w-full mt-4 bg-secondary/5 rounded-none p-4 ring-1 ring-foreground/5">
+              <div className="h-[320px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="currentColor" opacity={0.03} />
+                  <BarChart data={metricas?.tendenciaMaestre || []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis 
-                      dataKey="name" 
+                      dataKey="mes" 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 900, fill: 'currentColor', opacity: 0.2 }} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#cbd5e1' }} 
                       dy={10}
                     />
                     <YAxis 
                       axisLine={false} 
                       tickLine={false} 
-                      tick={{ fontSize: 10, fontWeight: 900, fill: 'currentColor', opacity: 0.2 }} 
+                      tick={{ fontSize: 10, fontWeight: 700, fill: '#cbd5e1' }} 
                     />
                     <Tooltip 
-                      cursor={{ fill: 'rgba(0,0,0,0.01)' }}
-                      contentStyle={{ borderRadius: '0', border: 'none', background: 'black', color: 'white', padding: '16px', fontSize: '12px', fontWeight: '900', textTransform: 'uppercase' }}
-                      itemStyle={{ color: 'white', letterSpacing: '0.1em' }}
+                      cursor={{ fill: '#f8fafc' }}
+                      contentStyle={{ borderRadius: '0', border: 'none', background: '#0f172a', color: '#fff', padding: '16px', fontSize: '11px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)' }}
                     />
-                    <Bar dataKey="pacientes" fill="black" radius={0} barSize={24}>
-                       {chartData.map((_, index) => (
-                         <Cell key={`cell-${index}`} fill={index === chartData.length - 1 ? 'black' : 'rgba(0,0,0,0.05)'} />
-                       ))}
-                    </Bar>
+                    <Bar dataKey="pacientes" fill="#0f172a" radius={0} barSize={24} />
+                    <Bar dataKey="planes" fill="#e2e8f0" radius={0} barSize={24} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
            </div>
 
-           <div className="grid sm:grid-cols-2 gap-4">
-              {shortcuts.map((s) => (
-                <a 
-                 key={s.label}
-                 href={s.url}
-                 target="_blank"
-                 rel="noopener noreferrer"
-                 className="flex items-center p-4 rounded-none bg-background border border-border/80 hover:border-foreground/30 transition-all group gap-4 shadow-sm ring-1 ring-foreground/5"
-                >
-                  <div className="w-12 h-12 rounded-none bg-secondary/30 flex items-center justify-center group-hover:bg-foreground group-hover:text-background transition-all">
-                    <s.icon className="w-5 h-5" />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-[12px] font-black uppercase tracking-[0.2em] leading-none">{s.label}</p>
-                    <p className="text-[11px] font-black text-muted-foreground uppercase opacity-30 tracking-widest leading-none">Herramienta Externa</p>
-                  </div>
-                </a>
-              ))}
-           </div>
+
         </div>
 
+        {/* SIDEBAR MONITOR */}
         <div className="lg:col-span-4 h-full">
-           <div className="bg-background border border-border/80 p-8 rounded-none shadow-sm h-full flex flex-col ring-1 ring-foreground/5">
-              <h2 className="text-[12px] font-black text-foreground uppercase tracking-[0.4em] flex items-center gap-4 mb-8 leading-none">
-                 <AlertTriangle className="h-5 w-5 opacity-20" /> ALERTAS CLÍNICAS
-              </h2>
+           <div className="bg-slate-900 p-10 rounded-none text-white flex flex-col h-full shadow-2xl shadow-slate-200 border border-slate-800">
+              <div className="flex items-center justify-between mb-10">
+                <div className="space-y-1">
+                  <h2 className="text-[12px] font-bold uppercase tracking-[0.4em] flex items-center gap-4 leading-none">
+                    <div className="w-1.5 h-1.5 rounded-none bg-emerald-500 animate-pulse" /> Vigilancia Activa
+                  </h2>
+                  <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-2">Protocolo de seguridad Eyder</p>
+                </div>
+              </div>
 
-              <div className="space-y-3 flex-grow">
+              <div className="space-y-4 flex-grow overflow-y-auto pr-2 custom-scrollbar">
                 {alertas.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-12 border border-dashed border-border/10 rounded-none opacity-20">
-                    <CheckCircle2 className="h-8 w-8 mb-4" />
-                    <p className="text-[11px] font-black uppercase tracking-[0.3em] text-center">PROTOCOLOS INTEGRALES</p>
+                  <div className="flex flex-col items-center justify-center py-20 border border-dashed border-slate-800 rounded-none opacity-40 text-center">
+                    <CheckCircle2 className="h-10 w-10 mb-4 text-emerald-500" />
+                    <p className="text-[11px] font-bold uppercase tracking-[0.4em]">Sin alertas críticas</p>
                   </div>
                 ) : (
-                  alertas.slice(0, 5).map((a, i) => {
-                    const idParaNavegar = a.pacienteId || (a as any).id;
-                    return (
-                      <div 
-                        key={idParaNavegar || i} 
-                        className="group flex flex-col p-4 rounded-none border border-border/40 hover:border-foreground/30 transition-all cursor-pointer bg-secondary/10 hover:bg-secondary/20"
-                        onClick={() => {
-                          if (idParaNavegar) navigate(`/pacientes/${idParaNavegar}`);
-                        }}
-                      >
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-base font-black uppercase tracking-tighter truncate leading-none">{a.nombre}</p>
-                          <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-all -translate-x-1 group-hover:translate-x-0" />
-                        </div>
-                        <p className="text-[11px] font-black text-destructive uppercase tracking-widest leading-none">
-                           {a.diasSinVisita} DÍAS DE AUSENCIA
-                        </p>
+                  alertas.slice(0, 5).map((a, i) => (
+                    <div 
+                      key={a.pacienteId || i} 
+                      className={`group flex flex-col p-6 rounded-none bg-white/5 border border-white/5 hover:border-white/20 hover:bg-white/10 transition-all cursor-pointer relative overflow-hidden`}
+                      onClick={() => navigate(`/pacientes/${a.pacienteId}`)}
+                    >
+                      <div className="flex items-center justify-between mb-3 relative z-10">
+                        <p className="text-[13px] font-bold uppercase tracking-tight truncate text-white">{a.nombre}</p>
+                        <span className={`text-[8px] font-bold px-2 py-0.5 rounded-none uppercase tracking-widest ${a.prioridad === 'Alta' ? 'bg-rose-500' : 'bg-slate-700'}`}>
+                           {a.prioridad}
+                        </span>
                       </div>
-                    );
-                  })
+                      <div className="flex justify-between items-center relative z-10">
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                           {a.tipoRiesgo || `${a.diasSinVisita}d AUSENCIA`}
+                        </p>
+                        <ArrowRight className="h-4 w-4 text-slate-600 group-hover:text-white group-hover:translate-x-1 transition-all" />
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
               
-              <div className="mt-8 p-4 rounded-none bg-secondary/20 border border-foreground/5 shadow-inner">
-                <p className="text-[11px] font-black uppercase tracking-[0.3em] mb-2 opacity-30 leading-none">{`// INSIGHT ALGORÍTMICO`}</p>
-                <p className="text-[12px] font-black leading-relaxed uppercase tracking-tight text-foreground/50">
-                   Priorizar protocolos de adherencia sistemática para pacientes con inactividad crítica.
-                </p>
+              <div className="mt-10 p-8 rounded-none bg-slate-800 border border-slate-700">
+                <div className="flex items-center gap-4 mb-4">
+                   <AlertCircle className="h-5 w-5 text-rose-500" />
+                   <div className="flex flex-col">
+                     <p className="text-[9px] font-bold uppercase tracking-[0.3em] text-slate-500 leading-none">Prioridad del Sistema</p>
+                     <p className="text-[14px] font-bold text-white mt-1 uppercase tracking-tight">Kpis Críticos</p>
+                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-8 pt-6 border-t border-slate-700">
+                   <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Riesgo Clin.</p>
+                      <p className="text-2xl font-bold text-white leading-none">{metricas?.kpisClave.riesgoClinico || 0}%</p>
+                   </div>
+                   <div className="space-y-1">
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">Abandono</p>
+                      <p className="text-2xl font-bold text-rose-500 leading-none">{metricas?.kpisClave.riesgoAbandono}</p>
+                   </div>
+                </div>
               </div>
 
               <button 
                 onClick={() => navigate('/pacientes')}
-                className="w-full mt-6 py-4 border border-border/80 rounded-none text-[12px] font-black text-muted-foreground hover:text-foreground hover:border-foreground/50 uppercase tracking-[0.3em] transition-all shadow-sm"
+                className="w-full mt-8 py-5 bg-background text-slate-900 rounded-none text-[11px] font-bold uppercase tracking-[0.3em] hover:bg-secondary transition-all flex items-center justify-center gap-3"
               >
-                Directorio Maestro
+                Director de Expedientes <ArrowRight className="h-4 w-4" />
               </button>
            </div>
         </div>

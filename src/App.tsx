@@ -19,7 +19,6 @@ import CreateEditPlan from "@/pages/CreateEditPlan";
 import PlanView from "@/pages/PlanView";
 import Requirements from "@/pages/Requirements";
 import Plans from "@/pages/Plans";
-import SettingsPage from "@/pages/Settings";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -74,7 +73,9 @@ const App = () => {
               <Route path="pacientes/:id/planes/:planId" element={<PlanView />} />
               <Route path="pacientes/:id/planes/:planId/editar" element={<CreateEditPlan />} />
               <Route path="planes" element={<Plans />} />
-              <Route path="configuracion" element={<SettingsPage />} />
+              <Route path="planes/nuevo" element={<CreateEditPlan />} />
+              <Route path="planes/:planId/editar" element={<CreateEditPlan />} />
+
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

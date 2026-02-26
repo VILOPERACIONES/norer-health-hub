@@ -42,9 +42,13 @@ const Plans = () => {
   const handleAssign = async () => {
     if (!assigningPlan || !selectedPatient) return;
     try {
-      await api.post(`/api/planes/${assigningPlan.id}/asignar`, { pacienteId: selectedPatient });
-      toast({ title: 'Plan asignado con éxito' });
+      const { data } = await api.post(`/api/planes/${assigningPlan.id}/asignar`, { pacienteId: selectedPatient });
+      const newPlan = data?.data || data;
+      toast({ title: 'Plan asignado con éxito. Redirigiendo a personalización...' });
       setAssigningPlan(null);
+      if (newPlan?.id) {
+        navigate(`/pacientes/${selectedPatient}/planes/${newPlan.id}/editar`);
+      }
     } catch (err) {
       toast({ title: 'Error al asignar', variant: 'destructive' });
     }
@@ -64,7 +68,7 @@ const Plans = () => {
            <h1 className="text-6xl font-black uppercase tracking-tighter">Biblioteca de Planes</h1>
            <p className="text-[10px] font-bold uppercase tracking-[0.4em] opacity-30">Gestión de Macros y Micro-nutrientes Maestro</p>
         </div>
-        <button onClick={() => navigate('/pacientes/nuevo-plan-base')} className="px-8 py-3 bg-black text-white font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-white hover:text-black transition-all">
+        <button onClick={() => navigate('/planes/nuevo')} className="px-8 py-3 bg-black text-white font-black text-xs uppercase tracking-widest border-2 border-black hover:bg-white hover:text-black transition-all">
           + NUEVO PLAN BASE
         </button>
       </header>
