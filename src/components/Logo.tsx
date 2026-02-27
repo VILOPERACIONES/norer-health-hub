@@ -26,11 +26,10 @@ const Logo = ({ size = 'md', className = '', collapsed = false }: LogoProps) => 
 
   return (
       <div className={`flex flex-col ${className}`}>
-        <span className={`${sizes[size].title} font-black tracking-tighter text-foreground leading-none flex items-center gap-2`}>
-          NORDER
-          <span className={`${sizes[size].dot} bg-foreground rotate-45 group-hover:rotate-90 transition-transform duration-700`} />
-        </span>
-        <span className="text-[10px] font-black tracking-[0.6em] text-foreground/30 uppercase mt-1.5 ml-0.5">
+        <div className="flex items-center gap-2 mb-1.5 pt-1">
+          <img src="/logo-nrdr.png" alt="NORDER" className="h-[22px] w-auto object-contain" />
+        </div>
+        <span className="text-[10px] font-black tracking-[0.45em] text-foreground/40 uppercase mt-1">
           THINK · EAT · LIVE
         </span>
       </div>

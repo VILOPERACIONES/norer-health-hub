@@ -6,13 +6,13 @@ import { useToast } from '@/hooks/use-toast';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
-    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-hover:text-slate-500 transition-colors leading-none">{label}</label>
+    <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
     <input 
       type={type}
       value={value} 
       onChange={(e) => onChange(e.target.value)} 
       readOnly={readOnly}
-      className={`w-full bg-background rounded-none px-5 py-3.5 text-[13px] font-medium text-slate-700 tracking-tight outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 transition-all border border-slate-200 ${readOnly ? 'bg-secondary cursor-not-allowed opacity-60' : 'hover:border-slate-300'}`} 
+      className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`} 
       placeholder={placeholder} 
     />
   </div>
@@ -20,40 +20,41 @@ const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = 
 
 const Select = ({ label, value, onChange, options }: any) => (
   <div className="space-y-2 group">
-    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-hover:text-slate-500 transition-colors leading-none">{label}</label>
+    <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
     <select 
       value={value} 
       onChange={(e) => onChange(e.target.value)} 
-      className="w-full bg-background rounded-none px-5 py-3.5 text-[11px] font-bold text-slate-700 uppercase tracking-widest outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 transition-all border border-slate-200 hover:border-slate-300 appearance-none cursor-pointer"
+      className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default appearance-none cursor-pointer"
+      style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
     >
-      {options.map((o: string) => <option key={o} value={o}>{o.toUpperCase()}</option>)}
+      {options.map((o: string) => <option key={o} value={o}>{o}</option>)}
     </select>
   </div>
 );
 
 const TextArea = ({ label, value, onChange, placeholder }: any) => (
   <div className="space-y-2 col-span-full group">
-    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 group-hover:text-slate-500 transition-colors leading-none">{label}</label>
+    <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
     <textarea 
       value={value} 
       onChange={(e) => onChange(e.target.value)} 
-      className="w-full bg-background rounded-none p-5 text-[13px] font-medium text-slate-700 tracking-tight outline-none focus:ring-2 focus:ring-slate-900/5 focus:border-slate-900 transition-all border border-slate-200 hover:border-slate-300 min-h-[120px] resize-none" 
+      className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default min-h-[120px] resize-y" 
       placeholder={placeholder} 
     />
   </div>
 );
 
 const FormSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-  <div className="bg-background p-8 md:p-10 rounded-none border border-slate-100 shadow-sm animate-slide-up">
-    <div className="flex items-center gap-4 mb-10 border-b border-border/40 pb-6">
-      <div className="p-2 bg-slate-900 rounded-none">
-        <Icon className="h-4 w-4 text-white" />
+  <div className="bg-bg-surface p-8 rounded-[12px] border border-border-subtle shadow-none animate-slide-up">
+    <div className="flex items-center gap-3 mb-8 border-b border-border-subtle pb-4">
+      <div className="p-2 bg-bg-elevated border border-border-default rounded-[8px]">
+        <Icon className="h-[18px] w-[18px] text-text-secondary" />
       </div>
-      <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.3em] leading-none">
+      <h3 className="text-[16px] font-semibold text-text-primary m-0">
         {title}
       </h3>
     </div>
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
+    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
       {children}
     </div>
   </div>
@@ -245,88 +246,79 @@ const EditPatient = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-secondary/30 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-6">
-          <Activity className="h-10 w-10 text-slate-900 animate-pulse" />
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.6em] animate-pulse">Sincronizando Expediente</div>
-        </div>
+      <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
+        <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
+        <p className="text-[14px] font-medium text-text-muted">Cargando expediente para edición...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-12 animate-fade-in max-w-none pb-32 px-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-8 pt-8">
-        <div className="space-y-4">
-          <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 hover:text-slate-900 transition-all w-fit group leading-none">
-            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> Volver al perfil
+    <div className="space-y-10 animate-fade-in max-w-none pb-24 px-6">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
+        <div className="space-y-2">
+          <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
+            <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al perfil
           </button>
-          <div className="space-y-2">
-            <h1 className="text-4xl font-bold text-slate-900 tracking-[-0.04em] uppercase leading-none">Editar Expediente</h1>
-            <p className="text-slate-400 font-bold text-[10px] uppercase tracking-[0.4em] ml-1 leading-none">Actualización de Nodo Maestro</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 bg-secondary p-4 rounded-none border border-slate-100">
-          <BookOpen className="h-5 w-5 text-slate-400" />
-          <div className="flex flex-col">
-            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Estado</span>
-            <span className="text-[11px] font-bold text-slate-700">MODO EDICIÓN CLÍNICA</span>
+          <div className="space-y-1">
+            <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Editar Expediente</h1>
+            <p className="text-text-secondary font-normal text-[14px] m-0">Actualización de datos de paciente</p>
           </div>
         </div>
       </div>
 
-      <div className="space-y-12">
-        <FormSection title="Ficha de Identificación" icon={User}>
-          <Input label="Nombre(s) *" value={form.nombre} onChange={(v: string) => update('nombre', v)} placeholder="JUAN MANUEL" />
-          <Input label="Apellidos *" value={form.apellido} onChange={(v: string) => update('apellido', v)} placeholder="GONZÁLEZ" />
+      <div className="space-y-8">
+        <FormSection title="Identificación del Paciente" icon={User}>
+          <Input label="Nombre(s) *" value={form.nombre} onChange={(v: string) => update('nombre', v)} placeholder="Juan Manuel" />
+          <Input label="Apellidos *" value={form.apellido} onChange={(v: string) => update('apellido', v)} placeholder="González" />
           <Input label="Teléfono *" value={form.telefono} onChange={(v: string) => update('telefono', v)} placeholder="+52 999 000 0000" />
-          <Input label="E-mail" value={form.email} onChange={(v: string) => update('email', v)} placeholder="PACIENTE@NORDER.HEALTH" />
+          <Input label="E-mail" value={form.email} onChange={(v: string) => update('email', v)} placeholder="paciente@ejemplo.com" />
           <Input label="Fecha de Nacimiento" value={form.fechaNacimiento} onChange={(v: string) => update('fechaNacimiento', v)} type="date" />
           <div className="space-y-2">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest ml-1 leading-none">Edad (Auto)</label>
-            <div className="bg-secondary rounded-none px-5 py-3.5 text-[13px] font-bold text-slate-400 border border-slate-100 flex items-center justify-between">
-              {edad} AÑOS <Clock className="h-3 w-3 opacity-30" />
+            <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">Edad (Cálculo)</label>
+            <div className="bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-muted border border-border-subtle flex items-center justify-between">
+              {edad} Años <Clock className="h-[18px] w-[18px] text-text-muted" />
             </div>
           </div>
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
           <Input label="Estatura (M)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="1.75" />
-          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="RECOMPOSICIÓN CORPORAL" />
+          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
         </FormSection>
 
-        <FormSection title="Estilo de Vida y Deporte" icon={Activity}>
-          <Input label="Gym de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="NOMBRE DEL CLUB" />
-          <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="CROSSFIT / PESAS" />
-          <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="5 DÍAS / SEMANA" />
-          <Input label="Duración Sesión" value={form.tiempo} onChange={(v: string) => update('tiempo', v)} placeholder="60-90 MINUTOS" />
+        <FormSection title="Dinámica Deportiva" icon={Activity}>
+          <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
+          <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
+          <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />
+          <Input label="Duración Sesión" value={form.tiempo} onChange={(v: string) => update('tiempo', v)} placeholder="EJ: 60-90 Minutos" />
           <Select label="Nivel de Actividad" value={form.nivelActividad} onChange={(v: string) => update('nivelActividad', v)} options={['Sedentario', 'Leve', 'Moderado', 'Intenso']} />
-          <div className="grid grid-cols-2 gap-4 col-span-full">
-            <Input label="SEDENTARIO %" value={form.porcentajeSedentario} onChange={(v: string) => update('porcentajeSedentario', v)} placeholder="0" type="number" />
-            <Input label="LEVE %" value={form.porcentajeLeve} onChange={(v: string) => update('porcentajeLeve', v)} placeholder="0" type="number" />
-            <Input label="MODERADO %" value={form.porcentajeModerado} onChange={(v: string) => update('porcentajeModerado', v)} placeholder="0" type="number" />
-            <Input label="INTENSO %" value={form.porcentajeIntenso} onChange={(v: string) => update('porcentajeIntenso', v)} placeholder="0" type="number" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 col-span-full">
+            <Input label="Sedentario %" value={form.porcentajeSedentario} onChange={(v: string) => update('porcentajeSedentario', v)} placeholder="0" type="number" />
+            <Input label="Leve %" value={form.porcentajeLeve} onChange={(v: string) => update('porcentajeLeve', v)} placeholder="0" type="number" />
+            <Input label="Moderado %" value={form.porcentajeModerado} onChange={(v: string) => update('porcentajeModerado', v)} placeholder="0" type="number" />
+            <Input label="Intenso %" value={form.porcentajeIntenso} onChange={(v: string) => update('porcentajeIntenso', v)} placeholder="0" type="number" />
           </div>
         </FormSection>
 
-        <div className="bg-background p-8 md:p-10 rounded-none border border-slate-100 shadow-sm animate-slide-up">
-          <div className="flex items-center gap-4 mb-10 border-b border-border/40 pb-6">
-            <div className="p-2 bg-slate-900 rounded-none">
-              <Clock className="h-4 w-4 text-white" />
+        <div className="bg-bg-surface p-8 rounded-[12px] border border-border-subtle shadow-none animate-slide-up">
+          <div className="flex items-center gap-3 mb-8 border-b border-border-subtle pb-4">
+            <div className="p-2 bg-bg-elevated border border-border-default rounded-[8px]">
+              <Clock className="h-[18px] w-[18px] text-text-secondary" />
             </div>
-            <h3 className="text-[12px] font-bold text-slate-800 uppercase tracking-[0.3em] leading-none">
+            <h3 className="text-[16px] font-semibold text-text-primary m-0">
               Recordatorio de 24 Horas
             </h3>
           </div>
-          <div className="overflow-hidden rounded-none border border-slate-100 bg-background">
+          <div className="overflow-hidden rounded-[8px] border border-border-subtle bg-bg-surface">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-secondary border-b border-slate-100">
-                  <th className="py-5 px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Tiempo</th>
-                  <th className="py-5 px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Hora</th>
-                  <th className="py-5 px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Ayer</th>
-                  <th className="py-5 px-8 text-[10px] font-bold text-slate-400 uppercase tracking-widest text-right">Usualmente</th>
+                <tr className="bg-bg-elevated border-b border-border-subtle">
+                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Tiempo</th>
+                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Hora</th>
+                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Ayer (Ingesta)</th>
+                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Usualmente</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-secondary">
+              <tbody className="divide-y divide-border-subtle">
                 {[
                   { k: 'Desayuno', label: 'Desayuno' },
                   { k: 'Colacion1', label: 'Colación 1' },
@@ -334,16 +326,16 @@ const EditPatient = () => {
                   { k: 'Colacion2', label: 'Colación 2' },
                   { k: 'Cena', label: 'Cena' },
                 ].map((t) => (
-                  <tr key={t.k} className="hover:bg-secondary/50 transition-colors">
-                    <td className="py-5 px-8 text-[11px] font-bold text-slate-900 uppercase tracking-widest">{t.label}</td>
-                    <td className="py-3 px-4">
-                      <input type="time" value={(form as any)[`hora${t.k}`]} onChange={(e) => update(`hora${t.k}`, e.target.value)} className="w-full bg-secondary/50 border border-slate-100 rounded-none px-3 py-2 text-[11px] font-bold text-slate-600 outline-none focus:bg-background focus:border-slate-900 transition-all" />
+                  <tr key={t.k} className="hover:bg-bg-elevated transition-colors">
+                    <td className="py-4 px-6 text-[14px] font-medium text-text-primary">{t.label}</td>
+                    <td className="py-2 px-6">
+                      <input type="time" value={(form as any)[`hora${t.k}`]} onChange={(e) => update(`hora${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all" />
                     </td>
-                    <td className="py-3 px-4">
-                      <input value={(form as any)[`ayer${t.k}`]} onChange={(e) => update(`ayer${t.k}`, e.target.value)} className="w-full bg-secondary/50 border border-slate-100 rounded-none px-3 py-2 text-[11px] font-medium text-slate-600 uppercase outline-none focus:bg-background focus:border-slate-900 transition-all" />
+                    <td className="py-2 px-6">
+                      <input value={(form as any)[`ayer${t.k}`]} onChange={(e) => update(`ayer${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all placeholder:text-text-muted" placeholder="Ej. Pollo con arroz" />
                     </td>
-                    <td className="py-3 px-8">
-                      <input value={(form as any)[`usalmente${t.k}`]} onChange={(e) => update(`usalmente${t.k}`, e.target.value)} className="w-full bg-secondary/50 border border-slate-100 rounded-none px-3 py-2 text-[11px] font-medium text-slate-600 uppercase outline-none focus:bg-background focus:border-slate-900 transition-all text-right" />
+                    <td className="py-2 px-6">
+                      <input value={(form as any)[`usalmente${t.k}`]} onChange={(e) => update(`usalmente${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all placeholder:text-text-muted" placeholder="Mismo patrón" />
                     </td>
                   </tr>
                 ))}
@@ -352,39 +344,36 @@ const EditPatient = () => {
           </div>
         </div>
 
-        <FormSection title="Suplementos y Gustos" icon={Shield}>
-          <TextArea label="Historial de Productos" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} />
-          <TextArea label="Recomendación de Suplementos" value={form.recomSuplementos} onChange={(v: string) => update('recomSuplementos', v)} />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 col-span-full">
-            <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} />
-            <Input label="Alimentos Favoritos" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} />
-            <Input label="Alimentos No Deseados" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} />
+        <FormSection title="Anamnesis y Suplementación" icon={Shield}>
+          <TextArea label="Historial de Suplementos (Fase Actual)" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} placeholder="Describa los productos que consume el paciente actualmente..." />
+          <TextArea label="Propuesta Inicial de Suplementación" value={form.recomSuplementos} onChange={(v: string) => update('recomSuplementos', v)} placeholder="Recomendaciones basadas en el objetivo..." />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 col-span-full">
+            <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
+            <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
+            <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
           </div>
         </FormSection>
 
-        <FormSection title="Historial Clínico" icon={Heart}>
-          <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} />
-          <Input label="Cirugías / Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} />
-          <Select label="Estreñimiento" value={form.estrenimiento} onChange={(v: string) => update('estrenimiento', v)} options={['No', 'Leve', 'Frecuente']} />
-          <Select label="Consumo Alcohol" value={form.alcohol} onChange={(v: string) => update('alcohol', v)} options={['No', 'Social', 'Frecuente']} />
-          <Select label="Tabaco" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Social', 'Frecuente']} />
-          <Input label="Consumo Agua (L)" value={form.agua} onChange={(v: string) => update('agua', v)} placeholder="2.5" />
-          {form.sexo === 'F' && <Input label="Ciclo Menstrual" value={form.cicloMenstrual} onChange={(v: string) => update('cicloMenstrual', v)} placeholder="REGULAR / IRREGULAR" />}
-          <TextArea label="Signos y Síntomas" value={form.signosSintomas} onChange={(v: string) => update('signosSintomas', v)} />
+        <FormSection title="Perfil Clínico" icon={Heart}>
+          <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
+          <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
+          <Select label="Tránsito Intestinal" value={form.estrenimiento} onChange={(v: string) => update('estrenimiento', v)} options={['No', 'Leve', 'Frecuente']} />
+          <Select label="Consumo de Alcohol" value={form.alcohol} onChange={(v: string) => update('alcohol', v)} options={['No', 'Social', 'Frecuente']} />
+          <Select label="Hábito Tabáquico" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Ocasional', 'Frecuente']} />
+          <Input label="Ingesta de Agua (L)”" value={form.agua} onChange={(v: string) => update('agua', v)} placeholder="Ej. 2.5 Lts" />
+          {form.sexo === 'F' && <Input label="Ciclo Menstrual" value={form.cicloMenstrual} onChange={(v: string) => update('cicloMenstrual', v)} placeholder="Regular / 28 Días" />}
+          <TextArea label="Signos y Síntomas Adicionales" value={form.signosSintomas} onChange={(v: string) => update('signosSintomas', v)} placeholder="Cansancio crónico, dolor de cabeza..." />
         </FormSection>
 
-        <div className="pt-12 flex justify-end items-center gap-8">
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-none bg-slate-200 animate-pulse" />
-            <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">Sincronización de cambios activa</span>
-          </div>
+        <div className="pt-6 flex justify-end items-center gap-6">
+          <p className="text-[14px] font-normal text-text-secondary m-0">Revisa los datos antes de guardar</p>
           <button
             onClick={handleSave}
             disabled={saving}
-            className="flex items-center gap-4 bg-slate-900 text-white px-12 py-5 rounded-none text-[11px] font-bold uppercase tracking-[0.25em] transition-all hover:bg-slate-800 hover:shadow-2xl hover:shadow-slate-200 disabled:opacity-50 group"
+            className="flex items-center gap-2 bg-brand-primary text-bg-base px-[24px] py-[12px] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] disabled:opacity-50"
           >
-            {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Save className="h-5 w-5 group-hover:scale-110 transition-transform" />}
-            {saving ? 'Guardando...' : 'Actualizar Nodo Maestro'}
+            {saving ? <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
+            {saving ? 'Guardando...' : 'Actualizar Información'}
           </button>
         </div>
       </div>

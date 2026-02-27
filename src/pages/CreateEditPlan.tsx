@@ -223,18 +223,18 @@ const CreateEditPlan = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-none">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
-        <div className="space-y-4">
-          <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
-            <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> VOLVER
+    <div className="space-y-8 animate-fade-in pb-20 max-w-[1400px]">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
+        <div className="space-y-2">
+          <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
+            <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver
           </button>
-          <div className="animate-slide-up space-y-2">
-            <h1 className="text-4xl font-black text-foreground tracking-tighter uppercase leading-none">
-              {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Maestro') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Maestro')}
+          <div className="animate-slide-up space-y-1">
+            <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
+              {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Base') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional')}
             </h1>
-            <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">
-              {isBasePlan ? 'DEFINICIÓN DE PROTOCOLO ESTÁNDAR PARA LA BIBLIOTECA' : 'AJUSTE DE REQUERIMIENTOS Y PERSONALIZACIÓN DE TIEMPOS'}
+            <p className="text-text-secondary font-normal text-[14px] m-0">
+              {isBasePlan ? 'Definición de protocolo estándar para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
             </p>
           </div>
         </div>
@@ -243,25 +243,25 @@ const CreateEditPlan = () => {
           <div className="relative">
             <button 
               onClick={() => setShowTemplates(!showTemplates)}
-              className="px-8 py-4 bg-secondary/50 border-2 border-dashed border-foreground/10 text-[11px] font-black uppercase tracking-widest hover:border-foreground/30 transition-all flex items-center gap-3"
+              className="px-[18px] py-[10px] bg-bg-surface border border-border-default text-text-primary text-[14px] font-medium rounded-[8px] hover:bg-bg-elevated transition-colors flex items-center gap-2"
             >
-              <ClipboardList className="h-4 w-4" /> USAR PLANTILLA BASE
+              <ClipboardList className="h-[18px] w-[18px]" /> Usar plantilla base
             </button>
             {showTemplates && (
-              <div className="absolute top-full right-0 mt-4 w-80 bg-background border-2 border-foreground shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-40">Seleccionar de Biblioteca</p>
-                <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar">
+              <div className="absolute top-full right-0 mt-2 w-[350px] bg-bg-surface border border-border-default rounded-[12px] shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
+                <p className="text-[14px] font-medium text-text-muted m-0">Seleccionar plantilla</p>
+                <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar pr-2">
                   {availableTemplates.map(t => (
                     <button 
                       key={t.id} 
                       onClick={() => loadTemplate(t)}
-                      className="w-full text-left p-4 hover:bg-secondary border border-transparent hover:border-foreground/10 transition-all group"
+                      className="w-full text-left p-3 rounded-[8px] hover:bg-bg-elevated border border-transparent hover:border-border-default transition-all group"
                     >
-                      <p className="text-xs font-black uppercase tracking-tight group-hover:text-black">{t.nombre || 'Protocolo Sin Nombre'}</p>
-                      <p className="text-[9px] font-bold opacity-30 uppercase mt-1">{t.calorias} KCAL · {t.tipo}</p>
+                      <p className="text-[14px] font-medium text-text-primary group-hover:text-brand-primary m-0">{t.nombre || 'Protocolo Sin Nombre'}</p>
+                      <p className="text-[12px] font-normal text-text-muted mt-1 m-0">{t.calorias} Kcal · {t.tipo}</p>
                     </button>
                   ))}
-                  {availableTemplates.length === 0 && <p className="p-4 text-center text-[10px] font-bold opacity-30 uppercase">Sin plantillas disponibles</p>}
+                  {availableTemplates.length === 0 && <p className="p-4 text-center text-[14px] font-normal text-text-muted">Sin plantillas disponibles</p>}
                 </div>
               </div>
             )}
@@ -271,65 +271,70 @@ const CreateEditPlan = () => {
         {isBasePlan && isEdit && (
           <button 
             onClick={handleDelete}
-            className="px-8 py-4 bg-red-50 text-red-600 border-2 border-red-200 text-[11px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white hover:border-red-600 transition-all flex items-center gap-3"
+            className="px-[18px] py-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium rounded-[8px] hover:bg-[#3d1a1a] transition-colors flex items-center gap-2"
           >
-            <Trash2 className="h-4 w-4" /> ELIMINAR PLANTILLA
+            <Trash2 className="h-[18px] w-[18px]" /> Eliminar plantilla
           </button>
         )}
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
+      <div className="grid lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
           {/* Configuración Metabólica */}
-          <div className="bg-secondary/10 p-6 rounded-none animate-slide-up border border-border/20">
-            <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] mb-8 flex items-center gap-4 leading-none opacity-30">
-               {`// REQUERIMIENTOS ESCENCIALES`}
+          <div className="bg-bg-surface p-6 rounded-[12px] animate-slide-up border border-border-subtle">
+            <h3 className="text-[16px] font-semibold text-text-primary mb-6 flex items-center gap-2 m-0">
+               Requerimientos Esenciales
             </h3>
             
             <div className="grid sm:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Identificador del Plan / Objetivo</label>
+                <label className="text-[12px] font-medium text-text-secondary">Identificador / Objetivo</label>
                 <input 
                   value={nombrePlan} 
                   onChange={(e) => setNombrePlan(e.target.value)} 
-                  placeholder="EJ: DEFINICIÓN 1800 KCAL / CROSSFIT"
-                  className="w-full bg-background rounded-none px-4 py-3 text-base font-black uppercase tracking-tight outline-none border border-foreground/5 focus:border-foreground/20 transition-all"
+                  placeholder="Ej: Balanceado 1800 kcal"
+                  className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Modelo de Enfoque</label>
-                <select value={tipo} onChange={(e) => setTipo(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 text-base font-black uppercase tracking-tight outline-none border border-foreground/5 transition-all">
-                  <option>Balanceada</option>
-                  <option>Keto / Low Carb</option>
-                  <option>Vegetariana / Vegana</option>
-                  <option>Hipercalórica / Volumen</option>
-                  <option>Hipocalórica / Déficit</option>
-                  <option>Personalizada</option>
+                <label className="text-[12px] font-medium text-text-secondary">Enfoque Nutricional</label>
+                <select 
+                  value={tipo} 
+                  onChange={(e) => setTipo(e.target.value)} 
+                  className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors appearance-none"
+                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
+                >
+                  <option value="Balanceada">Balanceada</option>
+                  <option value="Keto / Low Carb">Keto / Low Carb</option>
+                  <option value="Vegetariana / Vegana">Vegetariana / Vegana</option>
+                  <option value="Hipercalórica / Volumen">Hipercalórica / Volumen</option>
+                  <option value="Hipocalórica / Déficit">Hipocalórica / Déficit</option>
+                  <option value="Personalizada">Personalizada</option>
                 </select>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-1 gap-6 mt-6">
                <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 leading-none opacity-40">Energía Total (KCAL)</label>
-                <div className="flex flex-col gap-2">
-                  <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 text-2xl font-black text-foreground tracking-tighter outline-none border border-foreground/5 transition-all" />
+                <label className="text-[12px] font-medium text-text-secondary">Energía Total (Kcal)</label>
+                <div className="flex flex-col gap-3">
+                  <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[18px] font-semibold text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors" />
                   
                   {valData && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-1">
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
                       {[
-                        { key: 'getSedentario', label: 'SED' },
-                        { key: 'getLeve', label: 'LEV' },
-                        { key: 'getModerado', label: 'MOD' },
-                        { key: 'getIntenso', label: 'INT' }
+                        { key: 'getSedentario', label: 'SEDENTARIO' },
+                        { key: 'getLeve', label: 'LEVE' },
+                        { key: 'getModerado', label: 'MODERADO' },
+                        { key: 'getIntenso', label: 'INTENSO' }
                       ].map(g => (
                         <button
                           key={g.key}
                           type="button"
                           onClick={() => setCalorias(Math.round(valData[g.key]).toString())}
-                          className="bg-white/50 hover:bg-black hover:text-white px-2 py-1 text-[8px] font-black uppercase tracking-widest transition-all border border-black/5"
+                          className="bg-bg-elevated hover:bg-brand-primary text-text-secondary hover:text-bg-base px-3 py-2 text-[12px] font-medium rounded-[8px] transition-colors border border-border-subtle"
                         >
-                          {g.label}: {Math.round(valData[g.key])}
+                          {g.label} ({Math.round(valData[g.key])})
                         </button>
                       ))}
                     </div>
@@ -338,96 +343,95 @@ const CreateEditPlan = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-6 mt-6 pt-6 border-t border-foreground/5">
+            <div className="grid grid-cols-3 gap-6 mt-8 pt-6 border-t border-border-subtle">
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] text-center w-full block leading-none">Proteína %</label>
-                <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 font-black text-center text-lg text-foreground outline-none border border-foreground/10 focus:border-foreground/30" />
+                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Proteína %</label>
+                <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] text-center w-full block leading-none">Carbos %</label>
-                <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 font-black text-center text-lg text-foreground outline-none border border-foreground/10 focus:border-foreground/30" />
+                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Carbohidratos %</label>
+                <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[9px] font-black text-muted-foreground/40 uppercase tracking-[0.2em] text-center w-full block leading-none">Grasas %</label>
-                <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="w-full bg-background rounded-none px-4 py-3 font-black text-center text-lg text-foreground outline-none border border-foreground/10 focus:border-foreground/30" />
+                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Grasas %</label>
+                <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
               </div>
             </div>
 
             {macroSum !== 100 && (
-              <div className="mt-6 p-4 bg-foreground text-background rounded-none animate-pulse">
-                <p className="text-[11px] font-black uppercase tracking-[0.2em] text-center leading-none">
-                   DISTRIBUCIÓN SUMA {macroSum}% (REQUERIDO: 100%)
+              <div className="mt-6 p-4 bg-[#2e1a1a] border border-accent-red/20 text-accent-red rounded-[8px]">
+                <p className="text-[14px] font-medium text-center m-0">
+                   La distribución suma {macroSum}% (Requiere 100%)
                 </p>
               </div>
             )}
           </div>
 
           {/* Menús Personalizados */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-2 gap-8 items-start">
+          <div className="grid lg:grid-cols-2 gap-6 items-start">
             {menus.map((menu, mi) => (
-              <div key={mi} className="bg-secondary/10 rounded-none animate-slide-up border border-border/40 overflow-hidden" style={{ animationDelay: `${mi * 0.1}s` }}>
-                <div className="bg-foreground text-background px-6 py-4 flex items-center justify-between">
+              <div key={mi} className="bg-bg-surface rounded-[12px] animate-slide-up border border-border-subtle overflow-hidden flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
+                <div className="bg-bg-elevated border-b border-border-subtle px-6 py-4 flex items-center justify-between">
                   <input
                     value={menu.nombre}
-                    onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value.toUpperCase() }))}
-                    className="text-lg font-black bg-transparent border-none outline-none w-full uppercase tracking-tighter selection:bg-background/20"
-                    placeholder="NOMBRE DEL MENÚ"
+                    onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
+                    className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-text-primary selection:bg-brand-primary placeholder:text-text-muted"
+                    placeholder="Nombre del menú"
                   />
                   <button
                      onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
-                     className="p-3 text-background/20 hover:text-background hover:bg-background/10 rounded-none transition-all"
+                     className="p-2 text-text-muted hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
                   >
-                    <Trash2 className="h-5 w-5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
 
-                <div className="p-4 space-y-6">
+                <div className="p-6 space-y-6 flex-1 flex flex-col">
                   {menu.tiempos.map((tiempo, ti) => (
-                    <div key={ti} className="relative p-5 border border-black/5 bg-white group hover:border-black/20 transition-all">
+                    <div key={ti} className="p-4 rounded-[8px] border border-border-subtle bg-bg-elevated group relative">
                       <div className="flex items-center justify-between mb-4">
                          <input
                            value={tiempo.nombre}
-                           onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value.toUpperCase() }))}
-                           className="text-[12px] font-black text-foreground bg-transparent border-none outline-none uppercase tracking-widest w-fit"
+                           onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value }))}
+                           className="text-[14px] font-semibold text-text-primary bg-transparent border-none outline-none w-[70%]"
+                           placeholder="Nombre del tiempo"
                          />
-                         <div className="flex items-center gap-1 opacity-20 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1 text-muted-foreground hover:text-destructive transition-all">
-                              <Trash2 className="h-3 w-3" />
-                            </button>
-                         </div>
+                         <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-text-muted hover:text-accent-red rounded-[6px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#2e1a1a]">
+                           <Trash2 className="h-3.5 w-3.5" />
+                         </button>
                       </div>
 
-                      <div className="space-y-3">
+                      <div className="space-y-4">
                         {tiempo.ingredientes.map((ing, ii) => (
-                          <div key={ii} className="space-y-2 pb-3 border-b border-black/5 last:border-0 text-[11px]">
+                          <div key={ii} className="relative space-y-2 pb-4 border-b border-border-default last:border-0 last:pb-0">
                              <div className="flex gap-2">
                                 <input
-                                  placeholder="ALIMENTO..."
+                                  placeholder="Alimento o ingrediente..."
                                   value={ing.descripcion}
                                   onChange={(e) => updateTiempo(mi, ti, (t) => ({
                                     ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, descripcion: e.target.value } : x)
                                   }))}
-                                  className="flex-1 bg-slate-50 px-2 py-1.5 font-bold uppercase outline-none border-b border-transparent focus:border-black transition-all"
+                                  className="flex-1 bg-bg-base px-3 py-2 rounded-[6px] text-[13px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors"
                                 />
-                                <button onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, j) => j !== ii) }))} className="text-red-500 opacity-20 hover:opacity-100"><X className="w-3 h-3" /></button>
+                                <button onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, j) => j !== ii) }))} className="text-text-muted hover:text-accent-red px-2 transition-colors"><X className="w-4 h-4" /></button>
                              </div>
-                             <div className="grid grid-cols-4 gap-1.5">
+                             <div className="grid grid-cols-4 gap-2">
                                 <div className="space-y-1">
-                                   <input type="number" value={ing.cantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="CANT" />
+                                   <input type="number" value={ing.cantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Cant" />
                                 </div>
                                 <div className="space-y-1">
-                                   <input value={ing.unidad} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, unidad: e.target.value.toUpperCase() } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="UNID" />
+                                   <input value={ing.unidad} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, unidad: e.target.value } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Unid" />
                                 </div>
                                 <div className="space-y-1">
-                                   <input type="number" value={ing.eqCantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqCantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="EQ" />
+                                   <input type="number" value={ing.eqCantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqCantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Eq" />
                                 </div>
                                 <div className="space-y-1">
-                                   <input value={ing.eqGrupo} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqGrupo: e.target.value } : x) }))} className="w-full bg-slate-50 py-1 text-[10px] font-black text-center outline-none" placeholder="GRUPO" />
+                                   <input value={ing.eqGrupo} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqGrupo: e.target.value } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Grupo" />
                                 </div>
                              </div>
                              {ing.eqCantidad ? (
-                               <p className="text-[9px] font-bold text-slate-400 uppercase tracking-tighter">
-                                 {ing.cantidad}{ing.unidad} {ing.descripcion} — {ing.eqCantidad} EQ {ing.eqGrupo}
+                               <p className="text-[12px] font-medium text-text-muted mt-2 m-0 bg-bg-base px-2 py-1 rounded-[4px] inline-block border border-border-default">
+                                 {ing.cantidad} {ing.unidad} {ing.descripcion} → {ing.eqCantidad} Eq {ing.eqGrupo}
                                </p>
                              ) : null}
                           </div>
@@ -435,21 +439,22 @@ const CreateEditPlan = () => {
                         
                         <button
                           onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, emptyIngrediente()] }))}
-                          className="w-full py-1.5 border border-black/10 text-[8px] font-black uppercase tracking-widest hover:bg-black hover:text-white transition-all opacity-40 hover:opacity-100"
+                          className="w-full py-2 bg-transparent border border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
                         >
-                          + AGREGAR ITEM
+                          + Agregar Alimento
                         </button>
                       </div>
                     </div>
                   ))}
                   
+                  <div className="flex-1" />
                   <button
                     onClick={() => updateMenu(mi, (m) => ({
-                      ...m, tiempos: [...m.tiempos, { nombre: 'NUEVO TIEMPO', ingredientes: [], nota: '' }]
+                      ...m, tiempos: [...m.tiempos, { nombre: 'Nuevo Tiempo', ingredientes: [], nota: '' }]
                     }))}
-                    className="w-full py-4 border-2 border-dashed border-border/40 rounded-none text-[9px] font-black text-muted-foreground uppercase tracking-[0.3em] hover:bg-foreground/5 transition-all"
+                    className="w-full py-3 mt-4 border border-dashed border-border-default hover:border-text-secondary rounded-[8px] text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors"
                   >
-                    + AGREGAR COMIDA
+                    + Agregar Tiempo de Comida
                   </button>
                 </div>
               </div>
@@ -457,83 +462,80 @@ const CreateEditPlan = () => {
             
             <button
                onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
-               className="h-full min-h-[400px] border-4 border-dashed border-foreground/5 p-10 flex flex-col items-center justify-center gap-4 text-muted-foreground hover:text-foreground hover:bg-foreground/5 hover:border-foreground/20 transition-all group"
+               className="h-[100%] min-h-[400px] border-2 border-dashed border-border-default rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-text-muted hover:text-text-primary hover:bg-bg-elevated hover:border-text-muted transition-all group"
             >
-              <Plus className="w-12 h-12 group-hover:rotate-90 transition-transform duration-500" />
-              <span className="text-[11px] font-black uppercase tracking-[0.4em]">AGREGAR OPCIÓN</span>
+              <Plus className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+              <span className="text-[14px] font-medium">Agregar Menú Alternativo</span>
             </button>
           </div>
         </div>
 
         {/* Sidebar Summary & Persistence */}
-        <div className="lg:col-span-4 space-y-8">
-          <div className="sticky top-20 space-y-8 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="bg-foreground text-background p-6 rounded-none relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-5 translate-x-1/4 -translate-y-1/4 rotate-12">
-                  <Save className="w-24 h-24" />
-               </div>
-               <h3 className="text-[10px] font-black uppercase tracking-[0.3em] mb-8 opacity-20 leading-none">CÓMPUTO METABÓLICO</h3>
+        <div className="lg:col-span-4 space-y-6">
+          <div className="sticky top-24 space-y-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+            <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden">
+               <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0">Computo Metabólico</h3>
                
-               <div className="space-y-8 relative">
+               <div className="space-y-6 relative">
                   {[
-                    { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: 'text-emerald-400' },
-                    { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: 'text-amber-400' },
-                    { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: 'text-rose-400' },
+                    { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: 'text-text-primary' },
+                    { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: 'text-text-primary' },
+                    { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: 'text-text-primary' },
                   ].map((m) => (
-                    <div key={m.label} className="flex items-center justify-between border-b border-background/10 pb-4">
-                      <span className="text-[11px] font-black uppercase tracking-[0.1em] opacity-30">{m.label}</span>
+                    <div key={m.label} className="flex items-center justify-between border-b border-border-default pb-4">
+                      <span className="text-[14px] font-medium text-text-secondary">{m.label}</span>
                       <div className="text-right space-y-1">
-                        <p className={`text-2xl font-black tracking-tighter uppercase ${m.color}`}>{formatDecimal(m.gr)}<span className="text-[10px] ml-1 tracking-[0.1em] opacity-40">GR</span></p>
-                        <p className="text-[10px] font-black opacity-20 tracking-[0.1em] font-mono">{formatDecimal(m.grKg)} GR/KG</p>
+                        <p className={`text-[18px] font-bold m-0 ${m.color}`}>{formatDecimal(m.gr)}<span className="text-[12px] ml-1 font-medium text-text-muted">Gr</span></p>
+                        <p className="text-[12px] font-normal text-text-muted m-0">{formatDecimal(m.grKg)} Gr/Kg</p>
                       </div>
                     </div>
                   ))}
 
-                  <div className="pt-4">
+                  <div className="pt-2">
                      <div className="flex flex-col items-center">
-                        <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-40 mb-3 leading-none text-center">CARGA ENERGÉTICA TOTAL</span>
-                        <p className="text-3xl font-black tracking-tighter leading-none">{cal}<span className="text-sm ml-2 opacity-40 tracking-[0.1em] uppercase">KCAL</span></p>
+                        <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Carga Energética</span>
+                        <p className="text-[28px] font-bold text-text-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
                      </div>
                   </div>
                </div>
             </div>
 
-            <div className="bg-secondary/10 p-6 rounded-none space-y-8 border border-border/20">
-              <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] opacity-20 leading-none">ADMINISTRACIÓN DE PROTOCOLO</h3>
-              <div className="space-y-6">
+            <div className="bg-bg-surface p-6 rounded-[12px] space-y-6 border border-border-subtle">
+              <h3 className="text-[14px] font-semibold text-text-primary m-0">Ajustes Finales</h3>
+              <div className="space-y-5">
                 {!isBasePlan && (
                   <div className="space-y-2">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2 leading-none opacity-40">Próximo Seguimiento</label>
+                    <label className="text-[12px] font-medium text-text-secondary">Próximo Seguimiento (Opcional)</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
-                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-background rounded-none px-4 py-3 text-[11px] font-black outline-none border border-foreground/5 focus:border-foreground/30 shadow-inner" />
+                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
+                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
                     </div>
                   </div>
                 )}
                 
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-2 leading-none opacity-40">Anotaciones Estratégicas</label>
+                  <label className="text-[12px] font-medium text-text-secondary">Anotaciones Generales</label>
                   <textarea 
                     value={notas} 
                     onChange={(e) => setNotas(e.target.value)} 
-                    className="w-full bg-background rounded-none p-6 text-[11px] font-black leading-relaxed uppercase tracking-tighter border border-foreground/5 focus:border-foreground/30 outline-none resize-none min-h-[150px] placeholder:opacity-20"
-                    placeholder="PUNTOS CLAVE PARA EL PACIENTE Y EL EQUIPO CLÍNICO..."
+                    className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary border border-border-subtle focus:border-[#444] outline-none resize-y min-h-[120px] placeholder:text-text-muted"
+                    placeholder="Instrucciones, notas para el paciente..."
                   />
                 </div>
               </div>
 
-              <div className="pt-6">
+              <div className="pt-2">
                 <button
                   onClick={handleSave}
                   disabled={saving || macroSum !== 100}
-                  className="w-full py-6 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.3em] transition-all duration-200 flex items-center justify-center gap-4 border border-foreground"
+                  className="w-full py-[12px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {saving ? (
-                    <div className="w-4 h-4 border-2 border-background/20 border-t-background rounded-none animate-spin" />
+                    <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
                   ) : (
                     <>
-                      <Save className="h-4 w-4" />
-                      {isEdit ? 'ACTUALIZAR' : 'PERSISTIR'}
+                      <Save className="h-[18px] w-[18px]" />
+                      {isEdit ? 'Guardar Cambios' : 'Crear Protocolo'}
                     </>
                   )}
                 </button>

@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Outfit:wght@100;200;300;400;500;600;700;800;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 
 @tailwind base;
 @tailwind components;
@@ -6,48 +6,49 @@
 
 @layer base {
   :root {
-    --background: 32 20% 98%;
-    --foreground: 0 0% 0%;
-    --card: 32 20% 98%;
-    --card-foreground: 0 0% 0%;
-    --popover: 32 20% 98%;
-    --popover-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 32 15% 96%;
-    --secondary-foreground: 0 0% 0%;
-    --muted: 32 15% 94%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 20%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 0% 0%;
+    /* Mapped all standard Tailwind variables to the new dark mode system for backward compatibility */
+    --background: 0 0% 4%; /* bg-base #0a0a0a */
+    --foreground: 0 0% 94%; /* text-primary #f0f0f0 */
+    --card: 0 0% 7%; /* bg-surface #111111 */
+    --card-foreground: 0 0% 94%; /* text-primary #f0f0f0 */
+    --popover: 0 0% 7%; /* bg-surface #111111 */
+    --popover-foreground: 0 0% 94%;
+    --primary: 0 0% 100%; /* brand-primary #FFFFFF */
+    --primary-foreground: 0 0% 4%; /* bg-base #0a0a0a */
+    --secondary: 0 0% 10%; /* bg-elevated #1a1a1a */
+    --secondary-foreground: 0 0% 54%; /* text-secondary #8a8a8a */
+    --muted: 0 0% 13%; /* bg-muted #222222 */
+    --muted-foreground: 0 0% 33%; /* text-muted #555555 */
+    --accent: 0 0% 10%; /* bg-elevated #1a1a1a (used for hover bg in shadcn) */
+    --accent-foreground: 0 0% 94%; /* text-primary #f0f0f0 */
+    --destructive: 0 100% 60%; /* accent-red #ef4444 approx */
     --destructive-foreground: 0 0% 100%;
-    --border: 32 10% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
-    --radius: 1.5rem;
+    --border: 0 0% 16%; /* border-subtle #2a2a2a */
+    --input: 0 0% 20%; /* border-default #333333 */
+    --ring: 0 0% 20%; /* focus ring matches border-default */
+    --radius: 0.5rem; /* 8px for inputs, cards have their own via classes */
   }
 
   .dark {
-    --background: 0 0% 0%;
-    --foreground: 0 0% 100%;
-    --card: 0 0% 3%;
-    --card-foreground: 0 0% 100%;
-    --popover: 0 0% 3%;
-    --popover-foreground: 0 0% 100%;
+    --background: 0 0% 4%;
+    --foreground: 0 0% 94%;
+    --card: 0 0% 7%;
+    --card-foreground: 0 0% 94%;
+    --popover: 0 0% 7%;
+    --popover-foreground: 0 0% 94%;
     --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --secondary: 0 0% 8%;
-    --secondary-foreground: 0 0% 100%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 60%;
-    --accent: 0 0% 80%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 0% 100%;
-    --destructive-foreground: 0 0% 0%;
-    --border: 0 0% 12%;
-    --input: 0 0% 12%;
-    --ring: 0 0% 100%;
+    --primary-foreground: 0 0% 4%;
+    --secondary: 0 0% 10%;
+    --secondary-foreground: 0 0% 54%;
+    --muted: 0 0% 13%;
+    --muted-foreground: 0 0% 33%;
+    --accent: 0 0% 10%;
+    --accent-foreground: 0 0% 94%;
+    --destructive: 0 100% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 16%;
+    --input: 0 0% 20%;
+    --ring: 0 0% 20%;
   }
 }
 
@@ -56,10 +57,9 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans antialiased;
-    font-family: "Outfit", sans-serif;
-    font-size: 18px;
-    letter-spacing: -0.015em;
+    @apply bg-bg-base text-text-primary font-sans antialiased;
+    font-family: "Inter", system-ui, sans-serif;
+    font-size: 14px; /* body font size */
     line-height: 1.6;
   }
 }

@@ -144,38 +144,43 @@ const Requirements = () => {
   if (!paciente) return <div className="p-20 text-center animate-pulse font-black uppercase tracking-widest">Iniciando Protocolo de Requerimientos...</div>;
 
   return (
-    <div className="min-h-screen bg-white text-black font-sans pb-20 p-6 md:p-10">
-      <div className="max-w-none space-y-12">
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 border-b-4 border-black pb-8">
-           <div className="space-y-4">
-             <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest opacity-40 hover:opacity-100 transition-all">
-                <ArrowLeft className="w-4 h-4" /> Regresar al expediente
+    <div className="min-h-screen animate-fade-in pb-20 px-6 max-w-[1400px] mx-auto">
+      <div className="space-y-8 pt-6">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pb-6">
+           <div className="space-y-2">
+             <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
+                <ArrowLeft className="w-[18px] h-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
              </button>
-             <h1 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-none">Cálculo de Requerimientos</h1>
+             <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Cálculo de Requerimientos</h1>
+             <p className="text-text-secondary font-normal text-[14px] m-0">Ajuste técnico y macronutrientes</p>
            </div>
-           <button onClick={handleSave} className="px-10 py-4 bg-black text-white font-black uppercase tracking-widest hover:bg-white hover:text-black border-2 border-black transition-all">Sincronizar Protocolo</button>
+           <button onClick={handleSave} className="flex items-center gap-2 px-[18px] py-[10px] bg-brand-primary text-bg-base font-medium text-[14px] hover:bg-[#e0e0e0] rounded-[8px] transition-colors">
+              <Save className="w-[18px] h-[18px]" /> Sincronizar Protocolo
+           </button>
         </header>
 
-        <div className="grid lg:grid-cols-2 gap-16">
-          <div className="space-y-12">
-            <section className="space-y-6">
-              <h2 className="text-xs font-black uppercase tracking-widest bg-black text-white px-3 py-1 w-fit">Paso 1: Gasto Energético</h2>
-              <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid lg:grid-cols-2 gap-8">
+          <div className="space-y-8">
+            <section className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle space-y-6 animate-slide-up">
+              <h2 className="text-[16px] font-semibold text-text-primary flex items-center gap-2 m-0 border-b border-border-default pb-4">
+                <Activity className="w-[18px] h-[18px] text-text-muted" /> Paso 1: Gasto Energético
+              </h2>
+              <div className="grid md:grid-cols-2 gap-6 pt-2">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase opacity-30">Peso Control (kg)</label>
-                  <input type="number" value={peso} onChange={e => setPeso(e.target.value)} className="w-full border-2 border-black p-3 text-xl font-black outline-none focus:bg-black focus:text-white transition-all" />
+                  <label className="text-[12px] font-medium text-text-secondary">Peso Control (kg)</label>
+                  <input type="number" value={peso} onChange={e => setPeso(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-semibold text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase opacity-30">Fórmula Predictiva</label>
-                  <select value={formula} onChange={e => setFormula(e.target.value)} className="w-full border-2 border-black p-3 text-lg font-black outline-none bg-white">
+                  <label className="text-[12px] font-medium text-text-secondary">Fórmula Predictiva</label>
+                  <select value={formula} onChange={e => setFormula(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors appearance-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}>
                     <option value="mifflin">Mifflin-St Jeor</option>
                     <option value="harris">Harris-Benedict</option>
                     <option value="fao">FAO-OMS</option>
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase opacity-30">Factor de Actividad</label>
-                  <select value={actividad} onChange={e => setActividad(e.target.value)} className="w-full border-2 border-black p-3 text-lg font-black outline-none bg-white">
+                  <label className="text-[12px] font-medium text-text-secondary">Factor de Actividad</label>
+                  <select value={actividad} onChange={e => setActividad(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors appearance-none" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}>
                     <option value="1.1">Sedentario (1.1)</option>
                     <option value="1.2">Leve (1.2)</option>
                     <option value="1.3">Moderado (1.3)</option>
@@ -183,111 +188,119 @@ const Requirements = () => {
                     <option value="1.5">Elite (1.5)</option>
                   </select>
                 </div>
-                <div className="bg-black text-white p-6 flex flex-col justify-center">
-                  <p className="text-[10px] font-bold uppercase opacity-50 mb-2">GET Proyectado</p>
-                  <p className="text-4xl font-black">{Math.round(energeticData.get)} KCAL</p>
+                <div className="bg-bg-elevated border border-border-subtle rounded-[8px] p-4 flex flex-col justify-center">
+                  <p className="text-[12px] font-medium text-text-secondary mb-1 m-0">GET Proyectado</p>
+                  <p className="text-[24px] font-bold text-text-primary m-0">{Math.round(energeticData.get)} <span className="text-[14px] font-medium text-text-muted">Kcal</span></p>
                 </div>
               </div>
             </section>
 
-            <section className="space-y-6">
-              <h2 className="text-xs font-black uppercase tracking-widest bg-black text-white px-3 py-1 w-fit">Paso 2: Distribución de Macros</h2>
-              <div className="grid md:grid-cols-3 gap-6">
+            <section className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle space-y-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+              <h2 className="text-[16px] font-semibold text-text-primary flex items-center gap-2 m-0 border-b border-border-default pb-4">
+                <Calculator className="w-[18px] h-[18px] text-text-muted" /> Paso 2: Distribución de Macros
+              </h2>
+              <div className="grid md:grid-cols-3 gap-6 pt-2">
                  {['prot', 'carb', 'lip'].map(m => (
                    <div key={m} className="space-y-2">
-                      <label className="text-[10px] font-bold uppercase opacity-30">{m === 'lip' ? 'Lípidos %' : m === 'carb' ? 'Carbos %' : 'Proteínas %'}</label>
+                      <label className="text-[12px] font-medium text-text-secondary">{m === 'lip' ? 'Lípidos %' : m === 'carb' ? 'Carbos %' : 'Proteínas %'}</label>
                       <input 
                         type="number" 
                         value={macrosPct[m as keyof typeof macrosPct]} 
                         onChange={e => setMacrosPct({...macrosPct, [m]: parseInt(e.target.value) || 0})}
-                        className="w-full border-2 border-black p-3 text-xl font-black outline-none"
+                        className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[16px] font-semibold text-center text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors"
                       />
                    </div>
                  ))}
               </div>
-              <div className="grid grid-cols-3 gap-4 border-2 border-black divide-x-2 divide-black">
+              <div className="grid grid-cols-3 gap-4 border border-border-subtle rounded-[8px] divide-x divide-border-subtle overflow-hidden">
                 {Object.entries(macroData).map(([k, v]) => (
-                  <div key={k} className="p-4 space-y-2">
-                    <p className="text-[10px] font-black uppercase opacity-30">{k}</p>
-                    <p className="text-lg font-black">{Math.round(v.g)}g</p>
-                    <p className="text-[10px] font-bold">{formatDecimal(v.gkg)} g/kg</p>
+                  <div key={k} className="p-4 bg-bg-elevated flex flex-col items-center justify-center space-y-1">
+                    <p className="text-[12px] font-medium text-text-muted m-0 uppercase">{k}</p>
+                    <p className="text-[18px] font-bold text-text-primary m-0">{Math.round(v.g)}<span className="text-[12px] font-medium text-text-secondary ml-0.5">g</span></p>
+                    <p className="text-[11px] font-normal text-text-muted m-0">{formatDecimal(v.gkg)} g/kg</p>
                   </div>
                 ))}
               </div>
-              <div className={`p-2 text-center text-[10px] font-bold uppercase tracking-tighter ${macrosPct.prot + macrosPct.carb + macrosPct.lip === 100 ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'}`}>
+              <div className={`p-3 rounded-[8px] text-center text-[13px] font-medium border ${macrosPct.prot + macrosPct.carb + macrosPct.lip === 100 ? 'bg-[#1a2e1a] text-accent-green border-accent-green/20' : 'bg-[#2e1a1a] text-accent-red border-accent-red/20'}`}>
                 Suma: {macrosPct.prot + macrosPct.carb + macrosPct.lip}% {macrosPct.prot + macrosPct.carb + macrosPct.lip !== 100 && '(Debe ser 100%)'}
               </div>
             </section>
           </div>
 
-          <div className="space-y-12">
-             <section className="space-y-6">
-                <h2 className="text-xs font-black uppercase tracking-widest bg-black text-white px-3 py-1 w-fit">Paso 3: Tabla de Equivalentes</h2>
-                <div className="border-2 border-black max-h-[500px] overflow-auto">
-                   <table className="w-full text-left">
-                      <thead className="sticky top-0 bg-black text-white text-[10px] font-black uppercase">
-                        <tr>
-                          <th className="p-3">Grupo</th>
-                          <th className="p-3 text-center">Cant.</th>
-                          <th className="p-3 text-right">Kcal</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-black/10">
-                        {GROUPS.map(g => (
-                          <tr key={g.id} className="hover:bg-slate-50 transition-colors">
-                            <td className="p-3 text-[11px] font-bold uppercase">{g.name}</td>
-                            <td className="p-2">
-                              <input 
-                                type="number" 
-                                value={equivs[g.id]} 
-                                onChange={e => setEquivs({...equivs, [g.id]: parseFloat(e.target.value) || 0})}
-                                className="w-full border border-black/20 p-1 text-center font-black text-sm outline-none"
-                              />
-                            </td>
-                            <td className="p-3 text-right font-black text-xs">{(equivs[g.id] || 0) * g.kcal}</td>
+          <div className="space-y-8">
+             <section className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle space-y-6 animate-slide-up" style={{ animationDelay: '0.2s' }}>
+                <h2 className="text-[16px] font-semibold text-text-primary flex items-center gap-2 m-0 border-b border-border-default pb-4">
+                   <Beaker className="w-[18px] h-[18px] text-text-muted" /> Paso 3: Tabla de Equivalentes
+                </h2>
+                <div className="rounded-[8px] border border-border-subtle overflow-hidden relative">
+                   <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                     <table className="w-full text-left">
+                        <thead className="sticky top-0 bg-bg-elevated border-b border-border-subtle text-[12px] font-medium text-text-muted uppercase">
+                          <tr>
+                            <th className="px-4 py-3">Grupo</th>
+                            <th className="px-4 py-3 text-center w-24">Eq.</th>
+                            <th className="px-4 py-3 text-right">Kcal</th>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-slate-100 font-black">
-                        <tr>
-                          <td className="p-4 text-xs uppercase">Totales</td>
-                          <td className="p-2"></td>
-                          <td className="p-4 text-right text-lg">{equivTotals.kcal}</td>
-                        </tr>
-                      </tfoot>
-                   </table>
+                        </thead>
+                        <tbody className="divide-y divide-border-default bg-bg-surface">
+                          {GROUPS.map(g => (
+                            <tr key={g.id} className="hover:bg-bg-elevated transition-colors">
+                              <td className="px-4 py-2 text-[13px] font-medium text-text-primary">{g.name}</td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="number" 
+                                  value={equivs[g.id]} 
+                                  onChange={e => setEquivs({...equivs, [g.id]: parseFloat(e.target.value) || 0})}
+                                  className="w-full bg-bg-elevated border border-border-default rounded-[4px] px-2 py-1.5 text-center text-[13px] font-semibold text-text-primary outline-none focus:border-border-subtle"
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-right text-[13px] font-normal text-text-secondary">{(equivs[g.id] || 0) * g.kcal}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-bg-elevated border-t border-border-subtle sticky bottom-0">
+                          <tr>
+                            <td className="px-4 py-3 text-[13px] font-semibold text-text-primary uppercase tracking-tight">Totales</td>
+                            <td className="p-2"></td>
+                            <td className="px-4 py-3 text-right text-[14px] font-bold text-brand-primary">{equivTotals.kcal}</td>
+                          </tr>
+                        </tfoot>
+                     </table>
+                   </div>
                 </div>
                 {equivTotals.kcal > 0 && (
-                  <div className={`p-4 border-2 border-black flex items-center justify-between ${Math.abs(equivTotals.kcal - energeticData.get) <= 100 ? 'bg-emerald-500 text-white' : 'bg-amber-500 text-black'}`}>
-                    <span className="text-[10px] font-black uppercase tracking-widest">Diferencia Energética</span>
-                    <span className="text-xl font-black">{Math.round(equivTotals.kcal - energeticData.get)} KCAL</span>
+                  <div className={`p-4 rounded-[8px] border flex items-center justify-between transition-colors ${Math.abs(equivTotals.kcal - energeticData.get) <= 100 ? 'bg-[#1a2e1a] border-accent-green/20 text-accent-green' : 'bg-[#332517] border-[#d97706]/20 text-[#fbbf24]'}`}>
+                    <span className="text-[13px] font-medium">Diferencia Energética</span>
+                    <span className="text-[16px] font-bold">{Math.round(equivTotals.kcal - energeticData.get)} kcal</span>
                   </div>
                 )}
              </section>
           </div>
         </div>
 
-        <section className="space-y-6">
-           <h2 className="text-xs font-black uppercase tracking-widest bg-black text-white px-3 py-1 w-fit">Paso 4: Distribución por Tiempos</h2>
-           <div className="overflow-x-auto border-4 border-black">
-              <table className="w-full text-left min-w-[1000px]">
-                 <thead className="bg-black text-white text-[10px] font-black uppercase">
+        <section className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle space-y-6 animate-slide-up" style={{ animationDelay: '0.3s' }}>
+           <h2 className="text-[16px] font-semibold text-text-primary flex items-center gap-2 m-0 border-b border-border-default pb-4">
+              <span className="font-bold flex items-center gap-2 m-0 text-text-primary"><Activity className="w-[18px] h-[18px] text-text-muted" /> Paso 4: Distribución por Tiempos</span>
+           </h2>
+           <div className="overflow-x-auto rounded-[8px] border border-border-subtle custom-scrollbar">
+              <table className="w-full text-left min-w-[1000px] border-collapse bg-bg-surface">
+                 <thead className="bg-bg-elevated border-b border-border-subtle text-[12px] font-medium text-text-muted uppercase">
                    <tr>
-                     <th className="p-4">Grupo</th>
-                     {MEALS.map(m => <th key={m} className="p-4 text-center">{m}</th>)}
-                     <th className="p-4 text-right">Total</th>
-                     <th className="p-4 text-right">Target</th>
+                     <th className="px-4 py-3">Grupo</th>
+                     {MEALS.map(m => <th key={m} className="px-4 py-3 text-center">{m}</th>)}
+                     <th className="px-4 py-3 text-right">Total</th>
+                     <th className="px-4 py-3 text-right">Target</th>
                    </tr>
                  </thead>
-                 <tbody className="divide-y divide-black/10">
+                 <tbody className="divide-y divide-border-default">
                     {GROUPS.map(g => {
                       const rowTotal = Object.values(distribucion[g.id]).reduce((a, b) => a + b, 0);
                       const target = equivs[g.id] || 0;
                       return (
-                        <tr key={g.id} className="hover:bg-slate-50">
-                          <td className="p-4 text-[10px] font-black uppercase border-r border-black">{g.name}</td>
+                        <tr key={g.id} className="hover:bg-bg-elevated transition-colors">
+                          <td className="px-4 py-3 text-[13px] font-medium text-text-primary border-r border-border-default">{g.name}</td>
                           {MEALS.map(m => (
-                            <td key={m} className="p-2 border-r border-black/10">
+                            <td key={m} className="p-1.5 border-r border-border-default/50">
                               <input 
                                 type="number" 
                                 value={distribucion[g.id][m]} 
@@ -296,12 +309,12 @@ const Requirements = () => {
                                    nd[g.id][m] = parseFloat(e.target.value) || 0;
                                    setDistribucion(nd);
                                 }}
-                                className="w-full p-2 text-center font-black text-sm bg-transparent outline-none focus:bg-slate-200"
+                                className="w-full h-8 flex items-center text-center text-[13px] font-semibold text-text-primary bg-transparent outline-none focus:bg-bg-base rounded-[4px] hover:bg-bg-base/50 transition-colors"
                               />
                             </td>
                           ))}
-                          <td className={`p-4 text-right font-black ${rowTotal !== target && target > 0 ? 'text-red-500' : ''}`}>{rowTotal}</td>
-                          <td className="p-4 text-right font-black opacity-30">{target}</td>
+                          <td className={`px-4 py-3 text-right text-[13px] font-semibold ${rowTotal !== target && target > 0 ? 'text-accent-red' : 'text-text-primary'}`}>{rowTotal}</td>
+                          <td className="px-4 py-3 text-right text-[13px] font-medium text-text-muted">{target}</td>
                         </tr>
                       )
                     })}

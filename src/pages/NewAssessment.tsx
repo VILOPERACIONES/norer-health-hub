@@ -40,17 +40,17 @@ const TABLA_FAO_OMS = {
 const Collapsible = ({ title, icon: Icon, defaultOpen = false, children }: { title: string; icon?: any; defaultOpen?: boolean; children: React.ReactNode }) => {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className={`bg-secondary/10 rounded-none transition-all duration-300 overflow-hidden ${open ? 'ring-1 ring-foreground/10' : ''}`}>
+    <div className={`bg-bg-surface border border-border-subtle rounded-[12px] transition-all duration-300 overflow-hidden ${open ? 'ring-1 ring-border-default' : ''}`}>
       <button onClick={() => setOpen(!open)} className="flex items-center justify-between w-full p-4 group">
-        <div className="flex items-center gap-4">
-          {Icon && <div className={`w-10 h-10 rounded-none flex items-center justify-center transition-all ${open ? 'bg-foreground text-background' : 'bg-background text-muted-foreground'}`}><Icon className="h-4 w-4" /></div>}
-          <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground leading-none">{title}</h3>
+        <div className="flex items-center gap-3">
+          {Icon && <div className={`w-8 h-8 rounded-[8px] flex items-center justify-center transition-all ${open ? 'bg-brand-primary text-bg-base' : 'bg-bg-elevated text-text-muted'}`}><Icon className="h-4 w-4" /></div>}
+          <h3 className="text-[14px] font-semibold text-text-primary leading-none m-0">{title}</h3>
         </div>
-        <div className={`transition-all duration-300 ${open ? 'rotate-180 opacity-100' : 'opacity-20'}`}>
-           <ChevronDown className="h-4 w-4 text-foreground" />
+        <div className={`transition-all duration-300 ${open ? 'rotate-180 opacity-100 text-text-primary' : 'opacity-40 text-text-muted'}`}>
+           <ChevronDown className="h-4 w-4" />
         </div>
       </button>
-      {open && <div className="p-4 pt-0 space-y-6 animate-fade-in border-t border-foreground/5 mt-2">{children}</div>}
+      {open && <div className="p-4 pt-0 space-y-6 animate-fade-in border-t border-border-default/50 mt-2">{children}</div>}
     </div>
   );
 };
@@ -58,8 +58,8 @@ const Collapsible = ({ title, icon: Icon, defaultOpen = false, children }: { tit
 const Field = ({ label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '' }: {
   label: string; value: string | number; onChange?: (v: string) => void; type?: string; disabled?: boolean; suffix?: string; placeholder?: string;
 }) => (
-  <div className="space-y-2">
-    <label className="block text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-40 leading-none">{label}{suffix && ` (${suffix})`}</label>
+  <div className="space-y-1.5">
+    <label className="block text-[12px] font-medium text-text-secondary m-0">{label}{suffix && ` (${suffix})`}</label>
     <div className="relative group">
       <input
         type={type}
@@ -67,7 +67,7 @@ const Field = ({ label, value, onChange, type = 'number', disabled = false, suff
         onChange={onChange ? (e) => onChange(e.target.value) : undefined}
         disabled={disabled}
         placeholder={placeholder}
-        className={`w-full bg-background rounded-none px-4 py-3 text-sm font-black uppercase tracking-tight border-2 border-transparent focus:border-foreground/20 focus:bg-background outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${disabled ? 'opacity-20' : 'group-hover:border-foreground/5'}`}
+        className={`w-full bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
         step="0.01"
       />
     </div>
@@ -384,41 +384,41 @@ const NewAssessment = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-7xl pb-20 mx-auto">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border/40 pb-6">
-        <div className="space-y-6">
-           <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
-             <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> Regresar al Expediente
+    <div className="space-y-8 animate-fade-in max-w-[1400px] mx-auto pb-20 px-6">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-border-subtle pb-6 pt-6">
+        <div className="space-y-2">
+           <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
+             <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
            </button>
-           <div className="animate-slide-up space-y-2">
-              <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Formulario de consulta</h1>
-              <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">Análisis nutricional - NORDER HEALTH</p>
+           <div className="animate-slide-up space-y-1">
+              <h1 className="text-[26px] font-bold text-text-primary tracking-tight m-0">Formulario de Consulta</h1>
+              <p className="text-text-secondary font-normal text-[14px] m-0">Análisis nutricional</p>
            </div>
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 space-y-8">
+      <div className="grid lg:grid-cols-12 gap-6">
+        <div className="lg:col-span-8 space-y-6">
           {/* Métricas base */}
-          <div className="bg-secondary/10 p-6 rounded-none animate-slide-up border border-border/20">
-            <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] mb-6 flex items-center gap-4 leading-none">
-               <div className="w-2 h-2 rounded-full bg-foreground" /> DATOS DE CONTROL CRÍTICO
+          <div className="bg-bg-surface p-6 rounded-[12px] animate-slide-up border border-border-subtle">
+            <h3 className="text-[16px] font-semibold text-text-primary mb-6 flex items-center gap-2 m-0 border-b border-border-default pb-4">
+               <Activity className="w-[18px] h-[18px] text-text-muted" /> Datos de Control Crítico
             </h3>
-            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-6 pt-2">
               <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
               <Field label="Hora" value={hora} onChange={setHora} type="time" />
-              <Field label="Masa (KG)" value={peso} onChange={setPeso} />
-              <Field label="Estatura (M)" value={talla} onChange={setTalla} />
+              <Field label="Masa (kg)" value={peso} onChange={setPeso} />
+              <Field label="Estatura (m)" value={talla} onChange={setTalla} />
             </div>
 
             {calcData.imc > 0 && (
-              <div className="mt-6 p-6 bg-background rounded-none border border-foreground/5 flex items-center justify-between">
+              <div className="mt-6 p-4 bg-bg-elevated rounded-[8px] border border-border-default flex items-center justify-between">
                 <div>
-                  <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-2 opacity-30 leading-none">Proyección IMC / Score</p>
-                  <p className="text-2xl font-black tracking-tighter uppercase leading-none">{formatDecimal(calcData.imc)}</p>
+                  <p className="text-[12px] font-medium text-text-secondary mb-1 m-0">Proyección IMC</p>
+                  <p className="text-[20px] font-bold text-text-primary m-0">{formatDecimal(calcData.imc)}</p>
                 </div>
-                <div className="px-4 py-2 rounded-none bg-foreground text-background text-[10px] font-black uppercase tracking-[0.2em] font-mono">
-                   SISTEMA ACTIVO
+                <div className="px-3 py-1 rounded-[6px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 text-[12px] font-medium">
+                   Calculado
                 </div>
               </div>
             )}
@@ -431,9 +431,9 @@ const NewAssessment = () => {
                   <Field key={n} label={n} value={pliegues[n] || ''} onChange={(v) => setPliegues({ ...pliegues, [n]: v })} />
                 ))}
               </div>
-              <div className="bg-background p-4 flex items-center justify-between border border-foreground/5">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Suma Pliegues</span>
-                <span className="text-xl font-black">{formatDecimal(calcData.sumaPliegues)} mm</span>
+              <div className="bg-bg-elevated p-4 flex items-center justify-between border border-border-default rounded-[8px]">
+                <span className="text-[13px] font-medium text-text-secondary">Suma Pliegues</span>
+                <span className="text-[16px] font-bold text-text-primary">{formatDecimal(calcData.sumaPliegues)} <span className="text-[12px] font-normal text-text-muted">mm</span></span>
               </div>
             </Collapsible>
 
@@ -448,18 +448,18 @@ const NewAssessment = () => {
                   />
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-4 border-t border-foreground/5 pt-6">
+              <div className="grid grid-cols-3 gap-6 border-t border-border-default pt-6">
                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Brazo Cor.</p>
-                    <p className="text-lg font-black">{formatDecimal(calcData.brazoCor)}</p>
+                    <p className="text-[12px] font-medium text-text-secondary mb-1">Brazo Cor.</p>
+                    <p className="text-[16px] font-bold text-text-primary">{formatDecimal(calcData.brazoCor)}</p>
                  </div>
                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Muslo Cor.</p>
-                    <p className="text-lg font-black">{formatDecimal(calcData.piernaCor)}</p>
+                    <p className="text-[12px] font-medium text-text-secondary mb-1">Muslo Cor.</p>
+                    <p className="text-[16px] font-bold text-text-primary">{formatDecimal(calcData.piernaCor)}</p>
                  </div>
                  <div>
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-30">Pantor. Cor.</p>
-                    <p className="text-lg font-black">{formatDecimal(calcData.pantoCor)}</p>
+                    <p className="text-[12px] font-medium text-text-secondary mb-1">Pantor. Cor.</p>
+                    <p className="text-[16px] font-bold text-text-primary">{formatDecimal(calcData.pantoCor)}</p>
                  </div>
               </div>
             </Collapsible>
@@ -471,9 +471,9 @@ const NewAssessment = () => {
                 ))}
               </div>
               {calcData.complexion && (
-                <div className="bg-background p-4 flex items-center justify-between border border-foreground/5 mt-4">
-                  <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-40">Complexión Ósea</span>
-                  <span className="text-lg font-black">{formatDecimal(calcData.complexion)} - {calcData.clasifComplexion}</span>
+                <div className="bg-bg-elevated p-4 flex items-center justify-between border border-border-default rounded-[8px] mt-4">
+                  <span className="text-[13px] font-medium text-text-secondary">Complexión Ósea</span>
+                  <span className="text-[16px] font-bold text-text-primary">{formatDecimal(calcData.complexion)} <span className="text-[13px] font-normal text-text-muted">- {calcData.clasifComplexion}</span></span>
                 </div>
               )}
             </Collapsible>
@@ -496,31 +496,33 @@ const NewAssessment = () => {
               </div>
             </Collapsible>
 
-            <div className="bg-secondary/10 p-6 rounded-none border border-border/20">
-              <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-foreground mb-6 opacity-40 leading-none">OBSERVACIONES DEL ESPECIALISTA</h3>
-              <div className="space-y-6">
+            <div className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle">
+              <h3 className="text-[16px] font-semibold text-text-primary mb-6 flex items-center gap-2 m-0 border-b border-border-default pb-4">
+                 Observaciones del Especialista
+              </h3>
+              <div className="space-y-6 pt-2">
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-30 leading-none">EVOLUCIÓN CLÍNICA Y NOTAS</label>
-                  <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} className="w-full bg-background rounded-none p-4 text-sm font-black border-2 border-transparent focus:border-foreground/20 focus:bg-background outline-none min-h-[160px] uppercase tracking-tighter leading-relaxed transition-all" />
+                  <label className="text-[12px] font-medium text-text-secondary m-0">Evolución Clínica y Notas</label>
+                  <textarea value={comentarios} onChange={(e) => setComentarios(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary border border-border-subtle focus:border-[#444] outline-none min-h-[160px] resize-y transition-colors" placeholder="Añade tus observaciones aquí..." />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-30 leading-none">PROTOCOLIZACIÓN DE SUPLEMENTOS</label>
-                  <textarea value={suplementacion} onChange={(e) => setSuplementacion(e.target.value)} className="w-full bg-background rounded-none p-4 text-sm font-black border-2 border-transparent focus:border-foreground/20 focus:bg-background outline-none min-h-[120px] uppercase tracking-tighter leading-relaxed transition-all" />
+                  <label className="text-[12px] font-medium text-text-secondary m-0">Protocolización de Suplementos</label>
+                  <textarea value={suplementacion} onChange={(e) => setSuplementacion(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary border border-border-subtle focus:border-[#444] outline-none min-h-[120px] resize-y transition-colors" placeholder="Detalle de suplementos recetados..." />
                 </div>
-                <div className="pt-6 border-t border-foreground/10 space-y-4">
+                <div className="pt-6 border-t border-border-default space-y-4">
                   <div className="flex items-center justify-between">
-                    <label className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.2em] ml-1 opacity-30 leading-none">TEMARIO ABORDADO</label>
-                    <button onClick={() => setTemario([...temario, { id: Date.now().toString(), titulo: '', detalle: '' }])} className="text-[10px] font-black uppercase tracking-widest text-foreground hover:opacity-70 flex items-center gap-2 transition-all">
-                      <Plus className="h-3 w-3" /> AGREGAR TEMA
+                    <label className="text-[12px] font-medium text-text-secondary m-0">Temario Abordado</label>
+                    <button onClick={() => setTemario([...temario, { id: Date.now().toString(), titulo: '', detalle: '' }])} className="text-[12px] font-medium text-text-secondary hover:text-text-primary flex items-center gap-1.5 transition-colors">
+                      <Plus className="h-3.5 w-3.5" /> Agregar tema
                     </button>
                   </div>
                   {temario.map((t, idx) => (
-                    <div key={t.id || idx} className="bg-background p-4 border border-foreground/5 space-y-4 relative group hover:border-foreground/20 transition-all">
-                      <button onClick={() => setTemario(temario.filter((_, i) => i !== idx))} className="absolute top-4 right-4 text-destructive opacity-0 group-hover:opacity-100 transition-all">
-                         <Trash2 className="h-4 w-4" />
+                    <div key={t.id || idx} className="bg-bg-elevated p-4 rounded-[8px] border border-border-subtle space-y-3 relative group transition-all hover:border-text-muted">
+                      <button onClick={() => setTemario(temario.filter((_, i) => i !== idx))} className="absolute top-3 right-3 p-1.5 text-text-muted hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] opacity-0 group-hover:opacity-100 transition-colors">
+                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
-                      <input type="text" placeholder="TÍTULO DEL TEMA..." value={t.titulo} onChange={(e) => { const nt = [...temario]; nt[idx].titulo = e.target.value; setTemario(nt); }} className="w-full bg-transparent text-sm font-black uppercase tracking-tighter outline-none placeholder:opacity-30 border-b border-foreground/10 pb-2 focus:border-foreground/40 pr-8 transition-all" />
-                      <textarea placeholder="Detalle y acuerdos..." value={t.detalle} onChange={(e) => { const nt = [...temario]; nt[idx].detalle = e.target.value; setTemario(nt); }} className="w-full bg-transparent text-xs font-bold outline-none min-h-[60px] resize-none placeholder:opacity-30 pt-2" />
+                      <input type="text" placeholder="Título del tema..." value={t.titulo} onChange={(e) => { const nt = [...temario]; nt[idx].titulo = e.target.value; setTemario(nt); }} className="w-full bg-transparent text-[14px] font-semibold text-text-primary outline-none placeholder:text-text-muted border-b border-border-default pb-2 focus:border-border-subtle pr-8 transition-all" />
+                      <textarea placeholder="Detalles o acuerdos..." value={t.detalle} onChange={(e) => { const nt = [...temario]; nt[idx].detalle = e.target.value; setTemario(nt); }} className="w-full bg-transparent text-[13px] font-normal text-text-secondary outline-none min-h-[60px] resize-none placeholder:text-text-muted pt-2" />
                     </div>
                   ))}
                 </div>
@@ -529,129 +531,140 @@ const NewAssessment = () => {
           </div>
         </div>
 
-        <div className="lg:col-span-4 space-y-8">
-          <div className="sticky top-20 space-y-6 animate-slide-up">
+        <div className="lg:col-span-4 space-y-6">
+          <div className="sticky top-6 space-y-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
             {calcData.pctGrasaCorp !== null && (
-              <div className="bg-foreground text-background p-6 rounded-none relative overflow-hidden space-y-8">
-                <div className="absolute top-0 right-0 p-6 opacity-5 translate-x-6 translate-y-[-0.5rem]">
-                   <MoreHorizontal className="w-24 h-24" />
-                </div>
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">CÓMPUTO ALGORÍTMICO 4 COMPONENTES</h3>
+              <div className="bg-bg-surface p-6 rounded-[12px] border border-border-subtle relative overflow-hidden space-y-6">
+                <h3 className="text-[14px] font-semibold text-text-primary flex items-center gap-2 m-0 border-b border-border-default pb-4">
+                  Métricas Computadas (4C)
+                </h3>
                 
                 <div className="space-y-4 relative">
-                   <div className="flex items-center justify-between border-b border-background/10 pb-4">
-                      <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-40">Grasa Real // Grasa Ideal</span>
+                   <div className="flex items-center justify-between border-b border-border-default pb-4">
+                      <span className="text-[12px] font-medium text-text-secondary">Grasa Real / Ideal</span>
                       <div className="text-right space-y-1">
-                         <p className="text-xl font-black tracking-tighter leading-none text-destructive">{formatDecimal(calcData.pctGrasaCorp)}% // {formatDecimal(calcData.pctGrasaIdeal)}%</p>
-                         <p className="text-[10px] font-bold opacity-30 mt-1 font-mono leading-none">{formatDecimal(calcData.masaGrasaReal)} KG // {formatDecimal(calcData.masaGrasaIdeal)} KG</p>
+                         <p className="text-[18px] font-bold text-accent-red m-0">{formatDecimal(calcData.pctGrasaCorp)}% <span className="text-[14px] font-medium text-text-muted">/</span> {formatDecimal(calcData.pctGrasaIdeal)}%</p>
+                         <p className="text-[11px] font-normal text-text-muted m-0">{formatDecimal(calcData.masaGrasaReal)} kg / {formatDecimal(calcData.masaGrasaIdeal)} kg</p>
                       </div>
                    </div>
-                   <div className="flex items-center justify-between border-b border-background/10 pb-4">
-                      <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-40">Muscular // Ideal Mínimo</span>
+                   <div className="flex items-center justify-between border-b border-border-default pb-4">
+                      <span className="text-[12px] font-medium text-text-secondary">Músculo / Mínimo</span>
                       <div className="text-right space-y-1">
-                         <p className="text-xl font-black tracking-tighter leading-none text-emerald-400">{formatDecimal(calcData.pctMasaMuscular)}% // {formatDecimal(calcData.pctMusculoIdeal)}%</p>
-                         <p className="text-[10px] font-bold opacity-30 mt-1 font-mono leading-none">{formatDecimal(calcData.masaMuscular)} KG // {formatDecimal(calcData.musculoIdeal)} KG</p>
-                         {calcData.deficitMuscular !== null && calcData.deficitMuscular > 0 && <p className="text-[9px] font-black text-amber-400 uppercase tracking-widest mt-2 block">DÉFICIT: {formatDecimal(calcData.deficitMuscular)} KG</p>}
+                         <p className="text-[18px] font-bold text-accent-green m-0">{formatDecimal(calcData.pctMasaMuscular)}% <span className="text-[14px] font-medium text-text-muted">/</span> {formatDecimal(calcData.pctMusculoIdeal)}%</p>
+                         <p className="text-[11px] font-normal text-text-muted m-0">{formatDecimal(calcData.masaMuscular)} kg / {formatDecimal(calcData.musculoIdeal)} kg</p>
+                         {calcData.deficitMuscular !== null && calcData.deficitMuscular > 0 && <p className="text-[11px] font-medium text-[#fbbf24] mt-1 m-0">Déficit: {formatDecimal(calcData.deficitMuscular)} kg</p>}
                       </div>
                    </div>
-                   <div className="flex items-center justify-between border-b border-background/10 pb-4">
-                      <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-40">Masa Ósea</span>
+                   <div className="flex items-center justify-between border-b border-border-default pb-4">
+                      <span className="text-[12px] font-medium text-text-secondary">Masa Ósea</span>
                       <div className="text-right space-y-1">
-                         <p className="text-lg font-black tracking-tighter leading-none">{formatDecimal(calcData.pctMasaOsea)}%</p>
-                         <p className="text-[10px] font-bold opacity-30 mt-1 font-mono leading-none">{formatDecimal(calcData.masaOsea)} KG</p>
+                         <p className="text-[16px] font-bold text-text-primary m-0">{formatDecimal(calcData.pctMasaOsea)}%</p>
+                         <p className="text-[11px] font-normal text-text-muted m-0">{formatDecimal(calcData.masaOsea)} kg</p>
                       </div>
                    </div>
-                   <div className="flex items-center justify-between pt-2">
-                      <span className="text-[11px] font-black uppercase tracking-[0.2em] opacity-40">Masa Magra / Superficie Corp</span>
-                      <p className="text-lg font-black tracking-tighter leading-none font-mono">{formatDecimal(calcData.masaMagra)} <span className="opacity-40 font-sans text-[10px]">KG</span> / {formatDecimal(calcData.superficieCorp)} <span className="opacity-40 font-sans text-[10px]">M²</span></p>
+                   <div className="flex items-center justify-between">
+                      <span className="text-[12px] font-medium text-text-secondary">Masa Magra / Sup.</span>
+                      <p className="text-[14px] font-semibold text-text-primary m-0">{formatDecimal(calcData.masaMagra)} <span className="text-text-muted font-normal text-[12px]">kg</span> / {formatDecimal(calcData.superficieCorp)} <span className="text-text-muted font-normal text-[12px]">m²</span></p>
                    </div>
                 </div>
 
-                <div className="border-t border-background/20 pt-6 mt-6 space-y-4">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">Métricas Biotipológicas</h4>
+                <div className="border-t border-border-default pt-6 space-y-4">
+                  <h4 className="text-[13px] font-semibold text-text-primary m-0">Métricas Biotipológicas</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">Ponderal (IP)</p>
-                      <p className="text-sm font-black">{formatDecimal(calcData.indicePonderal)}</p>
+                    <div className="bg-bg-elevated p-3 rounded-[8px] border border-border-default">
+                      <p className="text-[11px] font-medium text-text-muted m-0 mb-1">Ponderal (IP)</p>
+                      <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(calcData.indicePonderal)}</p>
                     </div>
-                    <div>
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">Lorentz (Peso Ideal)</p>
-                      <p className="text-sm font-black">{formatDecimal(calcData.pesoIdeal)} kg</p>
+                    <div className="bg-bg-elevated p-3 rounded-[8px] border border-border-default">
+                      <p className="text-[11px] font-medium text-text-muted m-0 mb-1">Lorentz (Ideal)</p>
+                      <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(calcData.pesoIdeal)} kg</p>
                     </div>
-                    <div className="col-span-1">
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">Peso Ajustado</p>
-                      <p className="text-sm font-black">{formatDecimal(calcData.pesoAjustado)} kg</p>
+                    <div className="bg-bg-elevated p-3 rounded-[8px] border border-border-default">
+                      <p className="text-[11px] font-medium text-text-muted m-0 mb-1">Ajustado</p>
+                      <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(calcData.pesoAjustado)} kg</p>
                     </div>
-                    <div className="col-span-1">
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">Sobrepeso (Exceso)</p>
-                      <p className="text-sm font-black text-rose-500">+{formatDecimal(calcData.sobrepeso)} kg</p>
+                    <div className="bg-[#2e1a1a] bg-opacity-50 p-3 rounded-[8px] border border-accent-red/20">
+                      <p className="text-[11px] font-medium text-accent-red/70 m-0 mb-1">Exceso (Sobrepeso)</p>
+                      <p className="text-[14px] font-bold text-accent-red m-0">+{formatDecimal(calcData.sobrepeso)} kg</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-background/20 pt-6 mt-6 space-y-4">
-                  <h4 className="text-[9px] font-black uppercase tracking-[0.3em] opacity-30 leading-none">Cálculo de Energía (TMB/GET)</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">TMB Base (H-B)</p>
-                      <p className="text-sm font-black">{formatDecimal(calcData.tmb)} kcal</p>
+                <div className="border-t border-border-default pt-6 space-y-4">
+                  <h4 className="text-[13px] font-semibold text-text-primary m-0">Cálculo de Energía (GET)</h4>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="bg-bg-elevated p-3 rounded-[8px] border border-border-default">
+                      <p className="text-[11px] font-medium text-text-muted m-0 mb-1">TMB Base</p>
+                      <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(calcData.tmb)} <span className="text-[11px] font-normal text-text-muted">kcal</span></p>
                     </div>
-                       <div>
-                          <p className="text-[8px] uppercase tracking-widest opacity-40">FAO/OMS</p>
-                          <p className="text-sm font-black">{formatDecimal(calcData.faoOmsRequerimiento)} kcal</p>
-                       </div>
-                       <div className="col-span-2 space-y-2 pt-2">
-                          <p className="text-[8px] uppercase tracking-widest opacity-30">H-B (GET con ETA 10%)</p>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="text-[10px] font-bold opacity-60 uppercase">SEDENTARIO: {formatDecimal(calcData.getSedentario)}</div>
-                            <div className="text-[10px] font-bold opacity-60 uppercase">LIGERO: {formatDecimal(calcData.getLeve)}</div>
-                            <div className="text-[10px] font-bold opacity-60 uppercase">MODERADO: {formatDecimal(calcData.getModerado)}</div>
-                            <div className="text-[10px] font-bold opacity-60 uppercase">INTENSO: {formatDecimal(calcData.getIntenso)}</div>
-                          </div>
-                       </div>
+                    <div className="bg-bg-elevated p-3 rounded-[8px] border border-border-default">
+                       <p className="text-[11px] font-medium text-text-muted m-0 mb-1">FAO/OMS</p>
+                       <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(calcData.faoOmsRequerimiento)} <span className="text-[11px] font-normal text-text-muted">kcal</span></p>
+                    </div>
+                  </div>
+                  <div className="bg-bg-elevated p-4 rounded-[8px] border border-border-default">
+                    <p className="text-[12px] font-medium text-text-secondary m-0 mb-3 border-b border-border-subtle pb-2">Proyección con ETA (10%)</p>
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-4">
+                      <div>
+                         <p className="text-[11px] font-normal text-text-muted m-0">Sedentario</p>
+                         <p className="text-[13px] font-semibold text-text-primary m-0">{formatDecimal(calcData.getSedentario)}</p>
+                      </div>
+                      <div>
+                         <p className="text-[11px] font-normal text-text-muted m-0">Ligero</p>
+                         <p className="text-[13px] font-semibold text-text-primary m-0">{formatDecimal(calcData.getLeve)}</p>
+                      </div>
+                      <div>
+                         <p className="text-[11px] font-normal text-text-muted m-0">Moderado</p>
+                         <p className="text-[13px] font-semibold text-text-primary m-0">{formatDecimal(calcData.getModerado)}</p>
+                      </div>
+                      <div>
+                         <p className="text-[11px] font-normal text-text-muted m-0">Intenso</p>
+                         <p className="text-[13px] font-semibold text-text-primary m-0">{formatDecimal(calcData.getIntenso)}</p>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
             )}
 
-             <div className="flex flex-col gap-2">
+             <div className="flex flex-col gap-3">
                 <button
                    onClick={() => handleSave(true)}
                    disabled={saving}
-                   className="w-full py-6 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.3em] transition-all disabled:opacity-50 flex items-center justify-center gap-4 hover:shadow-[0_0_20px_rgba(0,0,0,0.1)] active:scale-[0.98]"
+                   className="w-full py-4 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#e0e0e0]"
                  >
                    {saving ? (
-                     <div className="w-4 h-4 border-2 border-background/20 border-t-background rounded-full animate-spin" />
+                     <div className="w-5 h-5 border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
                    ) : (
                      <>
-                       <Save className="h-4 w-4" /> PERSISTIR & DISEÑAR PLAN
+                       <Save className="h-[18px] w-[18px]" /> Sincronizar y Crear Plan
                      </>
                    )}
                  </button>
                  <button
                    onClick={() => handleSave(false)}
                    disabled={saving}
-                   className="w-full py-4 bg-background border border-foreground/10 text-foreground rounded-none text-[10px] font-black uppercase tracking-[0.2em] hover:bg-secondary/20 transition-all opacity-40 hover:opacity-100 flex items-center justify-center gap-2"
+                   className="w-full py-3 bg-bg-surface border border-border-subtle text-text-primary rounded-[8px] text-[13px] font-medium hover:bg-bg-elevated transition-colors flex items-center justify-center gap-2"
                  >
-                    <Clock className="h-3 w-3" /> SOLO GUARDAR VALORACIÓN (QUEDA PENDIENTE)
+                    <Clock className="h-4 w-4 text-text-muted" /> Guardar valoración (Pendiente)
                  </button>
              </div>
           </div>
         </div>
       </div>
       <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
-        <AlertDialogContent className="rounded-none border-2 border-black">
+        <AlertDialogContent className="bg-bg-surface border border-border-subtle rounded-[12px]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-sm font-black uppercase tracking-widest">Protocolo Incompleto</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs font-bold leading-relaxed">
-              No todos los campos han sido completados. ¿Está seguro de que desea persistir la consulta con datos parciales?
+            <AlertDialogTitle className="text-[18px] font-bold text-text-primary m-0">Protocolo Incompleto</AlertDialogTitle>
+            <AlertDialogDescription className="text-[14px] font-normal text-text-secondary mt-2 m-0">
+              No todos los campos han sido completados. ¿Está seguro de que desea guardar la consulta con datos parciales?
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel className="rounded-none border-black text-[10px] font-black uppercase tracking-widest">No, completar</AlertDialogCancel>
+          <AlertDialogFooter className="mt-6 flex gap-3 sm:gap-0">
+            <AlertDialogCancel className="bg-bg-elevated border border-border-subtle text-text-primary rounded-[8px] font-medium hover:bg-bg-base text-[14px]">Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={() => handleSave()}
-              className="rounded-none bg-black text-white hover:bg-neutral-800 text-[10px] font-black uppercase tracking-widest"
+              className="bg-brand-primary text-bg-base hover:bg-[#e0e0e0] rounded-[8px] font-medium text-[14px]"
             >
               Sí, guardar así
             </AlertDialogAction>
