@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, MessageCircle, Lock, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit2, FileText, MessageCircle, Lock, Trash2, Clock } from 'lucide-react';
 import api from '@/lib/api';
 import type { Plan } from '@/types';
 import { formatDate, formatDecimal } from '@/lib/format';
@@ -101,7 +101,7 @@ const PlanView = () => {
         
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 animate-slide-up">
            <div className="space-y-1">
-              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Plan {plan.tipo}</h1>
+              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Plan {plan.tipoPlan || plan.tipo}</h1>
               <p className="text-text-secondary font-normal text-[14px] m-0">Configuración integral de macronutrientes y suplementación</p>
            </div>
            

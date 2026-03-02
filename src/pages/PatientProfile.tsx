@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, Ruler, ClipboardList, Trash2, ArrowLeft } from 'lucide-react';
+import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, Ruler, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal } from '@/lib/format';
@@ -44,53 +44,61 @@ const ChartBox = ({ title, children }: { title: string, children: React.ReactNod
   </div>
 );
 
-const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan }: { 
+const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onEditPlan }: { 
   val: Valoracion, 
   index: number, 
   onVerDetalles: (id: string) => void, 
-  onVerPlan: (id: string) => void,
-  onAsignarPlan: (valId: string) => void
+  onVerPlan: (id: string) => void, 
+  onAsignarPlan: (id: string) => void,
+  onEditPlan: (id: string) => void
 }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
-  const planId = val.plan?.id || (val as any).planId;
+  const planId = (val as any).planId;
+  const estadoEnvio = (val as any).estadoEnvio || (val as any).plan?.estadoEnvio || 'pendiente';
 
   return (
-    <div className="border border-border-subtle bg-bg-surface mb-3 rounded-[12px] overflow-hidden">
+    <div className="bg-bg-elevated/30 border border-border-subtle rounded-[12px] overflow-hidden group">
       <button 
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center justify-between p-5 transition-all group ${isOpen ? 'bg-bg-elevated border-b border-border-subtle' : 'hover:bg-bg-elevated'}`}
+        className="w-full text-left p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-bg-elevated/50 transition-colors"
       >
-        <div className="flex items-center gap-6">
-          <span className="font-bold text-[12px] text-text-muted w-8">#{val.medicionNumero || index + 1}</span>
-          <div className="flex flex-col items-start gap-1">
-            <span className="font-medium uppercase tracking-wider text-[14px] text-text-primary">{formatDate(val.fecha)}</span>
-            <span className="text-[11px] font-medium text-text-secondary uppercase tracking-wider">{val.hora || '--:--'} HRS</span>
+        <div className="flex items-center gap-4">
+           <div className="w-10 h-10 rounded-full bg-bg-surface border border-border-subtle flex items-center justify-center font-bold text-[14px] text-text-primary">
+             #{(val as any).numeroValoracion || '—'}
+           </div>
+           <div>
+             <h3 className="text-[16px] font-bold text-text-primary m-0 tracking-tight">{formatDate(val.fecha)}</h3>
+             <p className="text-[12px] font-medium text-text-muted mt-0.5 uppercase tracking-wider">{val.id.slice(-8).toUpperCase()}</p>
+           </div>
+        </div>
+
+        <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
+          <div className="flex gap-6">
+            <div className="space-y-1">
+               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Masa</p>
+               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.pesoActual || val.peso)} <span className="text-[11px] font-normal text-text-secondary">kg</span></p>
+            </div>
+            <div className="space-y-1">
+               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Imc</p>
+               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.imc)}</p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {!planId ? (
+               <span className="px-2 py-0.5 bg-[#2d1a1a] text-accent-red rounded-full text-[10px] font-medium border border-accent-red/20 uppercase tracking-wider">Plan Histórico Ausente</span>
+            ) : estadoEnvio === 'pendiente' ? (
+               <span className="px-2 py-0.5 bg-[#2d221a] text-accent-orange rounded-full text-[10px] font-medium border border-[#f59e0b]/20 uppercase tracking-wider">Plan Pendiente</span>
+            ) : (
+               <span className="px-2 py-0.5 bg-[#1a2d1a] text-accent-green rounded-full text-[10px] font-medium border border-accent-green/20 uppercase tracking-wider">Plan Enviado</span>
+            )}
+          </div>
+
+          <div className="h-4 w-[1px] bg-border-subtle hidden md:block" />
+          <div className={`p-1.5 rounded-full bg-bg-surface border border-border-subtle transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+            <ChevronDown className="h-4 w-4 text-text-secondary" />
           </div>
         </div>
-        <div className="flex items-center gap-10">
-           {!planId && (
-             <div className="flex items-center gap-2 px-3 py-1 bg-[#1a0f00] border border-accent-orange/30 rounded-full">
-               <span className="text-[10px] font-bold text-accent-orange uppercase tracking-widest">Plan Pendiente</span>
-             </div>
-           )}
-           <div className="hidden md:flex items-center gap-8">
-             <div className="flex flex-col items-end">
-               <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest mb-0.5">PESO</span>
-               <span className="text-[14px] font-semibold text-text-primary">{val.pesoActual || val.peso || '--'} KG</span>
-             </div>
-             <div className="flex flex-col items-end">
-               <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest mb-0.5">IMC</span>
-               <span className="text-[14px] font-semibold text-text-primary">{val.imc || '--'}</span>
-             </div>
-             <div className="flex flex-col items-end">
-               <span className="text-[10px] font-medium text-text-muted uppercase tracking-widest mb-0.5">GRASA</span>
-               <span className="text-[14px] font-semibold text-text-primary">{val.pctGrasaCorp || val.pctGrasa2comp || (val as any).pctGrasaCorporal4comp || '--'}%</span>
-             </div>
-           </div>
-           <div className={`p-2 rounded-[8px] transition-colors ${isOpen ? 'bg-[#222]' : 'group-hover:bg-[#222]'}`}>
-             {isOpen ? <X className="h-4 w-4 text-text-primary" /> : <ChevronDown className="h-4 w-4 text-text-secondary" />}
-           </div>
-         </div>
       </button>
       
       {isOpen && (
@@ -100,31 +108,41 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan }: {
             <MetricItem label="GLUCOSA" value={`${(val as any).glucosa || (val as any).bioquimicoGlucosa || '—'} MG/DL`} />
             <MetricItem label="PRESIÓN ART." value={(val as any).presionArterial || '—'} />
             <MetricItem label="SUMA PLIEGUES" value={`${(val as any).sumaPliegues || '—'} MM`} />
-            <MetricItem label="DÉFICIT MÚSCULO" value={`${(val as any).deficitMusculo || '0'} KG`} alert={(val as any).deficitMusculo > 0} />
+            <MetricItem label="DÉFICIT MÚSCULO" value={`${(val as any).deficitMusculo || '0'} KG`} alert={parseFloat((val as any).deficitMusculo?.toString() || '0') > 0} />
             <MetricItem label="SUP. CORPORAL" value={`${(val as any).superficieCorp || (val as any).superficieCorporal || '—'} M²`} />
           </div>
           
-          <div className="flex flex-wrap gap-4 pt-6 border-t border-border-subtle">
+          <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-subtle">
             <button 
               onClick={() => onVerDetalles(val.id)}
-              className="flex items-center gap-2 px-[18px] py-[10px] border border-border-default text-[12px] font-medium rounded-[8px] hover:bg-bg-elevated transition-colors text-text-primary"
+              className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-[#222] transition-colors"
             >
               <ClipboardList className="h-[18px] w-[18px]" /> Ver detalles clínicos
             </button>
-            {planId ? (
-              <button 
-                onClick={() => onVerPlan(planId)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-brand-primary text-bg-base text-[12px] font-medium rounded-[8px] hover:bg-[#e0e0e0] transition-colors"
-              >
-                <Activity className="h-[18px] w-[18px]" /> Ver plan de nutrición
-              </button>
-            ) : (
+            {!planId ? (
               <button 
                 onClick={() => onAsignarPlan(val.id)}
                 className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a0f00] text-accent-orange text-[12px] font-medium border border-accent-orange/30 rounded-[8px] hover:bg-[#2a1a00] transition-colors"
               >
-                <Plus className="h-[18px] w-[18px]" /> Asignar plan pendiente
+                <Plus className="h-[18px] w-[18px]" /> Asignar plan
               </button>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                <button 
+                  onClick={() => onVerPlan(planId)}
+                  className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-bg-elevated"
+                >
+                  <FileText className="h-[18px] w-[18px]" /> {estadoEnvio === 'enviado' ? 'Ver plan' : 'Ver y preparar envío'}
+                </button>
+                {estadoEnvio === 'pendiente' && (
+                  <button 
+                    onClick={() => onEditPlan(planId)}
+                    className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-secondary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-[#222] hover:text-text-primary"
+                  >
+                    <Edit className="h-[18px] w-[18px]" /> Editar
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -185,8 +203,9 @@ const PatientProfile = () => {
             .filter(v => v && v.fecha)
             .map(v => ({
               ...v,
-              grasaEvolucion: parseFloat(v.pctGrasa2comp || v.pctGrasaCorporal4comp || 0),
-              masaMagraEvolucion: parseFloat(v.kgMasaMagra2comp || v.masaMagra || v.kgMasaMagra4comp || 0)
+              pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
+              grasaEvolucion: parseFloat((v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
+              masaMagraEvolucion: parseFloat((v.kgMasaMagra2comp || v.masaMagra || v.kgMasaMagra4comp || 0).toString().replace(',', '.'))
             }))
             .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
           setValoraciones(processed);
@@ -296,22 +315,54 @@ const PatientProfile = () => {
 
         {showFullExpediente && (
           <div className="animate-slide-down space-y-8 bg-bg-surface p-8 rounded-[12px] border border-border-subtle">
-            <h3 className="text-[18px] font-semibold text-text-primary m-0">Detalles del Expediente</h3>
-            <div className="grid lg:grid-cols-2 gap-6">
-              <ClinicalSection title="Estilo de Vida y Deporte" icon={Activity} data={{
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border-subtle pb-6">
+              <div>
+                <h3 className="text-[20px] font-bold text-text-primary m-0 tracking-tight">Detalles Completos del Expediente</h3>
+                <p className="text-[14px] text-text-secondary m-0">Información clínica y hábitos registrados</p>
+              </div>
+              <button
+                onClick={() => navigate(`/pacientes/${id}/editar`)}
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#222]"
+              >
+                <Edit className="h-4 w-4" /> Editar Expediente Completo
+              </button>
+            </div>
+
+            <div className="grid lg:grid-cols-2 gap-8">
+              <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
                 'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
                 'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
                 'Disciplina': (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina || 'N/A',
                 'Frecuencia': (paciente.ejercicio || (paciente as any).datosEjercicio)?.frecuencia || 'N/A',
                 'Duración': (paciente.ejercicio || (paciente as any).datosEjercicio)?.tiempo || 'N/A',
                 'Nivel Actividad': (paciente.ejercicio || (paciente as any).datosEjercicio)?.nivelActividad || 'N/A',
+                'Distribución Actividad': `${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeSedentario || 0}% S / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeLeve || 0}% L / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeModerado || 0}% M / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeIntenso || 0}% I`,
               }} />
-              <ClinicalSection title="Historial Clínico" icon={Heart} data={{
+              
+              <ClinicalSection title="Perfil Clínico y Patologías" icon={Heart} data={{
                 'Patología': paciente.antecedentes?.patologia || 'N/A',
-                'Cirugías': paciente.antecedentes?.cirugias || 'N/A',
+                'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
                 'Alergias': paciente.antecedentes?.alergias || 'N/A',
-                'Estreñimiento': paciente.antecedentes?.estrenimiento || 'N/A',
+                'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
                 'Ciclo Menstrual': paciente.antecedentes?.cicloMenstrual || 'N/A',
+                'Agua al día': paciente.antecedentes?.agua || 'N/A',
+                'Alcohol': paciente.antecedentes?.consumoAlcohol || 'N/A',
+                'Tabaco': paciente.antecedentes?.tabaco || 'N/A',
+              }} />
+
+              <ClinicalSection title="Hábitos (Usualmente vs Ayer)" icon={Clock} data={{
+                'Desayuno': `${(paciente as any).habitos?.desayuno?.usualmente || (paciente as any).consumoCalorico?.usalmenteDesayuno || 'N/A'} (Ayer: ${(paciente as any).habitos?.desayuno?.ayer || (paciente as any).consumoCalorico?.ayerDesayuno || '—'})`,
+                'Colación 1': `${(paciente as any).habitos?.colacion1?.usualmente || (paciente as any).consumoCalorico?.usalmenteColacion1 || 'N/A'} (Ayer: ${(paciente as any).habitos?.colacion1?.ayer || (paciente as any).consumoCalorico?.ayerColacion1 || '—'})`,
+                'Almuerzo': `${(paciente as any).habitos?.almuerzo?.usualmente || (paciente as any).consumoCalorico?.usalmenteAlmuerzo || 'N/A'} (Ayer: ${(paciente as any).habitos?.almuerzo?.ayer || (paciente as any).consumoCalorico?.ayerAlmuerzo || '—'})`,
+                'Colación 2': `${(paciente as any).habitos?.colacion2?.usualmente || (paciente as any).consumoCalorico?.usalmenteColacion2 || 'N/A'} (Ayer: ${(paciente as any).habitos?.colacion2?.ayer || (paciente as any).consumoCalorico?.ayerColacion2 || '—'})`,
+                'Cena': `${(paciente as any).habitos?.cena?.usualmente || (paciente as any).consumoCalorico?.usalmenteCena || 'N/A'} (Ayer: ${(paciente as any).habitos?.cena?.ayer || (paciente as any).consumoCalorico?.ayerCena || '—'})`,
+              }} />
+
+              <ClinicalSection title="Suplementación y Notas" icon={Shield} data={{
+                'Historial Suplementos': paciente.antecedentes?.historialProductos || 'N/A',
+                'Propuesta Nutriólogo': paciente.antecedentes?.recomendacionSuplementos || 'N/A',
+                'Preferencias (Gusta)': paciente.antecedentes?.alimentosGustan || 'N/A',
+                'Aversiones (No gusta)': paciente.antecedentes?.alimentosNoGustan || 'N/A',
                 'Signos y Síntomas': paciente.antecedentes?.signosYSintomas || 'N/A'
               }} />
             </div>
@@ -372,7 +423,8 @@ const PatientProfile = () => {
                 />
                 <Area 
                   type="monotone" 
-                  dataKey="peso" 
+                  dataKey="pesoEvolucion" 
+                  name="Peso"
                   stroke="#f0f0f0" 
                   strokeWidth={2} 
                   fillOpacity={1} 
@@ -405,6 +457,7 @@ const PatientProfile = () => {
                 <Area 
                   type="monotone" 
                   dataKey="grasaEvolucion" 
+                  name="Grasa"
                   stroke="#8a8a8a" 
                   strokeWidth={2} 
                   fill="rgba(138, 138, 138, 0.05)"
@@ -436,6 +489,7 @@ const PatientProfile = () => {
                 <Area 
                   type="monotone" 
                   dataKey="masaMagraEvolucion" 
+                  name="Masa Magra"
                   stroke="#22c55e" 
                   strokeWidth={2} 
                   fill="rgba(34, 197, 94, 0.05)"
@@ -456,14 +510,15 @@ const PatientProfile = () => {
           {valoraciones.length > 0 ? (
             <div className="space-y-3">
               {valoraciones.map((v, i) => (
-                <AccordionRow 
-                  key={v.id} 
-                  val={v} 
-                  index={i} 
-                  onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
-                  onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
-                  onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
-                />
+                 <AccordionRow 
+                   key={v.id} 
+                   val={v} 
+                   index={i} 
+                   onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
+                   onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
+                   onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
+                   onEditPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}/editar`)}
+                 />
               ))}
             </div>
           ) : (

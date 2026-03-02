@@ -20,7 +20,7 @@ export const formatDateShort = (dateStr: string | null | undefined): string => {
 
 export const formatDecimal = (n: number | string | null | undefined, decimals = 2): string => {
   if (n == null || n === '') return '—';
-  const num = typeof n === 'string' ? parseFloat(n) : n;
+  const num = typeof n === 'string' ? parseFloat(n.toString().replace(',', '.')) : n;
   if (isNaN(num)) return '—';
   return num.toFixed(decimals).replace('.', ',');
 };
