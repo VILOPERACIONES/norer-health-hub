@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, Ruler, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
+import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal } from '@/lib/format';
@@ -75,12 +75,12 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
           <div className="flex gap-6">
             <div className="space-y-1">
-               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Masa</p>
+               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Peso</p>
                <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.pesoActual || val.peso)} <span className="text-[11px] font-normal text-text-secondary">kg</span></p>
             </div>
             <div className="space-y-1">
-               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Imc</p>
-               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.imc)}</p>
+               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">% Grasa</p>
+               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal((val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || 0)} <span className="text-[11px] font-normal text-text-secondary">%</span></p>
             </div>
           </div>
 
@@ -103,13 +103,11 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
       
       {isOpen && (
         <div className="p-6 bg-bg-surface text-text-primary animate-slide-down">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
-            <MetricItem label="ESTATURA" value={`${val.estatura || val.talla || '—'} M`} />
-            <MetricItem label="GLUCOSA" value={`${(val as any).glucosa || (val as any).bioquimicoGlucosa || '—'} MG/DL`} />
-            <MetricItem label="PRESIÓN ART." value={(val as any).presionArterial || '—'} />
-            <MetricItem label="SUMA PLIEGUES" value={`${(val as any).sumaPliegues || '—'} MM`} />
-            <MetricItem label="DÉFICIT MÚSCULO" value={`${(val as any).deficitMusculo || '0'} KG`} alert={parseFloat((val as any).deficitMusculo?.toString() || '0') > 0} />
-            <MetricItem label="SUP. CORPORAL" value={`${(val as any).superficieCorp || (val as any).superficieCorporal || '—'} M²`} />
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
+            <MetricItem label="ESTATURA" value={`${val.estatura || val.talla || '—'} cm`} />
+            <MetricItem label="IMC" value={formatDecimal(val.imc)} />
+            <MetricItem label="% GRASA" value={`${(val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || '—'}%`} />
+            <MetricItem label="MASA MAGRA" value={`${(val as any).masaMagra || '—'} kg`} />
           </div>
           
           <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-subtle">
@@ -204,8 +202,8 @@ const PatientProfile = () => {
             .map(v => ({
               ...v,
               pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
-              grasaEvolucion: parseFloat((v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
-              masaMagraEvolucion: parseFloat((v.kgMasaMagra2comp || v.masaMagra || v.kgMasaMagra4comp || 0).toString().replace(',', '.'))
+              grasaEvolucion: parseFloat((v.pctGrasa || v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
+              masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.'))
             }))
             .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
           setValoraciones(processed);
@@ -383,11 +381,10 @@ const PatientProfile = () => {
         </div>
 
         {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || '--'} KG`} icon={Activity} />
           <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
-          <KpiCardCompact label="Porcentaje Grasa" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || '--'}%`} icon={Heart} />
-          <KpiCardCompact label="Score Ponderal" value={formatDecimal((currentVal as any)?.indicePonderal || 0)} icon={Ruler} />
+          <KpiCardCompact label="Porcentaje Grasa" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Heart} />
         </section>
 
         {/* PROGRESS CHARTS HIGH-CONTRAST */}

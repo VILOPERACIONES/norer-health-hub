@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Settings, LogOut, Menu, User as UserIcon, ClipboardList, ChevronLeft, ChevronRight, Calendar, MessageSquare, Clock, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { BarChart3, Users, Settings, LogOut, Menu, User as UserIcon, ClipboardList, ChevronLeft, ChevronRight, Calendar, MessageSquare, Clock, ShieldCheck, Sun, Moon, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 import Logo from './Logo';
 import { useAuthStore } from '@/store/auth';
@@ -9,6 +9,8 @@ const navItems = [
   { to: '/dashboard', icon: BarChart3, label: 'PANEL' },
   { to: '/pacientes', icon: Users, label: 'PACIENTES' },
   { to: '/planes', icon: ClipboardList, label: 'PLANES' },
+  { to: '/equivalencias', icon: BookOpen, label: 'SMAE' },
+  { to: '/configuracion', icon: Settings, label: 'AJUSTES' },
 ];
 
 const Layout = () => {

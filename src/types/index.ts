@@ -148,6 +148,7 @@ export interface Plan {
   nombre?: string;
   pacienteId: string | null;
   valoracionId?: string | null;
+  pdfCustomMeta?: any;
   fechaCreacion?: string;
   tipoPlan: string;
   tipo?: string; 

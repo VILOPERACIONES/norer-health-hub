@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, MessageCircle, Lock, Trash2, Clock } from 'lucide-react';
+import { format } from 'date-fns';
+import { ArrowLeft, Edit2, FileText, Send, Lock, Trash2, Clock, Settings2 } from 'lucide-react';
 import api from '@/lib/api';
 import type { Plan } from '@/types';
+import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
@@ -54,28 +56,80 @@ const PlanView = () => {
     }
   };
 
+  const [showConfig, setShowConfig] = useState(false);
+  const [savingMeta, setSavingMeta] = useState(false);
+
+  const handleSaveMeta = async (meta: any) => {
+    setSavingMeta(true);
+    try {
+      await api.put(`/api/planes/${planId}/pdf-meta`, meta);
+      setPlan(prev => prev ? { ...prev, pdfCustomMeta: meta } as Plan : prev);
+      toast({ title: 'Configuración PDF guardada', description: 'Los ajustes se aplicarán al generar o enviar.' });
+      setShowConfig(false);
+    } catch (err) {
+      toast({ title: 'Error', description: 'No se pudo guardar la configuración.', variant: 'destructive' });
+    } finally {
+      setSavingMeta(false);
+    }
+  };
+
   const handlePdf = async () => {
     try {
-      toast({ title: 'GENERANDO REPORTE', description: 'Preparando protocolo clínico maestro...' });
-      const response = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      toast({ title: 'Generando Reporte', description: 'Componiendo estructura maestra en PDF...' });
+      const res = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `plan-${planId}.pdf`);
+      link.setAttribute('download', `Plan_${plan?.pacienteId}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
 
-      // Sincronizar estado enviado
-      await api.put(`/api/planes/${planId}/estado`, { estadoEnvio: 'enviado' });
-      toast({ title: 'ESTADO SINCRONIZADO', description: 'El reporte ha sido marcado como enviado.' });
+      toast({ title: 'PDF DESCARGADO', description: 'El reporte se ha generado correctamente.' });
     } catch (err) {
-      toast({ title: 'Error de Generación', description: 'No se pudo sincronizar el reporte PDF', variant: 'destructive' });
+      toast({ title: 'Error de Generación', description: 'No se pudo generar el reporte PDF', variant: 'destructive' });
     }
   };
 
-  const handleWhatsApp = () => {
-    toast({ title: 'Sincronización pendiente', description: 'El envío por canal maestro WhatsApp estará disponible próximamente.' });
+  const [sending, setSending] = useState(false);
+
+  const handleEnviar = async () => {
+    if (!window.confirm('¿Enviar este plan al paciente por correo y WhatsApp?')) return;
+    setSending(true);
+    try {
+      const { data } = await api.post(`/api/planes/${planId}/enviar`);
+      const resultado = data?.data || data;
+      const emailOk    = resultado?.email    === 'ok';
+      const whatsappOk = resultado?.whatsapp === 'ok';
+      const ambosOk    = emailOk && whatsappOk;
+      const ambosErr   = !emailOk && !whatsappOk;
+
+      let title = 'Plan enviado';
+      let description = '';
+
+      if (ambosOk) {
+        title = 'Plan enviado correctamente';
+        description = 'Correo y WhatsApp entregados al paciente.';
+      } else if (ambosErr) {
+        title = 'Enviado con advertencias';
+        description = 'El plan se marcó como enviado, pero tanto el correo como WhatsApp fallaron. Verifica la configuración.';
+      } else {
+        const ok  = emailOk ? 'Correo ✓' : 'WhatsApp ✓';
+        const err = emailOk ? 'WhatsApp ✗' : 'Correo ✗';
+        description = `${ok} entregado. ${err} falló — verifica la configuración.`;
+      }
+
+      toast({ title, description });
+      setPlan((prev) => prev ? { ...prev, estadoEnvio: 'enviado' } as Plan : prev);
+    } catch (err: any) {
+      toast({
+        title: 'Error al enviar',
+        description: err.response?.data?.message || 'No se pudo enviar el plan. Verifica la configuración de correo y WhatsApp.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) return (
@@ -113,16 +167,28 @@ const PlanView = () => {
                 <Edit2 className="h-[18px] w-[18px]" /> Editar
               </button>
               <button
+                onClick={() => setShowConfig(true)}
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
+              >
+                <Settings2 className="h-[18px] w-[18px]" /> Configurar PDF
+              </button>
+              <button
                 onClick={handlePdf}
                 className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
               >
-                <FileText className="h-[18px] w-[18px]" /> PDF
+                <FileText className="h-[18px] w-[18px]" /> Descargar
               </button>
               <button
-                onClick={handleWhatsApp}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-accent-green hover:text-[#000]"
+                onClick={handleEnviar}
+                disabled={sending}
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-accent-green hover:text-[#000] disabled:opacity-50"
               >
-                <MessageCircle className="h-[18px] w-[18px]" /> WhatsApp
+                {sending ? (
+                  <div className="w-[18px] h-[18px] border-2 border-accent-green/30 border-t-accent-green rounded-full animate-spin" />
+                ) : (
+                  <Send className="h-[18px] w-[18px]" />
+                )}
+                {sending ? 'Enviando...' : 'Enviar al paciente'}
               </button>
               <button
                 onClick={handleDelete}
@@ -231,6 +297,15 @@ const PlanView = () => {
           </p>
         </div>
       )}
+
+      <PDFPreviewModal 
+        isOpen={showConfig} 
+        onClose={() => setShowConfig(false)} 
+        planId={planId}
+        planCustomMeta={plan.pdfCustomMeta || {}}
+        onSaveMeta={handleSaveMeta}
+        loading={savingMeta}
+      />
     </div>
   );
 };

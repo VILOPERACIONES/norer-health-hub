@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown, ClipboardList } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown, ClipboardList, ChevronDown, ChevronUp } from 'lucide-react';
+import BarridoEquivalenciasComp from '@/components/BarridoEquivalencias';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan } from '@/types';
 import { formatDecimal } from '@/lib/format';
@@ -48,6 +49,7 @@ const CreateEditPlan = () => {
   const [valData, setValData] = useState<any>(null);
   const [availableTemplates, setAvailableTemplates] = useState<Plan[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showBarridoRef, setShowBarridoRef] = useState(false);
 
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
@@ -87,6 +89,55 @@ const CreateEditPlan = () => {
             
             // USAR MAPEO ROBUSTO
             setMenus(mapMenusFromBackend(p.menus));
+
+            // Intentar cargar la valoración ligada o la más reciente para mostrar el barrido
+            if (!isBasePlan && pacienteId) {
+              try {
+                // Obtener lista para hallar la ligada o simplemente tomar la última
+                const { data: vDataList } = await api.get(`/api/pacientes/${pacienteId}/valoraciones`);
+                const valList = vDataList?.data || vDataList;
+                if (valList && valList.length > 0) {
+                   const matched = p.valoracionId ? valList.find((v: any) => v.id === p.valoracionId) : null;
+                   const vToUse = matched || valList[0];
+                   
+                   // Cargar detalle completo de esa valoración
+                   const { data: vDataFull } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${vToUse.id}`);
+                   const v = vDataFull?.data || vDataFull;
+                   if (v) {
+                     // Fetch barrido separadamente
+                     const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${vToUse.id}/barrido`).catch(() => null);
+                     let barrido = bRes?.data;
+                     // Descender por los .data hasta el objeto de verdad
+                     while (barrido?.data) {
+                       barrido = barrido.data;
+                     }
+                     if (typeof barrido === 'string') {
+                       try { barrido = JSON.parse(barrido); } catch (e) {}
+                     }
+                     if (barrido?.barrido) {
+                       barrido = barrido.barrido; 
+                     }
+                     if (typeof barrido === 'string') {
+                       try { barrido = JSON.parse(barrido); } catch (e) {}
+                     }
+                     
+                     setValData({ ...v, barridoEquivalencias: barrido });
+                     if (!pesoUltimo) setPesoUltimo(v.pesoCurrent || v.pesoActual || v.peso || 0);
+                   }
+                }
+              } catch (e) {
+                console.error('Error cargando valoración ligada al plan:', e);
+              }
+            }
+          }
+          // Load templates as well if we are dealing with a patient
+          if (!isBasePlan) {
+            try {
+              const { data: tData } = await api.get('/api/planes?tipo=base');
+              setAvailableTemplates(tData?.data || tData || []);
+            } catch (e) {
+              console.error('Error loading templates', e);
+            }
           }
         } catch (err) {
           console.error('Error cargando plan:', err);
@@ -103,9 +154,25 @@ const CreateEditPlan = () => {
             const { data: vData } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
             const v = vData?.data || vData;
             if (v) {
-              setPesoUltimo(v.peso || 0);
-              setValData(v);
-              if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
+               // Fetch barrido
+               const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null);
+               let barrido = bRes?.data;
+               while (barrido?.data) {
+                 barrido = barrido.data;
+               }
+               if (typeof barrido === 'string') {
+                 try { barrido = JSON.parse(barrido); } catch (e) {}
+               }
+               if (barrido?.barrido) {
+                 barrido = barrido.barrido; 
+               }
+               if (typeof barrido === 'string') {
+                 try { barrido = JSON.parse(barrido); } catch (e) {}
+               }
+               
+               setPesoUltimo(v.peso || 0);
+               setValData({ ...v, barridoEquivalencias: barrido });
+               if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
             }
           }
           // Cargar plantillas disponibles
@@ -223,7 +290,7 @@ const CreateEditPlan = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-[1400px]">
+    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full px-6 lg:px-10 mt-2">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
         <div className="space-y-2">
           <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
@@ -239,7 +306,7 @@ const CreateEditPlan = () => {
           </div>
         </div>
 
-        {!isBasePlan && !isEdit && (
+        {!isBasePlan && (
           <div className="relative">
             <button 
               onClick={() => setShowTemplates(!showTemplates)}
@@ -280,6 +347,7 @@ const CreateEditPlan = () => {
 
       <div className="grid lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
+        
           {/* Configuración Metabólica */}
           <div className="bg-bg-surface p-6 rounded-[12px] animate-slide-up border border-border-subtle">
             <h3 className="text-[16px] font-semibold text-text-primary mb-6 flex items-center gap-2 m-0">
@@ -319,26 +387,6 @@ const CreateEditPlan = () => {
                 <label className="text-[12px] font-medium text-text-secondary">Energía Total (Kcal)</label>
                 <div className="flex flex-col gap-3">
                   <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[18px] font-semibold text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors" />
-                  
-                  {valData && (
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
-                      {[
-                        { key: 'getSedentario', label: 'SEDENTARIO' },
-                        { key: 'getLeve', label: 'LEVE' },
-                        { key: 'getModerado', label: 'MODERADO' },
-                        { key: 'getIntenso', label: 'INTENSO' }
-                      ].map(g => (
-                        <button
-                          key={g.key}
-                          type="button"
-                          onClick={() => setCalorias(Math.round(valData[g.key]).toString())}
-                          className="bg-bg-elevated hover:bg-brand-primary text-text-secondary hover:text-bg-base px-3 py-2 text-[12px] font-medium rounded-[8px] transition-colors border border-border-subtle"
-                        >
-                          {g.label} ({Math.round(valData[g.key])})
-                        </button>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -473,32 +521,102 @@ const CreateEditPlan = () => {
         {/* Sidebar Summary & Persistence */}
         <div className="lg:col-span-4 space-y-6">
           <div className="sticky top-24 space-y-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
-            <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden">
-               <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0">Computo Metabólico</h3>
-               
-               <div className="space-y-6 relative">
-                  {[
-                    { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: 'text-text-primary' },
-                    { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: 'text-text-primary' },
-                    { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: 'text-text-primary' },
-                  ].map((m) => (
-                    <div key={m.label} className="flex items-center justify-between border-b border-border-default pb-4">
-                      <span className="text-[14px] font-medium text-text-secondary">{m.label}</span>
-                      <div className="text-right space-y-1">
-                        <p className={`text-[18px] font-bold m-0 ${m.color}`}>{formatDecimal(m.gr)}<span className="text-[12px] ml-1 font-medium text-text-muted">Gr</span></p>
-                        <p className="text-[12px] font-normal text-text-muted m-0">{formatDecimal(m.grKg)} Gr/Kg</p>
+            {isBasePlan ? (
+              <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden">
+                 <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0">Computo Metabólico</h3>
+                 
+                 <div className="space-y-6 relative">
+                    {[
+                      { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: 'text-text-primary' },
+                      { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: 'text-text-primary' },
+                      { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: 'text-text-primary' },
+                    ].map((m) => (
+                      <div key={m.label} className="flex items-center justify-between border-b border-border-default pb-4">
+                        <span className="text-[14px] font-medium text-text-secondary">{m.label}</span>
+                        <div className="text-right space-y-1">
+                          <p className={`text-[18px] font-bold m-0 ${m.color}`}>{formatDecimal(m.gr)}<span className="text-[12px] ml-1 font-medium text-text-muted">Gr</span></p>
+                          <p className="text-[12px] font-normal text-text-muted m-0">{formatDecimal(m.grKg)} Gr/Kg</p>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
 
-                  <div className="pt-2">
-                     <div className="flex flex-col items-center">
-                        <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Carga Energética</span>
-                        <p className="text-[28px] font-bold text-text-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
-                     </div>
-                  </div>
-               </div>
-            </div>
+                    <div className="pt-2">
+                       <div className="flex flex-col items-center">
+                          <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Carga Energética</span>
+                          <p className="text-[28px] font-bold text-text-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
+                       </div>
+                    </div>
+                 </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden flex flex-col items-center">
+                   <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Energía Total Actual</span>
+                   <p className="text-[32px] font-bold text-brand-primary m-0">{cal}<span className="text-[16px] ml-1 font-medium text-text-muted">Kcal</span></p>
+                </div>
+
+                <div className="bg-[#111] border border-[#333] rounded-[12px] overflow-hidden">
+                  <button 
+                    onClick={() => setShowBarridoRef(!showBarridoRef)}
+                    className="w-full flex flex-col items-start p-4 hover:bg-[#1a1a1a] transition-colors text-left"
+                  >
+                    <div className="w-full flex items-center justify-between mb-2">
+                      <h3 className="text-[14px] font-bold text-[#f0f0f0] m-0 flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-[#90c2ff]" /> 
+                        Barrido Estratégico
+                      </h3>
+                      {showBarridoRef ? <ChevronUp className="w-5 h-5 text-[#8a8a8a]" /> : <ChevronDown className="w-5 h-5 text-[#8a8a8a]" />}
+                    </div>
+                    <p className="text-[12px] text-[#8a8a8a] m-0">
+                      {valData?.numeroValoracion ? `Apoyo de cálculo - Consulta #${valData.numeroValoracion}` : 'Herramienta de apoyo (Scratchpad)'}
+                    </p>
+                  </button>
+                                    {showBarridoRef && (
+                      <div className="p-4 border-t border-[#333] bg-[#0a0a0a]">
+                        {(() => {
+                           let bd = valData?.barridoEquivalencias;
+                           if (typeof bd === 'string') {
+                             try { bd = JSON.parse(bd); } catch (e) {}
+                           }
+                           
+                           if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Aún no hay barrido guardado en esta consulta.</p>;
+                           
+                           const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
+
+                           return (
+                             <div className="space-y-4">
+                               {bd.tiempos.map((t: string) => {
+                                  // distribucion[t] is an object where keys are grupos and values are cantidades
+                                  const tiempoDist = (bd.distribucion || {})[t] || {};
+                                  const distributionItems = Object.entries(tiempoDist).filter(([g, cant]) => {
+                                     return Number(cant) > 0;
+                                  });
+                                  if (distributionItems.length === 0) return null; // No hay nada asignado a este tiempo
+                                  
+                                  return (
+                                    <div key={t} className="bg-[#1a1a1a] p-3 rounded-[8px] border border-[#333]">
+                                      <h4 className="text-[12px] font-bold text-[#90c2ff] uppercase tracking-wider mb-2 m-0 border-b border-[#333] pb-1.5">{t}</h4>
+                                      <div className="flex flex-wrap gap-2 pt-1.5">
+                                        {distributionItems.map(([g, cant]) => {
+                                           return (
+                                             <span key={g} className="px-2 py-1 bg-[#111] border border-[#333] rounded text-[11px] font-medium text-[#e0e0e0] flex items-center gap-1.5 shadow-sm">
+                                               <span className="w-1.5 h-1.5 rounded-full bg-[#90c2ff]" /> 
+                                               {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(2))} eq</span>
+                                             </span>
+                                           );
+                                        })}
+                                      </div>
+                                    </div>
+                                  );
+                               })}
+                             </div>
+                           )
+                        })()}
+                      </div>
+                    )}
+                </div>
+              </div>
+            )}
 
             <div className="bg-bg-surface p-6 rounded-[12px] space-y-6 border border-border-subtle">
               <h3 className="text-[14px] font-semibold text-text-primary m-0">Ajustes Finales</h3>

@@ -89,7 +89,7 @@ const Plans = () => {
             onClick={() => navigate('/planes/nuevo')} 
             className="flex items-center gap-2 bg-transparent border border-border-default text-text-primary rounded-[8px] px-[18px] py-[10px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
           >
-            <Plus className="h-[18px] w-[18px] text-text-secondary" /> Nuevo Protocolo
+            <Plus className="h-[18px] w-[18px] text-text-secondary" /> Nuevo Menú
           </button>
         </header>
 
