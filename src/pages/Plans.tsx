@@ -122,7 +122,7 @@ const Plans = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4">
-                        <p className="text-[14px] font-normal text-text-secondary m-0">{formatDate(p.fechaCreacion || p.createdAt)}</p>
+                        <p className="text-[14px] font-normal text-text-secondary m-0">{formatDate(p.fechaCreacion)}</p>
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-2">

@@ -63,8 +63,6 @@ const Login = () => {
         <div className="flex flex-col items-center">
            <Logo size="md" className="text-white mb-4" />
            <div className="mt-4 text-center space-y-2">
-              <h1 className="text-3xl font-black text-white uppercase tracking-tighter leading-none whitespace-nowrap">Norder Master</h1>
-              <p className="text-white/30 text-[10px] font-black uppercase tracking-[0.3em] font-mono leading-none">Clinical Operating System</p>
            </div>
         </div>
 
