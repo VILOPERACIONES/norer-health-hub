@@ -31,6 +31,23 @@ const Layout = () => {
   };
 
   const userName = user?.nombre || 'Especialista';
+  const isAdmin = user?.rol === 'admin' || (user as any)?.role === 'admin';
+  const roleLabel = isAdmin ? 'Administrador' : (user?.rol === 'practicante' ? 'Practicante' : 'Nutriólogo');
+
+  // Filtrar items según permisos
+  const filteredNavItems = navItems.filter(item => {
+    if (isAdmin) return true;
+    if (!user?.permisos) return true; // Si no hay permisos definidos, ver todo (fallback)
+    
+    // Mapeo simple de rutas a llaves de permisos
+    const path = item.to.replace('/', '');
+    if (path === 'dashboard') return user.permisos?.dashboard?.read !== false;
+    if (path === 'pacientes') return user.permisos?.pacientes?.read !== false;
+    if (path === 'planes') return user.permisos?.planes?.read !== false;
+    if (path === 'equivalencias') return user.permisos?.smae?.read !== false;
+    if (path === 'configuracion') return true; // Ajustes siempre visible para perfil
+    return true;
+  });
 
   const sidebarContent = (
     <div className={`flex flex-col h-full bg-bg-surface border-r border-border-subtle transition-all duration-300 ${collapsed ? 'w-24' : 'w-64'} shadow-none relative`}>
@@ -40,7 +57,7 @@ const Layout = () => {
 
       <nav className={`flex-1 px-4 space-y-1 mt-6 ${collapsed ? 'flex flex-col items-center' : ''}`}>
         {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4 pt-4">Navegación</p>}
-        {navItems.map((item) => (
+        {filteredNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -59,41 +76,46 @@ const Layout = () => {
           </NavLink>
         ))}
 
-        <div className={`pt-6 mt-6 ${collapsed ? 'px-0' : ''}`}>
-          {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4">Accesos Directos</p>}
-          <div className="space-y-1">
-            {[
-              { label: collapsed ? '' : 'Calendario', icon: Calendar, color: 'text-text-secondary', title: 'Google Calendar' },
-              { label: collapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' },
-              { label: collapsed ? '' : 'Cal.com', icon: Clock, color: 'text-text-secondary', title: 'Cal.com Sync' }
-            ].map((ext) => (
-              <button
-                key={ext.title}
-                title={ext.title}
-                className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg transition-colors w-full text-left ${collapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
-              >
-                <ext.icon className={`h-[18px] w-[18px] shrink-0 ${ext.color}`} />
-                {!collapsed && ext.label}
-              </button>
-            ))}
+        {isAdmin && (
+          <div className={`pt-6 mt-6 ${collapsed ? 'px-0' : ''}`}>
+            {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4">Accesos Directos</p>}
+            <div className="space-y-1">
+              {[
+                { label: collapsed ? '' : 'Calendario', icon: Calendar, color: 'text-text-secondary', title: 'Google Calendar' },
+                { label: collapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' },
+                { label: collapsed ? '' : 'Cal.com', icon: Clock, color: 'text-text-secondary', title: 'Cal.com Sync' }
+              ].map((ext) => (
+                <button
+                  key={ext.title}
+                  title={ext.title}
+                  className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg transition-colors w-full text-left ${collapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
+                >
+                  <ext.icon className={`h-[18px] w-[18px] shrink-0 ${ext.color}`} />
+                  {!collapsed && ext.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </nav>
 
       <div className={`px-4 pb-6 mt-auto space-y-2 ${collapsed ? 'flex flex-col items-center' : ''}`}>
-        <div className={`rounded-[8px] bg-bg-elevated border border-border-subtle transition-all ${collapsed ? 'p-2' : 'px-4 py-3'}`}>
+        <NavLink 
+          to="/configuracion"
+          className={({ isActive }) => `block w-full rounded-[12px] transition-all group/profile ${isActive ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-bg-elevated border-border-subtle'} border ${collapsed ? 'p-2' : 'px-4 py-3'}`}
+        >
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 shrink-0 rounded-full bg-[#1a1a1a] text-brand-primary flex items-center justify-center font-bold text-[12px] border border-border-default">
+            <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-[12px] border transition-colors ${collapsed ? 'mx-auto' : ''} ${user?.rol === 'admin' || (user as any)?.role === 'admin' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/30' : 'bg-[#1a1a1a] text-[#aaa] border-border-default'}`}>
               {userName[0].toUpperCase()}
             </div>
             {!collapsed && (
               <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-semibold text-text-primary truncate">{userName}</p>
-                <p className="text-[11px] font-medium text-text-muted mt-0.5 leading-none">Nutriólogo</p>
+                <p className="text-[13px] font-bold text-text-primary truncate transition-colors group-hover/profile:text-brand-primary">{userName}</p>
+                <p className="text-[10px] font-black uppercase tracking-tighter text-text-muted mt-0.5 leading-none">{roleLabel}</p>
               </div>
             )}
           </div>
-        </div>
+        </NavLink>
         <button
           onClick={handleLogout}
           title={collapsed ? 'SALIR' : ''}

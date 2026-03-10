@@ -19,21 +19,30 @@ const Login = () => {
     setError('');
     setLoading(true);
     try {
-      const response = await api.post('/api/auth/login', { email, password });
+      const response = await api.post('/api/admin/login', { email, password });
       if (response.data?.success && response.data?.data?.token) {
         const token = response.data.data.token;
         const userData = response.data.data.user;
         
         const user = {
-          id: userData?.id || '1',
+          id: userData?.id || 'super-admin',
           email: userData?.email || email,
-          nombre: userData?.nombre || userData?.name || userData?.fullName || userData?.firstName || 'Especialista',
+          nombre: userData?.nombre || 'Especialista',
+          rol: userData?.rol || 'practicante',
+          permisos: userData?.permisos || {},
           telefono: userData?.telefono || '',
-          certificacion: userData?.certificacion || '',
         };
         
         setAuth(token, user);
-        navigate('/dashboard');
+        
+        // Redirección dinámica según permisos
+        if (user.rol === 'admin' || user.permisos?.dashboard?.read !== false) {
+          navigate('/dashboard');
+        } else if (user.permisos?.pacientes?.read !== false) {
+          navigate('/pacientes');
+        } else {
+          navigate('/configuracion');
+        }
       } else {
         setError('Error en la autenticación. Formato no soportado.');
       }

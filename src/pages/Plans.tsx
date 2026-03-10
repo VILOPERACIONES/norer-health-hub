@@ -1,18 +1,15 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Search, UserPlus, ClipboardList, ChevronRight, X, Trash2, Edit3, Calendar, Flame } from 'lucide-react';
+import { Plus, Search, Trash2, Edit3 } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
-import type { Plan, Paciente } from '@/types';
+import type { Plan } from '@/types';
 
 const Plans = () => {
   const [planesBase, setPlanesBase] = useState<Plan[]>([]);
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [assigningPlan, setAssigningPlan] = useState<Plan | null>(null);
-  const [selectedPatient, setSelectedPatient] = useState('');
   
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -20,13 +17,8 @@ const Plans = () => {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [baseRes, pacRes] = await Promise.all([
-        api.get('/api/planes?tipo=base'),
-        api.get('/api/pacientes')
-      ]);
-      const data = baseRes.data?.data || baseRes.data || [];
-      setPlanesBase(data);
-      setPacientes(pacRes.data?.data || pacRes.data || []);
+      const { data } = await api.get('/api/planes?tipo=base');
+      setPlanesBase(data?.data || data || []);
     } catch (err) {
       toast({ title: 'Error', description: 'No se pudieron cargar los planes', variant: 'destructive' });
     } finally {
@@ -37,21 +29,6 @@ const Plans = () => {
   useEffect(() => {
     fetchData();
   }, [toast]);
-
-  const handleAssign = async () => {
-    if (!assigningPlan || !selectedPatient) return;
-    try {
-      const { data } = await api.post(`/api/planes/${assigningPlan.id}/asignar`, { pacienteId: selectedPatient });
-      const newPlan = data?.data || data;
-      toast({ title: 'Plan asignado con éxito. Redirigiendo a personalización...' });
-      setAssigningPlan(null);
-      if (newPlan?.id) {
-        navigate(`/pacientes/${selectedPatient}/planes/${newPlan.id}/editar`);
-      }
-    } catch (err) {
-      toast({ title: 'Error al asignar', variant: 'destructive' });
-    }
-  };
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -64,6 +41,7 @@ const Plans = () => {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
     }
   };
+
   const filteredPlanes = planesBase.filter(p => 
     p.nombre?.toLowerCase().includes(search.toLowerCase())
   );
@@ -87,9 +65,9 @@ const Plans = () => {
           </div>
           <button 
             onClick={() => navigate('/planes/nuevo')} 
-            className="flex items-center gap-2 bg-transparent border border-border-default text-text-primary rounded-[8px] px-[18px] py-[10px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
+            className="flex items-center gap-2 bg-white text-black rounded-[8px] px-[18px] py-[10px] text-[14px] font-bold transition-all hover:bg-white/90 uppercase"
           >
-            <Plus className="h-[18px] w-[18px] text-text-secondary" /> Nuevo Menú
+            <Plus className="h-[18px] w-[18px]" /> Nuevo Protocolo
           </button>
         </header>
 
@@ -149,13 +127,6 @@ const Plans = () => {
                       <td className="px-6 py-4 text-right">
                         <div className="flex justify-end items-center gap-2">
                           <button 
-                            onClick={() => setAssigningPlan(p)}
-                            className="p-2 text-text-secondary hover:text-accent-green hover:bg-[#1a2e1a] rounded-[8px] transition-colors"
-                            title="Desplegar a Paciente"
-                          >
-                            <UserPlus className="w-[18px] h-[18px]" />
-                          </button>
-                          <button 
                             onClick={() => navigate(`/planes/${p.id}/editar`)}
                             className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-muted rounded-[8px] transition-colors"
                             title="Editar Protocolo"
@@ -179,63 +150,6 @@ const Plans = () => {
           </div>
         </section>
       </div>
-
-      {/* Modal Asignar */}
-      {assigningPlan && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-6 animate-fade-in shadow-none">
-          <div className="bg-bg-surface w-full max-w-lg rounded-[12px] overflow-hidden animate-slide-up border border-border-subtle">
-            <div className="p-6 border-b border-border-subtle flex justify-between items-start">
-              <div>
-                <h3 className="text-[18px] font-semibold text-text-primary m-0">Asignar Protocolo</h3>
-                <p className="text-[14px] font-normal text-text-secondary mt-1">Selecciona al paciente destino</p>
-              </div>
-              <button 
-                onClick={() => setAssigningPlan(null)}
-                className="p-2 hover:bg-bg-elevated transition-colors rounded-[8px] text-text-secondary hover:text-text-primary"
-              >
-                <X className="w-[18px] h-[18px]" />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              <div className="p-4 bg-bg-elevated rounded-[8px] border border-border-subtle flex items-center gap-4">
-                <div className="h-10 w-10 bg-bg-base border border-border-default text-text-primary flex items-center justify-center font-bold rounded-full">
-                  <ClipboardList className="w-5 h-5 text-text-secondary" />
-                </div>
-                <div>
-                  <p className="text-[12px] font-medium text-text-muted m-0">Plantilla Seleccionada</p>
-                  <p className="text-[14px] font-semibold text-text-primary m-0">{assigningPlan.nombre}</p>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary">Paciente Destino</label>
-                <select 
-                  className="w-full bg-bg-elevated border border-border-subtle p-3 text-[14px] text-text-primary font-normal outline-none focus:border-[#444] rounded-[8px] transition-all appearance-none cursor-pointer"
-                  style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
-                  value={selectedPatient}
-                  onChange={e => setSelectedPatient(e.target.value)}
-                >
-                  <option value="" className="text-text-muted">Seleccionar de expedientes...</option>
-                  {pacientes.map(p => (
-                    <option key={p.id} value={p.id}>{p.nombre} {p.apellido}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end pt-4">
-                <button 
-                  onClick={handleAssign}
-                  disabled={!selectedPatient}
-                  className="w-full bg-brand-primary text-bg-base font-medium text-[14px] px-[18px] py-[10px] hover:bg-[#e0e0e0] transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-[8px] flex items-center justify-center gap-2"
-                >
-                  Confirmar asignación
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

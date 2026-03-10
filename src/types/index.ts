@@ -2,6 +2,8 @@ export interface User {
   id: string;
   nombre: string;
   email: string;
+  rol?: 'admin' | 'practicante';
+  permisos?: Record<string, { read: boolean; write: boolean; delete: boolean }>;
   telefono?: string;
   certificacion?: string;
   profesion?: string;
