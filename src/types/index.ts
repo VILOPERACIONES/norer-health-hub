@@ -2,6 +2,8 @@ export interface User {
   id: string;
   nombre: string;
   email: string;
+  rol?: 'admin' | 'practicante';
+  permisos?: Record<string, { read: boolean; write: boolean; delete: boolean }>;
   telefono?: string;
   certificacion?: string;
   profesion?: string;
@@ -24,36 +26,83 @@ export interface AuthState {
 export interface Paciente {
   id: string;
   nombre: string;
-  apellido: string;
+  apellido: string | null;
   telefono: string;
   email?: string;
   fechaNacimiento?: string;
   sexo?: 'M' | 'F';
-  membresia?: 'ninguna' | 'basica' | 'premium';
-  membresiaVencimiento?: string;
-  ultimoPeso?: number;
-  ultimaVisita?: string;
-  ocupacion?: string;
-  motivoConsulta?: string;
-  createdAt?: string;
-  ejercicio?: Ejercicio;
-  antecedentes?: Antecedentes;
-  habitos?: Consumo;
+  estatura?: string | number;
+  complexion?: string | null;
+  fechaRegistro?: string;
+  nivelMembresia?: string;
+  suscripcionIdExterno?: string | null;
+  suscripcionInicio?: string | null;
+  suscripcionFin?: string | null;
+  ejercicio?: Ejercicio; 
+  datosEjercicio?: Ejercicio; 
+  antecedentes?: Antecedentes; 
+  habitos?: ConsumoCalorico; 
+  consumoCalorico?: ConsumoCalorico; 
   ultimaValoracion?: Valoracion;
+  valoraciones?: Valoracion[];
+  talla?: number; 
+  edad?: number;
 }
 
-export interface DashboardMetricas {
-  totalPacientes: number;
-  nuevosEsteMes: number;
-  planesEsteMes: number;
-  membresiasActivas: { total: number; basica: number; premium: number };
+export interface Ejercicio {
+  id?: string;
+  pacienteId?: string;
+  objetivo?: string;
+  gymOrigen?: string;
+  disciplina?: string;
+  horaEntrenamiento?: string | null;
+  frecuencia?: string;
+  tiempo?: string;
+  detallesAdicionales?: string | null;
+  nivelActividad?: string;
+  porcentajeSedentario?: number;
+  porcentajeLeve?: number;
+  porcentajeModerado?: number;
+  porcentajeIntenso?: number;
 }
 
-export interface Alerta {
-  pacienteId: string;
-  nombre: string;
-  telefono: string;
-  diasSinVisita: number;
+export interface Antecedentes {
+  id?: string;
+  pacienteId?: string;
+  alimentosNoGustan?: string;
+  alimentosGustan?: string;
+  alergias?: string;
+  patologia?: string;
+  cirugias?: string;
+  estrenimiento?: string | null;
+  consumoAlcohol?: string;
+  tabaco?: string;
+  agua?: string;
+  cicloMenstrual?: string | null;
+  signosYSintomas?: string | null;
+  historialProductos?: string;
+  recomendacionSuplementos?: string;
+}
+
+export interface ConsumoCalorico {
+  id?: string;
+  pacienteId?: string;
+  recordatorio24hActivo?: boolean;
+  horaDesayuno?: string;
+  horaColacion1?: string;
+  horaAlmuerzo?: string;
+  horaColacion2?: string;
+  horaCena?: string;
+  ayerDesayuno?: string;
+  ayerColacion1?: string;
+  ayerAlmuerzo?: string;
+  ayerColacion2?: string;
+  ayerCena?: string;
+  usalmenteDesayuno?: string | null;
+  usalmenteColacion1?: string | null;
+  usalmenteAlmuerzo?: string | null;
+  usalmenteColacion2?: string | null;
+  usalmenteCena?: string | null;
 }
 
 export interface Valoracion {
@@ -63,7 +112,9 @@ export interface Valoracion {
   hora?: string;
   numeracion?: number;
   peso: number;
+  pesoActual?: number | string;
   talla: number;
+  estatura?: number | string;
   imc?: number | string;
   pctGrasa2comp?: number | string;
   bioimpedanciaPctGrasa?: number | string;
@@ -87,72 +138,106 @@ export interface Valoracion {
   suplementacion?: string;
   temario?: { tema: string; detalle: string }[];
   plan?: Plan;
-}
-
-export interface Ingrediente {
-  descripcion: string;
-  cantidad: number;
-  unidad: string;
-  eqCantidad?: number;
-  eqGrupo?: string;
-  nota?: string;
-}
-
-export interface TiempoComida {
-  nombre: string;
-  ingredientes: Ingrediente[];
-  nota?: string;
-}
-
-export interface Menu {
-  nombre: string;
-  tiempos: TiempoComida[];
+  medicionNumero?: number;
+  deficitMusculo?: number;
+  superficieCorp?: number;
+  pctGrasaCorp?: number;
+  indicePonderal?: number;
 }
 
 export interface Plan {
   id: string;
-  pacienteId: string;
-  valoracionId?: string;
-  tipo: string;
+  nombre?: string;
+  pacienteId: string | null;
+  valoracionId?: string | null;
+  pdfCustomMeta?: any;
+  fechaCreacion?: string;
+  tipoPlan: string;
+  tipo?: string; 
   calorias: number;
-  macros: { proteinas: number; carbohidratos: number; grasas: number };
+  proteinasPct: number;
+  carbohidratosPct: number;
+  grasasPct: number;
+  proteinasKcal?: number;
+  carbohidratosKcal?: number;
+  grasasKcal?: number;
+  proteinasGr?: number;
+  carbohidratosGr?: number;
+  grasasGr?: number;
+  getSedentario?: number;
+  getLeve?: number;
+  getModerado?: number;
+  getIntenso?: number;
   menus: Menu[];
   proximaSesion?: string;
   proximaSesionHora?: string;
+  notasGenerales?: string;
   notas?: string;
-  activo?: boolean;
-  createdAt?: string;
+  estado?: 'activo' | 'archivado' | 'pendiente';
+  estadoEnvio?: 'pendiente' | 'enviado';
 }
 
-export interface Ejercicio {
+export interface Menu {
   id?: string;
-  tipo?: string;
-  frecuencia?: string;
-  duracion?: string;
-  intensidad?: string;
-  notas?: string;
+  nombre: string;
+  orden?: number;
+  tiempos: TiempoComida[];
+  tiemposComida?: TiempoComida[]; // Soporte para data bruta de backend
 }
 
-export interface Antecedentes {
+export interface TiempoComida {
   id?: string;
-  personales?: string;
-  familiares?: string;
-  patologicos?: string;
-  quirurgicos?: string;
-  alergias?: string;
-  medicamentos?: string;
-  alimentosGusta?: string;
-  alimentosNoGusta?: string;
-  patologia?: string;
+  nombre: string;
+  orden?: number;
+  nota?: string;
+  notaPie?: string; // Soporte para data bruta de backend
+  ingredientes: Ingrediente[];
 }
 
-export interface Consumo {
-  desayuno?: string;
-  comida?: string;
-  cena?: string;
-  colaciones?: string;
-  agua?: string;
-  alcohol?: string;
-  tabaco?: string;
-  suplementos?: string;
+export interface Ingrediente {
+  id?: string;
+  descripcion: string;
+  cantidad: number | string;
+  unidad: string;
+  eqCantidad?: number | string;
+  eqGrupo?: string;
+  nota?: string;
+  orden?: number;
+}
+
+export interface DashboardMetricas {
+  resumen: {
+    pacientesTotales: number;
+    pacientesNuevos: number;
+    planesNutricionales: number;
+    consultasTotales: number;
+  };
+  kpisClave: {
+    tasaRetencion: number;
+    conversionMembresia: number;
+    riesgoAbandono: number;
+    riesgoClinico: number;
+    promedioGrasaGral: number;
+  };
+  tendenciaMaestre: {
+    mes: string;
+    pacientes: number;
+    consultas: number;
+    planes: number;
+  }[];
+  googleCalendarUrl?: string;
+  objetivos: {
+    nombre: string;
+    cantidad: number;
+  }[];
+}
+
+export interface Alerta {
+  pacienteId: string;
+  nombre: string;
+  telefono: string;
+  diasSinVisita: number;
+  prioridad: 'Alta' | 'Baja';
+  tipoRiesgo?: string;
+  fechaPlan?: string;
 }

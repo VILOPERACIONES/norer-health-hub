@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Edit2, FileText, MessageCircle, Lock, Trash2 } from 'lucide-react';
+import { format } from 'date-fns';
+import { ArrowLeft, Edit2, FileText, Send, Lock, Trash2, Clock, Settings2 } from 'lucide-react';
 import api from '@/lib/api';
 import type { Plan } from '@/types';
+import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,8 +19,23 @@ const PlanView = () => {
     const fetch = async () => {
       try {
         const { data } = await api.get(`/api/pacientes/${pacienteId}/planes/${planId}`);
-        const serverData = data?.data || data;
-        if (serverData) setPlan(serverData);
+        let serverData = data?.data || data;
+        if (serverData) {
+          // Normalización para visualización
+          serverData.menus = serverData.menus?.map((m: any) => ({
+            ...m,
+            tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => ({
+              ...t,
+              nota: t.nota || t.notaPie || '',
+              ingredientes: (t.ingredientes || []).map((i: any) => ({
+                ...i,
+                cantidad: parseFloat(i.cantidad) || i.cantidad,
+                eqCantidad: parseFloat(i.eqCantidad) || i.eqCantidad
+              }))
+            }))
+          })) || [];
+          setPlan(serverData);
+        }
       } catch (err) {
         console.error('Error cargando plan:', err);
       } finally {
@@ -28,176 +45,226 @@ const PlanView = () => {
     fetch();
   }, [pacienteId, planId]);
 
-  const handleDelete = async () => {
-    if (!window.confirm('¿ELIMINAR ESTE PROTOCOLO MAESTRO?')) return;
+  const [showConfig, setShowConfig] = useState(false);
+  const [savingMeta, setSavingMeta] = useState(false);
+
+  const handleSaveMeta = async (meta: any) => {
+    setSavingMeta(true);
     try {
-      await api.delete(`/api/pacientes/${pacienteId}/planes/${planId}`);
-      toast({ title: 'Protocolo eliminado' });
-      navigate(`/pacientes/${pacienteId}`);
+      await api.put(`/api/planes/${planId}/pdf-meta`, meta);
+      setPlan(prev => prev ? { ...prev, pdfCustomMeta: meta } as Plan : prev);
+      toast({ title: 'Configuración PDF guardada', description: 'Los ajustes se aplicarán al generar o enviar.' });
+      setShowConfig(false);
     } catch (err) {
-      toast({ title: 'Error', description: 'No se pudo eliminar el plan', variant: 'destructive' });
+      toast({ title: 'Error', description: 'No se pudo guardar la configuración.', variant: 'destructive' });
+    } finally {
+      setSavingMeta(false);
     }
   };
 
   const handlePdf = async () => {
     try {
-      toast({ title: 'GENERANDO REPORTE', description: 'Preparando protocolo clínico maestro...' });
-      const response = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
-      const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      toast({ title: 'Generando Reporte', description: 'Componiendo estructura maestra en PDF...' });
+      const res = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `plan-${planId}.pdf`);
+      link.setAttribute('download', `Plan_${plan?.pacienteId}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
 
-      // Sincronizar estado enviado
-      await api.put(`/api/planes/${planId}/estado`, { estadoEnvio: 'enviado' });
-      toast({ title: 'ESTADO SINCRONIZADO', description: 'El reporte ha sido marcado como enviado.' });
+      toast({ title: 'PDF DESCARGADO', description: 'El reporte se ha generado correctamente.' });
     } catch (err) {
-      toast({ title: 'Error de Generación', description: 'No se pudo sincronizar el reporte PDF', variant: 'destructive' });
+      toast({ title: 'Error de Generación', description: 'No se pudo generar el reporte PDF', variant: 'destructive' });
     }
   };
 
-  const handleWhatsApp = () => {
-    toast({ title: 'Sincronización pendiente', description: 'El envío por canal maestro WhatsApp estará disponible próximamente.' });
+  const [sending, setSending] = useState(false);
+
+  const handleEnviar = async () => {
+    if (!window.confirm('¿Enviar este plan al paciente por correo y WhatsApp?')) return;
+    setSending(true);
+    try {
+      const { data } = await api.post(`/api/planes/${planId}/enviar`);
+      const resultado = data?.data || data;
+      const emailOk    = resultado?.email    === 'ok';
+      const whatsappOk = resultado?.whatsapp === 'ok';
+      const ambosOk    = emailOk && whatsappOk;
+      const ambosErr   = !emailOk && !whatsappOk;
+
+      let title = 'Plan enviado';
+      let description = '';
+
+      if (ambosOk) {
+        title = 'Plan enviado correctamente';
+        description = 'Correo y WhatsApp entregados al paciente.';
+      } else if (ambosErr) {
+        title = 'Enviado con advertencias';
+        description = 'El plan se marcó como enviado, pero tanto el correo como WhatsApp fallaron. Verifica la configuración.';
+      } else {
+        const ok  = emailOk ? 'Correo ✓' : 'WhatsApp ✓';
+        const err = emailOk ? 'WhatsApp ✗' : 'Correo ✗';
+        description = `${ok} entregado. ${err} falló — verifica la configuración.`;
+      }
+
+      toast({ title, description });
+      setPlan((prev) => prev ? { ...prev, estadoEnvio: 'enviado' } as Plan : prev);
+    } catch (err: any) {
+      toast({
+        title: 'Error al enviar',
+        description: err.response?.data?.message || 'No se pudo enviar el plan. Verifica la configuración de correo y WhatsApp.',
+        variant: 'destructive',
+      });
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] animate-pulse h-[60vh] space-y-6">
-      <div className="w-12 h-12 border-[4px] border-foreground/5 border-t-foreground rounded-none animate-spin" />
-      <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em]">SINCRONIZANDO PROTOCOLO...</p>
+    <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
+      <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
+      <p className="text-[14px] font-medium text-text-muted">Sincronizando protocolo...</p>
     </div>
   );
   
   if (!plan) return (
-     <div className="flex flex-col items-center justify-center min-h-[400px] h-[60vh] space-y-6">
-      <p className="text-xl font-black text-muted-foreground uppercase tracking-[0.3em] opacity-10">PROTOCOLO NO LOCALIZADO</p>
-      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] border-b border-foreground pb-1 hover:opacity-50 transition-all">VOLVER AL EXPEDIENTE</button>
+     <div className="h-[80vh] flex flex-col items-center justify-center gap-6">
+      <p className="text-[16px] font-medium text-text-muted">Protocolo no localizado</p>
+      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[14px] font-medium text-text-primary hover:text-text-secondary transition-colors underline underline-offset-4">Volver al expediente</button>
     </div>
   );
 
   return (
-    <div className="space-y-8 animate-fade-in max-w-7xl pb-20 mx-auto">
-      <div className="flex flex-col gap-6">
-        <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground hover:text-foreground transition-all w-fit group leading-none">
-          <ArrowLeft className="h-4 w-4 group-hover:-translate-x-1 transition-all" /> VOLVER AL EXPEDIENTE
+    <div className="space-y-10 animate-fade-in max-w-none pb-24 px-6">
+      <div className="flex flex-col gap-6 pt-6">
+        <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group">
+          <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
         </button>
         
-        <div className="flex flex-col xl:flex-row xl:items-end justify-between gap-6 animate-slide-up">
-           <div className="space-y-2">
-              <h1 className="text-3xl font-black text-foreground tracking-tighter uppercase leading-none">Plan {plan.tipo}</h1>
-              <p className="text-muted-foreground font-black text-[10px] uppercase tracking-[0.3em] opacity-40 leading-none">CONFIGURACIÓN INTEGRAL DE MACRONUTRIENTES Y SUPLEMENTACIÓN</p>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 animate-slide-up">
+           <div className="space-y-1">
+              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Plan {plan.tipoPlan || plan.tipo}</h1>
+              <p className="text-text-secondary font-normal text-[14px] m-0">Configuración integral de macronutrientes y suplementación</p>
            </div>
            
-           <div className="flex flex-wrap gap-2">
+           <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
-                className="px-6 py-3 bg-foreground text-background rounded-none text-[11px] font-black uppercase tracking-[0.1em] transition-all flex items-center gap-3 border border-foreground"
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222]"
               >
-                <Edit2 className="h-4 w-4" /> EDITAR
+                <Edit2 className="h-[18px] w-[18px]" /> Editar
               </button>
               <button
-                onClick={handleDelete}
-                className="px-6 py-3 border border-border/80 text-destructive text-[11px] font-black uppercase tracking-[0.1em] rounded-none hover:bg-destructive/5 transition-all"
+                onClick={() => setShowConfig(true)}
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
               >
-                ELIMINAR
+                <Settings2 className="h-[18px] w-[18px]" /> Configurar PDF
               </button>
               <button
                 onClick={handlePdf}
-                className="px-6 py-3 bg-background border border-border/80 rounded-none text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-3 hover:bg-secondary/10 transition-all"
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
               >
-                <FileText className="h-4 w-4" /> PDF
+                <FileText className="h-[18px] w-[18px]" /> Descargar
               </button>
               <button
-                onClick={handleWhatsApp}
-                className="px-6 py-3 bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 rounded-none text-[11px] font-black uppercase tracking-[0.1em] flex items-center gap-3 hover:bg-emerald-500 hover:text-white transition-all"
+                onClick={handleEnviar}
+                disabled={sending}
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-accent-green hover:text-[#000] disabled:opacity-50"
               >
-                <MessageCircle className="h-4 w-4" /> WHATSAPP
+                {sending ? (
+                  <div className="w-[18px] h-[18px] border-2 border-accent-green/30 border-t-accent-green rounded-full animate-spin" />
+                ) : (
+                  <Send className="h-[18px] w-[18px]" />
+                )}
+                {sending ? 'Enviando...' : 'Enviar al paciente'}
               </button>
            </div>
         </div>
       </div>
 
-      <div className="bg-foreground text-background p-6 rounded-none animate-slide-up">
+      <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] animate-slide-up">
          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            <div className="space-y-2">
-               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Masa Térmica Diaria</p>
-               <p className="text-xl font-black tracking-tighter uppercase leading-none">{plan.calorias}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">KCAL</span></p>
+            <div className="space-y-1">
+               <p className="text-[12px] font-medium text-text-muted m-0">Calorías Diarias</p>
+               <p className="text-[22px] font-bold text-text-primary m-0">{plan.calorias}<span className="text-[14px] font-medium text-text-secondary ml-1">Kcal</span></p>
             </div>
-            <div className="space-y-2">
-               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Sintetización Pro</p>
-               <p className="text-xl font-black text-emerald-400 tracking-tighter leading-none">{plan.macros.proteinas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% G/KG</span></p>
+            <div className="space-y-1">
+               <p className="text-[12px] font-medium text-text-muted m-0">Proteínas</p>
+               <p className="text-[22px] font-bold text-text-primary m-0">{plan.proteinasPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
             </div>
-            <div className="space-y-2">
-               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Energía Carbo</p>
-               <p className="text-xl font-black text-amber-400 tracking-tighter leading-none">{plan.macros.carbohidratos}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% CH</span></p>
+            <div className="space-y-1">
+               <p className="text-[12px] font-medium text-text-muted m-0">Carbohidratos</p>
+               <p className="text-[22px] font-bold text-text-primary m-0">{plan.carbohidratosPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
             </div>
-            <div className="space-y-2">
-               <p className="text-[10px] font-black opacity-30 uppercase tracking-[0.2em] leading-none">Densidad Lípidos</p>
-               <p className="text-xl font-black text-rose-400 tracking-tighter leading-none">{plan.macros.grasas}<span className="text-sm ml-2 tracking-[0.1em] opacity-30">% GR</span></p>
+            <div className="space-y-1">
+               <p className="text-[12px] font-medium text-text-muted m-0">Lípidos</p>
+               <p className="text-[22px] font-bold text-text-primary m-0">{plan.grasasPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
             </div>
          </div>
       </div>
 
-      {plan.notas && (
-        <div className="bg-secondary/10 p-6 rounded-none border border-foreground/5">
-          <h3 className="text-[10px] font-black text-foreground uppercase tracking-[0.3em] mb-4 opacity-40 leading-none">{`// RECOMENDACIONES ESTRATÉGICAS`}</h3>
-          <p className="text-sm font-black leading-relaxed uppercase tracking-tighter text-foreground/70">{plan.notas}</p>
+      {(plan.notasGenerales || plan.notas) && (
+        <div className="bg-bg-elevated p-6 rounded-[12px] border border-border-subtle">
+           <div className="flex items-center gap-2 mb-3 text-text-secondary">
+             <FileText className="w-[18px] h-[18px] text-text-primary" />
+             <h3 className="text-[16px] font-semibold text-text-primary m-0">Recomendaciones Generales</h3>
+           </div>
+          <p className="text-[14px] font-normal leading-relaxed text-text-secondary m-0">{plan.notasGenerales || plan.notas}</p>
         </div>
       )}
 
       {/* Menus Grid */}
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-6">
         {plan.menus.map((menu, i) => (
-          <div key={i} className="bg-background border border-border/40 p-6 rounded-none hover:border-foreground/20 transition-all flex flex-col h-full">
-            <div className="flex items-center gap-4 mb-8">
-              <div className="w-1.5 h-6 bg-foreground" />
-              <h3 className="text-xl font-black text-foreground tracking-tighter uppercase whitespace-nowrap">{menu.nombre}</h3>
+          <div key={i} className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] flex flex-col h-full hover:border-[#444] transition-colors">
+            <div className="flex items-center gap-3 mb-6 border-b border-border-subtle pb-4">
+              <div className="w-1.5 h-5 bg-brand-primary rounded-full" />
+              <h3 className="text-[18px] font-semibold text-text-primary m-0">{menu.nombre}</h3>
             </div>
             
-            <div className="space-y-8 flex-1">
+            <div className="space-y-6 flex-1">
               {menu.tiempos.map((t, j) => (
-                <div key={j} className="group/tiempo">
-                  <div className="flex items-center gap-3 mb-4">
-                     <span className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] leading-none">{t.nombre}</span>
-                     <div className="h-[1px] flex-1 bg-foreground/5 group-hover/tiempo:bg-foreground/10 transition-colors" />
+                <div key={j} className="group/tiempo p-4 bg-bg-elevated rounded-[8px] border border-border-subtle">
+                  <div className="flex items-center gap-2 mb-4">
+                     <Clock className="w-4 h-4 text-text-muted" />
+                     <span className="text-[14px] font-semibold text-text-primary m-0">{t.nombre}</span>
                   </div>
-                   <ul className="space-y-4">
+                   <ul className="space-y-3">
                      {t.ingredientes.map((ing, k) => (
-                       <li key={k} className="flex items-start gap-3">
-                          <div className="mt-2 w-1 h-1 rounded-full bg-foreground/10" />
-                          <div className="flex-1 space-y-1">
-                             <span className="text-sm font-black text-foreground uppercase tracking-tight leading-loose block">
-                                {ing.cantidad} {ing.unidad} {ing.descripcion}
+                       <li key={k} className="flex flex-col gap-1">
+                          <div className="flex items-start gap-2">
+                             <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-text-muted" />
+                             <span className="text-[14px] font-medium text-text-secondary m-0 leading-tight">
+                                {ing.cantidad} {ing.unidad} <span className="text-text-primary">{ing.descripcion}</span>
                              </span>
-                             <div className="flex flex-wrap gap-x-4 gap-y-1">
-                                {ing.eqCantidad && (
-                                   <p className="text-[9px] font-black text-muted-foreground uppercase tracking-[0.1em] opacity-40 leading-none">
-                                      Eq: {ing.eqCantidad} {ing.eqGrupo}
-                                    </p>
-                                )}
-                                {ing.nota && (
-                                   <p className="text-[9px] font-bold text-muted-foreground italic leading-none opacity-30">
-                                      * {ing.nota}
-                                   </p>
-                                )}
-                             </div>
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 ml-[14px]">
+                             {ing.eqCantidad && (
+                                <p className="text-[12px] font-medium text-text-muted m-0">
+                                   Eq: {ing.eqCantidad} {ing.eqGrupo}
+                                 </p>
+                             )}
+                             {ing.nota && (
+                                <p className="text-[12px] font-normal italic text-text-muted m-0">
+                                   * {ing.nota}
+                                </p>
+                             )}
                           </div>
                        </li>
                      ))}
                    </ul>
-                  {t.nota && <p className="text-[11px] font-black text-foreground/40 mt-4 pl-4 border-l border-foreground/10 uppercase tracking-tighter leading-relaxed font-mono">{t.nota}</p>}
+                  {t.nota && <p className="text-[13px] font-normal text-text-muted mt-4 p-3 bg-bg-base rounded-[6px] border border-border-subtle italic m-0">{t.nota}</p>}
                 </div>
               ))}
             </div>
             
             {plan.proximaSesion && plan.menus.length === 1 && (
-               <div className="mt-8 pt-6 border-t border-border/20">
-                  <div className="flex items-center gap-3 p-4 bg-secondary/5 rounded-none border border-foreground/5">
-                     <Lock className="h-4 w-4 opacity-10" />
-                     <p className="text-[10px] font-black text-foreground uppercase tracking-[0.2em] leading-none opacity-40">
-                        SIGUIENTE HIT: {formatDate(plan.proximaSesion)}
+               <div className="mt-6 pt-6 border-t border-border-default">
+                  <div className="flex items-center gap-3 p-4 bg-bg-elevated rounded-[8px] border border-border-subtle">
+                     <Lock className="h-[18px] w-[18px] text-text-secondary" />
+                     <p className="text-[14px] font-medium text-text-primary m-0">
+                        Siguiente cita: <span className="font-normal text-text-secondary">{formatDate(plan.proximaSesion)}</span>
                      </p>
                   </div>
                </div>
@@ -207,12 +274,21 @@ const PlanView = () => {
       </div>
 
       {plan.proximaSesion && plan.menus.length > 1 && (
-        <div className="bg-foreground text-background p-6 rounded-none flex items-center justify-center animate-slide-up">
-          <p className="text-[11px] font-black uppercase tracking-[0.3em] text-center leading-none">
-            PRÓXIMA SESIÓN DE CONTROL MAESTRO · {formatDate(plan.proximaSesion)}
+        <div className="bg-bg-elevated border border-border-subtle py-4 px-6 rounded-[12px] flex items-center justify-center animate-slide-up">
+          <p className="text-[14px] font-medium text-text-primary m-0">
+            Próxima cita de seguimiento: <span className="font-normal text-text-secondary">{formatDate(plan.proximaSesion)}</span>
           </p>
         </div>
       )}
+
+      <PDFPreviewModal 
+        isOpen={showConfig} 
+        onClose={() => setShowConfig(false)} 
+        planId={planId}
+        planCustomMeta={plan.pdfCustomMeta || {}}
+        onSaveMeta={handleSaveMeta}
+        loading={savingMeta}
+      />
     </div>
   );
 };
