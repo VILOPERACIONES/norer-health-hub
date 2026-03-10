@@ -11,10 +11,37 @@ const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = 
       type={type}
       value={value} 
       onChange={(e) => onChange(e.target.value)} 
-      readOnly={readOnly}
       className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`} 
       placeholder={placeholder} 
     />
+  </div>
+);
+
+const PhoneInput = ({ label, ladaValue, onLadaChange, phoneValue, onPhoneChange, placeholder }: any) => (
+  <div className="space-y-2 group">
+    <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
+    <div className="flex gap-2">
+      <select 
+        value={ladaValue} 
+        onChange={(e) => onLadaChange(e.target.value)} 
+        className="w-[110px] bg-bg-elevated rounded-[8px] px-2 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default appearance-none cursor-pointer text-center"
+      >
+        <option value="52">+52 (MX)</option>
+        <option value="1">+1 (US/CA)</option>
+        <option value="34">+34 (ES)</option>
+        <option value="54">+54 (AR)</option>
+        <option value="57">+57 (CO)</option>
+        <option value="56">+56 (CL)</option>
+        <option value="51">+51 (PE)</option>
+      </select>
+      <input 
+        type="tel"
+        value={phoneValue} 
+        onChange={(e) => onPhoneChange(e.target.value)} 
+        className="flex-1 bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default" 
+        placeholder={placeholder} 
+      />
+    </div>
   </div>
 );
 
@@ -66,21 +93,16 @@ const NewPatient = () => {
   const [saving, setSaving] = useState(false);
   
   const [form, setForm] = useState({
-    nombre: '', apellido: '', telefono: '', email: '',
+    nombre: '', apellido: '', lada: '52', telefono: '', email: '',
     fechaNacimiento: '', sexo: 'F' as 'M' | 'F',
     objetivo: '', gymOrigen: '', disciplina: '', frecuencia: '', tiempo: '',
     nivelActividad: 'Sedentario',
     porcentajeSedentario: '', porcentajeLeve: '', porcentajeModerado: '', porcentajeIntenso: '',
-    horaDesayuno: '', ayerDesayuno: '', usalmenteDesayuno: '',
-    horaColacion1: '', ayerColacion1: '', usalmenteColacion1: '',
-    horaAlmuerzo: '', ayerAlmuerzo: '', usalmenteAlmuerzo: '',
-    horaColacion2: '', ayerColacion2: '', usalmenteColacion2: '',
-    horaCena: '', ayerCena: '', usalmenteCena: '',
     historialProductos: '', recomSuplementos: '',
     alimentosNoGusta: '', alimentosGusta: '', alergico: '',
     patologia: '', cirugias: '', estrenimiento: 'No',
     alcohol: 'No', tabaco: 'No', agua: '',
-    cicloMenstrual: '', signosSintomas: '',
+    signosSintomas: '',
     talla: '',
   });
 
@@ -106,7 +128,7 @@ const NewPatient = () => {
     const payload = {
       nombre: form.nombre,
       apellido: form.apellido,
-      telefono: form.telefono,
+      telefono: form.lada + form.telefono.replace(/\D/g, ''),
       email: form.email,
       fechaNacimiento: form.fechaNacimiento,
       sexo: form.sexo,
@@ -134,7 +156,6 @@ const NewPatient = () => {
         alimentosGustan: form.alimentosGusta,
         alimentosNoGustan: form.alimentosNoGusta,
         estrenimiento: form.estrenimiento,
-        cicloMenstrual: form.cicloMenstrual,
         signosYSintomas: form.signosSintomas,
         consumoAlcohol: form.alcohol,
         tabaco: form.tabaco,
@@ -143,23 +164,7 @@ const NewPatient = () => {
         recomendacionSuplementos: form.recomSuplementos
       },
       
-      habitos: {
-        horaDesayuno: form.horaDesayuno,
-        ayerDesayuno: form.ayerDesayuno,
-        usalmenteDesayuno: form.usalmenteDesayuno,
-        horaColacion1: form.horaColacion1,
-        ayerColacion1: form.ayerColacion1,
-        usalmenteColacion1: form.usalmenteColacion1,
-        horaAlmuerzo: form.horaAlmuerzo,
-        ayerAlmuerzo: form.ayerAlmuerzo,
-        usalmenteAlmuerzo: form.usalmenteAlmuerzo,
-        horaColacion2: form.horaColacion2,
-        ayerColacion2: form.ayerColacion2,
-        usalmenteColacion2: form.usalmenteColacion2,
-        horaCena: form.horaCena,
-        ayerCena: form.ayerCena,
-        usalmenteCena: form.usalmenteCena,
-      }
+
     };
 
     try {
@@ -195,7 +200,7 @@ const NewPatient = () => {
         <FormSection title="Identificación del Paciente" icon={User}>
           <Input label="Nombre(s) *" value={form.nombre} onChange={(v: string) => update('nombre', v)} placeholder="Juan Manuel" />
           <Input label="Apellidos *" value={form.apellido} onChange={(v: string) => update('apellido', v)} placeholder="González" />
-          <Input label="Teléfono *" value={form.telefono} onChange={(v: string) => update('telefono', v)} placeholder="+52 999 000 0000" />
+          <PhoneInput label="Teléfono (Lada + Número) *" ladaValue={form.lada} onLadaChange={(v: string) => update('lada', v)} phoneValue={form.telefono} onPhoneChange={(v: string) => update('telefono', v)} placeholder="999 000 0000" />
           <Input label="E-mail" value={form.email} onChange={(v: string) => update('email', v)} placeholder="paciente@ejemplo.com" />
           <Input label="Fecha de Nacimiento" value={form.fechaNacimiento} onChange={(v: string) => update('fechaNacimiento', v)} type="date" />
           <div className="space-y-2">
@@ -205,7 +210,7 @@ const NewPatient = () => {
             </div>
           </div>
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
-          <Input label="Estatura (M)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="1.75" />
+          <Input label="Estatura (cm)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="175" />
           <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
         </FormSection>
 
@@ -222,51 +227,6 @@ const NewPatient = () => {
             <Input label="Intenso %" value={form.porcentajeIntenso} onChange={(v: string) => update('porcentajeIntenso', v)} placeholder="0" type="number" />
           </div>
         </FormSection>
-
-        <div className="bg-bg-surface p-8 rounded-[12px] border border-border-subtle shadow-none animate-slide-up">
-          <div className="flex items-center gap-3 mb-8 border-b border-border-subtle pb-4">
-            <div className="p-2 bg-bg-elevated border border-border-default rounded-[8px]">
-              <Clock className="h-[18px] w-[18px] text-text-secondary" />
-            </div>
-            <h3 className="text-[16px] font-semibold text-text-primary m-0">
-              Recordatorio de 24 Horas
-            </h3>
-          </div>
-          <div className="overflow-hidden rounded-[8px] border border-border-subtle bg-bg-surface">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-bg-elevated border-b border-border-subtle">
-                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Tiempo</th>
-                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Hora</th>
-                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Ayer (Ingesta)</th>
-                  <th className="py-4 px-6 text-[12px] font-medium text-text-secondary uppercase">Usualmente</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border-subtle">
-                {[
-                  { k: 'Desayuno', label: 'Desayuno' },
-                  { k: 'Colacion1', label: 'Colación 1' },
-                  { k: 'Almuerzo', label: 'Almuerzo' },
-                  { k: 'Colacion2', label: 'Colación 2' },
-                  { k: 'Cena', label: 'Cena' },
-                ].map((t) => (
-                  <tr key={t.k} className="hover:bg-bg-elevated transition-colors">
-                    <td className="py-4 px-6 text-[14px] font-medium text-text-primary">{t.label}</td>
-                    <td className="py-2 px-6">
-                      <input type="time" value={(form as any)[`hora${t.k}`]} onChange={(e) => update(`hora${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all" />
-                    </td>
-                    <td className="py-2 px-6">
-                      <input value={(form as any)[`ayer${t.k}`]} onChange={(e) => update(`ayer${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all placeholder:text-text-muted" placeholder="Ej. Pollo con arroz" />
-                    </td>
-                    <td className="py-2 px-6">
-                      <input value={(form as any)[`usalmente${t.k}`]} onChange={(e) => update(`usalmente${t.k}`, e.target.value)} className="w-full bg-bg-surface border border-border-subtle rounded-[6px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all placeholder:text-text-muted" placeholder="Mismo patrón" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
 
         <FormSection title="Anamnesis y Suplementación" icon={Shield}>
           <TextArea label="Historial de Suplementos (Fase Actual)" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} placeholder="Describa los productos que consume el paciente actualmente..." />
@@ -285,7 +245,6 @@ const NewPatient = () => {
           <Select label="Consumo de Alcohol" value={form.alcohol} onChange={(v: string) => update('alcohol', v)} options={['No', 'Social', 'Frecuente']} />
           <Select label="Hábito Tabáquico" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Ocasional', 'Frecuente']} />
           <Input label="Ingesta de Agua (L)”" value={form.agua} onChange={(v: string) => update('agua', v)} placeholder="Ej. 2.5 Lts" />
-          {form.sexo === 'F' && <Input label="Ciclo Menstrual" value={form.cicloMenstrual} onChange={(v: string) => update('cicloMenstrual', v)} placeholder="Regular / 28 Días" />}
           <TextArea label="Signos y Síntomas Adicionales" value={form.signosSintomas} onChange={(v: string) => update('signosSintomas', v)} placeholder="Cansancio crónico, dolor de cabeza..." />
         </FormSection>
 

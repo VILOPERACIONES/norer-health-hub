@@ -24,6 +24,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   // Debounce ref
   const debounceRef = useState<NodeJS.Timeout | null>(null)[0];
@@ -31,12 +32,22 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
   const fetchPdf = async (metaOptions?: any) => {
     if (!planId) return;
     setLoadingPdf(true);
+    setPdfError(null);
     try {
       const res = await api.post(`/api/planes/${planId}/pdf/preview`, metaOptions || meta, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       setPdfUrl(url);
-    } catch (e) {
-      console.error(e);
+    } catch (e: any) {
+      console.error('PDF Preview error:', e);
+      // Intentar leer el body del error como texto
+      let msg = 'Error generando PDF';
+      if (e?.response?.data) {
+        try {
+          const text = await new Response(e.response.data).text();
+          msg = text.slice(0, 200);
+        } catch {}
+      }
+      setPdfError(msg);
     } finally {
       setLoadingPdf(false);
     }
@@ -184,8 +195,22 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
               className="w-full h-full rounded shadow-2xl border border-[#444] bg-white"
               title="PDF Preview"
             />
+          ) : pdfError ? (
+            <div className="flex flex-col items-center gap-3 text-center max-w-md px-6">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center">
+                <span className="text-red-400 text-lg">⚠</span>
+              </div>
+              <p className="text-red-400 font-semibold text-[13px]">Error al generar la vista previa</p>
+              <p className="text-[#666] text-[11px] font-mono break-all">{pdfError}</p>
+              <button 
+                onClick={() => fetchPdf(meta)}
+                className="mt-2 px-4 py-2 bg-[#333] hover:bg-[#444] text-white text-[12px] rounded-[6px] transition-colors"
+              >
+                Reintentar
+              </button>
+            </div>
           ) : (
-             <div className="text-gray-500 font-medium">No se logró cargar la vista previa.</div>
+            <div className="text-[#666] text-[13px]">Cargando vista previa...</div>
           )}
         </div>
 

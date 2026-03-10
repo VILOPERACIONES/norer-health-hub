@@ -342,7 +342,6 @@ const PatientProfile = () => {
                 'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
                 'Alergias': paciente.antecedentes?.alergias || 'N/A',
                 'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
-                'Ciclo Menstrual': paciente.antecedentes?.cicloMenstrual || 'N/A',
                 'Agua al día': paciente.antecedentes?.agua || 'N/A',
                 'Alcohol': paciente.antecedentes?.consumoAlcohol || 'N/A',
                 'Tabaco': paciente.antecedentes?.tabaco || 'N/A',

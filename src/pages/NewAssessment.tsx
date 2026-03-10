@@ -1,19 +1,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Trash2, Clock, Activity, Layers, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Trash2, Clock, Activity, Layers, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
-
-const IMC_CLASIF = (imc: number) => {
-  if (imc <= 0) return '';
-  if (imc < 18.5) return 'Bajo peso';
-  if (imc < 25) return 'Normal';
-  if (imc < 30) return 'Sobrepeso';
-  if (imc < 35) return 'Obesidad I';
-  if (imc < 40) return 'Obesidad II';
-  return 'Obesidad III';
-};
 
 const Field = ({
   label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '',
@@ -102,8 +92,6 @@ const NewAssessment = () => {
     return pesoNum - (pesoNum * pg / 100);
   }, [pesoNum, pctGrasa]);
 
-  const clasificacionImc = IMC_CLASIF(imc);
-
   const addTema = () => {
     setTemario([...temario, { id: Date.now().toString(), tema: '', detalle: '' }]);
   };
@@ -136,7 +124,6 @@ const NewAssessment = () => {
       pesoActual: pesoNum,
       estatura: estaturaNum,
       imc: parseFloat(imc.toFixed(2)),
-      clasificacionImc,
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
     };
@@ -248,13 +235,7 @@ const NewAssessment = () => {
                 </div>
                 <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider px-2 py-1 bg-bg-base rounded-[6px] border border-border-subtle">Auto</span>
               </div>
-              <div className="bg-bg-elevated p-4 rounded-[8px] border border-border-default flex items-center justify-between">
-                <div>
-                  <p className="text-[12px] font-medium text-text-secondary mb-1 m-0">Clasificación IMC</p>
-                  <p className="text-[16px] font-bold text-text-primary m-0">{clasificacionImc}</p>
-                </div>
-                <span className="text-[11px] font-medium text-text-muted uppercase tracking-wider px-2 py-1 bg-bg-base rounded-[6px] border border-border-subtle">Auto</span>
-              </div>
+
             </div>
           )}
 
@@ -369,27 +350,34 @@ const NewAssessment = () => {
         </div>
 
         {/* BOTONES */}
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={() => handleSave(true)}
-            disabled={saving}
-            className="flex-1 py-4 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 hover:bg-[#e0e0e0]"
-          >
-            {saving ? (
-              <div className="w-5 h-5 border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
-            ) : (
-              <>
-                <Save className="h-[18px] w-[18px]" /> Guardar y Crear Plan
-              </>
-            )}
-          </button>
-          <button
-            onClick={() => handleSave(false)}
-            disabled={saving}
-            className="flex-1 py-3 bg-bg-surface border border-border-subtle text-text-primary rounded-[8px] text-[13px] font-medium hover:bg-bg-elevated transition-colors flex items-center justify-center gap-2"
-          >
-            <Clock className="h-4 w-4 text-text-muted" /> Solo guardar valoración
-          </button>
+        <div className="space-y-4">
+          {barridoData?.isValid === false && (
+            <div className="text-[13px] text-accent-red font-medium flex items-center justify-center gap-2 p-3 bg-[#2e1a1a] border border-[#ff6b6b]/20 rounded-[8px]">
+              <AlertCircle className="w-4 h-4" /> La distribución de comidas del barrido no cuadra con las porciones objetivo. Corrígelo para guardar.
+            </div>
+          )}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => handleSave(true)}
+              disabled={saving || barridoData?.isValid === false}
+              className="flex-1 py-4 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 hover:bg-[#e0e0e0]"
+            >
+              {saving ? (
+                <div className="w-5 h-5 border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
+              ) : (
+                <>
+                  <Save className="h-[18px] w-[18px]" /> Guardar y Crear Plan
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => handleSave(false)}
+              disabled={saving || barridoData?.isValid === false}
+              className="flex-1 py-3 bg-bg-surface border border-border-subtle text-text-primary rounded-[8px] text-[13px] font-medium hover:bg-bg-elevated transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              <Clock className="h-4 w-4 text-text-muted" /> Solo guardar valoración
+            </button>
+          </div>
         </div>
       </div>
     </div>

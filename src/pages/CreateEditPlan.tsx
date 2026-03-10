@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown, ClipboardList, ChevronDown, ChevronUp } from 'lucide-react';
+import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import BarridoEquivalenciasComp from '@/components/BarridoEquivalencias';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan } from '@/types';
@@ -83,8 +84,18 @@ const CreateEditPlan = () => {
             setProteinas((p.proteinasPct || p.macros?.proteinas || 30).toString());
             setCarbohidratos((p.carbohidratosPct || p.macros?.carbohidratos || 40).toString());
             setGrasas((p.grasasPct || p.macros?.grasas || 30).toString());
-            setProximaSesion(p.proximaSesion || '');
-            setProximaSesionHora(p.proximaSesionHora || '');
+            
+            if (p.proximaSesion) {
+              const d = new Date(p.proximaSesion);
+              if (!isNaN(d.getTime())) {
+                setProximaSesion(d.toISOString().split('T')[0]);
+                setProximaSesionHora(d.toTimeString().substring(0, 5));
+              }
+            } else {
+              setProximaSesion('');
+              setProximaSesionHora('');
+            }
+            
             setNotas(p.notasGenerales || p.notas || '');
             
             // USAR MAPEO ROBUSTO
@@ -207,11 +218,52 @@ const CreateEditPlan = () => {
   const gPct = parseFloat(grasas) || 0;
   const macroSum = pPct + cPct + gPct;
 
+  // Energía del barrido de la valoración (referencia objetiva)
+  const kcalBarrido = useMemo(() => {
+    let bd = valData?.barridoEquivalencias;
+    if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch {} }
+    if (bd?.barrido) bd = bd.barrido;
+    if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch {} }
+    return bd?.kcalTotal ? Math.round(Number(bd.kcalTotal)) : null;
+  }, [valData]);
+
+  // Cuando carga el barrido y el usuario está CREANDO (no editando), pre-llenar la energía
+  useEffect(() => {
+    if (!isEdit && kcalBarrido && kcalBarrido > 0) {
+      setCalorias(String(kcalBarrido));
+    }
+  }, [kcalBarrido, isEdit]);
+
+  // Kcal por equivalente SMAE (para estimación de menú)
+  const KCAL_EQ: Record<string, number> = {
+    verduras: 0, frutas: 60, cerealSinGr: 70, cerealConGr: 115, leguminosas: 120,
+    aoaMuyBajo: 40, aoaBajo: 55, aoaModerado: 75, aoaAlto: 100,
+    lecheDesc: 95, lecheSemi: 110, lecheEntera: 150, lecheAz: 200,
+    grasaSinProt: 45, grasaConProt: 70, azSinGr: 40, azConGr: 85,
+  };
+
+  // Estimación de kcal del menú basado en equivalentes SMAE de los ingredientes
+  const kcalMenuEstimado = useMemo(() => {
+    let total = 0;
+    menus.forEach(m => {
+      m.tiempos.forEach(t => {
+        t.ingredientes.forEach(ing => {
+          const eq = ing.eqCantidad || 0;
+          const grupo = ing.eqGrupo || '';
+          const kcalPorEq = KCAL_EQ[grupo] ?? 0;
+          total += eq * kcalPorEq;
+        });
+      });
+    });
+    return Math.round(total);
+  }, [menus]);
+
   const macroCalc = useMemo(() => ({
     pGr: (cal * pPct / 100) / 4, pGrKg: pesoUltimo > 0 ? ((cal * pPct / 100) / 4) / pesoUltimo : 0,
     cGr: (cal * cPct / 100) / 4, cGrKg: pesoUltimo > 0 ? ((cal * cPct / 100) / 4) / pesoUltimo : 0,
     gGr: (cal * gPct / 100) / 9, gGrKg: pesoUltimo > 0 ? ((cal * gPct / 100) / 9) / pesoUltimo : 0,
   }), [cal, pPct, cPct, gPct, pesoUltimo]);
+
 
   const updateMenu = (menuIdx: number, fn: (m: Menu) => Menu) => {
     setMenus(menus.map((m, i) => i === menuIdx ? fn({ ...m }) : m));
@@ -237,6 +289,8 @@ const CreateEditPlan = () => {
       proteinasPct: parseFloat(proteinas), 
       carbohidratosPct: parseFloat(carbohidratos), 
       grasasPct: parseFloat(grasas),
+      proximaSesion,
+      proximaSesionHora,
       menus: menus.map(m => ({
         nombre: m.nombre,
         tiemposComida: m.tiempos.map(t => ({
@@ -451,43 +505,30 @@ const CreateEditPlan = () => {
 
                       <div className="space-y-4">
                         {tiempo.ingredientes.map((ing, ii) => (
-                          <div key={ii} className="relative space-y-2 pb-4 border-b border-border-default last:border-0 last:pb-0">
-                             <div className="flex gap-2">
-                                <input
-                                  placeholder="Alimento o ingrediente..."
-                                  value={ing.descripcion}
-                                  onChange={(e) => updateTiempo(mi, ti, (t) => ({
-                                    ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, descripcion: e.target.value } : x)
-                                  }))}
-                                  className="flex-1 bg-bg-base px-3 py-2 rounded-[6px] text-[13px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors"
-                                />
-                                <button onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: t.ingredientes.filter((_, j) => j !== ii) }))} className="text-text-muted hover:text-accent-red px-2 transition-colors"><X className="w-4 h-4" /></button>
-                             </div>
-                             <div className="grid grid-cols-4 gap-2">
-                                <div className="space-y-1">
-                                   <input type="number" value={ing.cantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, cantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Cant" />
-                                </div>
-                                <div className="space-y-1">
-                                   <input value={ing.unidad} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, unidad: e.target.value } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Unid" />
-                                </div>
-                                <div className="space-y-1">
-                                   <input type="number" value={ing.eqCantidad || ''} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqCantidad: parseFloat(e.target.value) || 0 } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Eq" />
-                                </div>
-                                <div className="space-y-1">
-                                   <input value={ing.eqGrupo} onChange={e => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, eqGrupo: e.target.value } : x) }))} className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444] transition-colors" placeholder="Grupo" />
-                                </div>
-                             </div>
-                             {ing.eqCantidad ? (
-                               <p className="text-[12px] font-medium text-text-muted mt-2 m-0 bg-bg-base px-2 py-1 rounded-[4px] inline-block border border-border-default">
-                                 {ing.cantidad} {ing.unidad} {ing.descripcion} → {ing.eqCantidad} Eq {ing.eqGrupo}
-                               </p>
-                             ) : null}
-                          </div>
+                          <SmaeIngredientePicker
+                            key={ii}
+                            ingrediente={ing}
+                            index={ii}
+                            onUpdate={(updates) =>
+                              updateTiempo(mi, ti, (t) => ({
+                                ...t,
+                                ingredientes: t.ingredientes.map((x, j) =>
+                                  j === ii ? { ...x, ...updates } : x
+                                ),
+                              }))
+                            }
+                            onRemove={() =>
+                              updateTiempo(mi, ti, (t) => ({
+                                ...t,
+                                ingredientes: t.ingredientes.filter((_, j) => j !== ii),
+                              }))
+                            }
+                          />
                         ))}
                         
                         <button
                           onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, emptyIngrediente()] }))}
-                          className="w-full py-2 bg-transparent border border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
+                          className="w-full py-2 bg-transparent border border-dashed border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
                         >
                           + Agregar Alimento
                         </button>
@@ -550,11 +591,68 @@ const CreateEditPlan = () => {
               </div>
             ) : (
               <div className="space-y-6">
-                <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden flex flex-col items-center">
-                   <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Energía Total Actual</span>
-                   <p className="text-[32px] font-bold text-brand-primary m-0">{cal}<span className="text-[16px] ml-1 font-medium text-text-muted">Kcal</span></p>
+                {/* ── Energía del BARRIDO (referencia) ── */}
+                {kcalBarrido && kcalBarrido > 0 && (
+                  <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-[12px] p-4 flex flex-col items-center">
+                    <span className="text-[10px] font-bold text-[#5a8abf] uppercase tracking-widest mb-1">Energía del Barrido</span>
+                    <p className="text-[28px] font-bold text-[#90c2ff] m-0">{kcalBarrido}<span className="text-[13px] ml-1 font-medium text-[#5a8abf]">kcal</span></p>
+                    <span className="text-[10px] text-[#4a6a8f] mt-1">Según la valoración #{valData?.numeroValoracion}</span>
+                    {cal !== kcalBarrido && cal > 0 && (
+                      <div className={`mt-2 px-3 py-1 rounded-full text-[10px] font-bold ${
+                        cal > kcalBarrido ? 'bg-orange-900/30 text-orange-400 border border-orange-800/40' : 'bg-green-900/30 text-green-400 border border-green-800/40'
+                      }`}>
+                        Plan: {cal > kcalBarrido ? '+' : ''}{cal - kcalBarrido} kcal vs barrido
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* ── Energía del PLAN actual ── */}
+                <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-4 flex flex-col items-center">
+                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">Energía del Plan</span>
+                  <p className="text-[32px] font-bold text-brand-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">kcal</span></p>
+                  {kcalMenuEstimado > 0 && (
+                    <div className={`mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${
+                      Math.abs(kcalMenuEstimado - cal) < 50
+                        ? 'bg-green-900/30 text-green-400 border border-green-800/40'
+                        : 'bg-yellow-900/30 text-yellow-400 border border-yellow-800/40'
+                    }`}>
+                      <span>Menús aportan ~{kcalMenuEstimado} kcal</span>
+                    </div>
+                  )}
                 </div>
 
+                {/* ── Macros del plan ── */}
+                <div className="bg-bg-surface border border-border-subtle p-4 rounded-[12px] space-y-3">
+                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest m-0">Distribución Macronutrimental</p>
+                  {[
+                    { label: 'Proteína', pct: pPct, gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c', bar: 'bg-[#ef8c8c]', note: pPct >= 35 ? 'Hiperproteico' : pPct <= 15 ? 'Hipoproteico' : null },
+                    { label: 'Carbohidratos', pct: cPct, gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff', bar: 'bg-[#90c2ff]', note: cPct <= 10 ? 'Cetogénico' : cPct <= 25 ? 'Low-Carb' : null },
+                    { label: 'Grasas', pct: gPct, gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842', bar: 'bg-[#f5c842]', note: null },
+                  ].map(m => (
+                    <div key={m.label}>
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[12px] font-semibold" style={{ color: m.color }}>{m.label}</span>
+                          {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#1a1a1a] border border-[#333] text-[#8a8a8a] font-medium">{m.note}</span>}
+                        </div>
+                        <span className="text-[12px] font-bold text-text-primary">{m.pct}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
+                        <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(m.pct, 100)}%` }} />
+                      </div>
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[10px] text-text-muted font-mono">{formatDecimal(m.gr)} g/día</span>
+                        {pesoUltimo > 0 && <span className="text-[10px] text-text-muted font-mono">{formatDecimal(m.grKg)} g/kg</span>}
+                      </div>
+                    </div>
+                  ))}
+                  {macroSum !== 100 && (
+                    <p className="text-[11px] text-accent-red text-center m-0 pt-1 border-t border-[#2e1a1a]">Suma: {macroSum}% ≠ 100%</p>
+                  )}
+                </div>
+
+                {/* ── Barrido estratégico (colapsable) ── */}
                 <div className="bg-[#111] border border-[#333] rounded-[12px] overflow-hidden">
                   <button 
                     onClick={() => setShowBarridoRef(!showBarridoRef)}
@@ -571,49 +669,53 @@ const CreateEditPlan = () => {
                       {valData?.numeroValoracion ? `Apoyo de cálculo - Consulta #${valData.numeroValoracion}` : 'Herramienta de apoyo (Scratchpad)'}
                     </p>
                   </button>
-                                    {showBarridoRef && (
-                      <div className="p-4 border-t border-[#333] bg-[#0a0a0a]">
-                        {(() => {
-                           let bd = valData?.barridoEquivalencias;
-                           if (typeof bd === 'string') {
-                             try { bd = JSON.parse(bd); } catch (e) {}
-                           }
-                           
-                           if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Aún no hay barrido guardado en esta consulta.</p>;
-                           
-                           const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
+                  {showBarridoRef && (
+                    <div className="p-4 border-t border-[#333] bg-[#0a0a0a]">
+                      {(() => {
+                         let bd = valData?.barridoEquivalencias;
+                         if (typeof bd === 'string') {
+                           try { bd = JSON.parse(bd); } catch (e) {}
+                         }
+                         
+                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Aún no hay barrido guardado en esta consulta.</p>;
+                         
+                         const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
 
-                           return (
-                             <div className="space-y-4">
-                               {bd.tiempos.map((t: string) => {
-                                  // distribucion[t] is an object where keys are grupos and values are cantidades
-                                  const tiempoDist = (bd.distribucion || {})[t] || {};
-                                  const distributionItems = Object.entries(tiempoDist).filter(([g, cant]) => {
-                                     return Number(cant) > 0;
-                                  });
-                                  if (distributionItems.length === 0) return null; // No hay nada asignado a este tiempo
-                                  
-                                  return (
-                                    <div key={t} className="bg-[#1a1a1a] p-3 rounded-[8px] border border-[#333]">
-                                      <h4 className="text-[12px] font-bold text-[#90c2ff] uppercase tracking-wider mb-2 m-0 border-b border-[#333] pb-1.5">{t}</h4>
-                                      <div className="flex flex-wrap gap-2 pt-1.5">
-                                        {distributionItems.map(([g, cant]) => {
-                                           return (
-                                             <span key={g} className="px-2 py-1 bg-[#111] border border-[#333] rounded text-[11px] font-medium text-[#e0e0e0] flex items-center gap-1.5 shadow-sm">
-                                               <span className="w-1.5 h-1.5 rounded-full bg-[#90c2ff]" /> 
-                                               {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(2))} eq</span>
-                                             </span>
-                                           );
-                                        })}
-                                      </div>
-                                    </div>
-                                  );
-                               })}
-                             </div>
-                           )
-                        })()}
-                      </div>
-                    )}
+                         const renderedTiempos = bd.tiempos.map((t: string) => {
+                            const tiempoDist = (bd.distribucion || {})[t] || {};
+                            const distributionItems = Object.entries(tiempoDist).filter(([, cant]) => Number(cant) > 0);
+                            if (distributionItems.length === 0) return null;
+                            const kcalTiempo = distributionItems.reduce((s, [g, cant]) => s + Number(cant) * (KCAL_EQ[g] ?? 0), 0);
+                            
+                            return (
+                              <div key={t} className="bg-[#1a1a1a] p-3 rounded-[8px] border border-[#333]">
+                                <div className="flex items-center justify-between mb-2">
+                                  <h4 className="text-[12px] font-bold text-[#90c2ff] uppercase tracking-wider m-0">{t}</h4>
+                                  <span className="text-[10px] font-mono text-[#8a8a8a]">{Math.round(kcalTiempo)} kcal</span>
+                                </div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {distributionItems.map(([g, cant]) => (
+                                    <span key={g} className="px-2 py-0.5 bg-[#111] border border-[#333] rounded text-[10px] font-medium text-[#e0e0e0]">
+                                      {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(1))} eq</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                         }).filter(Boolean);
+
+                         if (renderedTiempos.length === 0) {
+                           return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">El barrido está vacío o todas las porciones son 0.</p>;
+                         }
+
+                         return (
+                           <div className="space-y-3">
+                             {renderedTiempos}
+                           </div>
+                         )
+                      })()}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

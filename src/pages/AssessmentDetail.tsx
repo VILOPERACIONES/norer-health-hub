@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check } from 'lucide-react';
+import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
@@ -139,7 +139,8 @@ const AssessmentDetail = () => {
 
   // Barrido: estado controlado por el padre, se pasa al componente compartido
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
-  const [showBarrido, setShowBarrido] = useState(false);
+  const [initialBarridoData, setInitialBarridoData] = useState<string | null>(null);
+  const [showBarrido, setShowBarrido] = useState(true);
   const [savingBarrido, setSavingBarrido] = useState(false);
 
   useEffect(() => {
@@ -155,9 +156,11 @@ const AssessmentDetail = () => {
           const bd = br.data?.data || br.data;
           if (bd && (bd.tiempos || bd.kcalTotal)) {
             setBarridoData(bd as BarridoData);
+            setInitialBarridoData(JSON.stringify(bd));
           }
         } catch {
           // Sin barrido previo, estado inicial null
+          setInitialBarridoData(null);
         }
       } catch (err) {
         console.error('Error cargando valoración:', err);
@@ -176,6 +179,7 @@ const AssessmentDetail = () => {
         `/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`,
         barridoData
       );
+      setInitialBarridoData(JSON.stringify(barridoData));
       toast({ title: 'Barrido guardado correctamente' });
     } catch (err: any) {
       toast({
@@ -223,10 +227,9 @@ const AssessmentDetail = () => {
 
   // Formato: 2 decimales para precisión
   const imcDisplay = imcNum > 0 ? imcNum.toFixed(2) : '—';
-  const imcColor = imcNum >= 30 ? 'text-accent-red' : imcNum >= 25 ? 'text-yellow-400' : 'text-text-primary';
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-[1000px] mx-auto px-6">
+    <div className="space-y-8 animate-fade-in pb-20 w-full px-6 lg:px-10">
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 pb-6 border-b border-border-subtle">
         <div className="space-y-2">
@@ -268,13 +271,9 @@ const AssessmentDetail = () => {
           </div>
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">IMC</p>
-            <p className={`text-[20px] font-bold m-0 ${imcColor}`}>
+            <p className={`text-[20px] font-bold m-0 ${imcNum >= 30 ? 'text-accent-red' : imcNum >= 25 ? 'text-yellow-400' : 'text-text-primary'}`}>
               {imcDisplay}
             </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[12px] font-medium text-text-secondary m-0">Clasificación</p>
-            <p className="text-[16px] font-bold text-text-primary m-0">{val.clasificacionImc || '—'}</p>
           </div>
         </div>
 
@@ -353,11 +352,16 @@ const AssessmentDetail = () => {
               onChange={(data) => setBarridoData(data)}
             />
             {/* Botón "Guardar barrido" separado — POST upsert */}
-            <div className="flex justify-end pt-2 border-t border-border-subtle">
+            <div className="flex items-center justify-between pt-4 mt-2 border-t border-border-subtle">
+              <div className="text-[12px] text-accent-red font-medium">
+                {barridoData?.isValid === false && (
+                  <span className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> La distribución de comidas no de cuadra con las porciones planeadas.</span>
+                )}
+              </div>
               <button
                 onClick={handleGuardarBarrido}
-                disabled={savingBarrido}
-                className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50"
+                disabled={savingBarrido || barridoData?.isValid === false || JSON.stringify(barridoData) === initialBarridoData}
+                className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {savingBarrido ? (
                   <div className="w-4 h-4 border-2 border-bg-base/30 border-t-bg-base rounded-full animate-spin" />

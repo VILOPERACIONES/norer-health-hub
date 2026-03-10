@@ -1,5 +1,5 @@
-import { useState, useMemo, useRef } from 'react';
-import { Plus, X, Check, AlertCircle, RotateCcw, Trash2 } from 'lucide-react';
+import { useState, useMemo, useRef, useCallback } from 'react';
+import { Plus, X, Check, AlertCircle, RotateCcw, Trash2, GripHorizontal } from 'lucide-react';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface BarridoData {
@@ -11,6 +11,8 @@ export interface BarridoData {
   kcalManuales?: Record<string, number>;
   /** Energía total manual — si está seteada, reemplaza la suma automática */
   energiaTotalManual?: number | null;
+  /** Es válido cuando la distribución coincide con las porciones para TODOS los grupos. */
+  isValid?: boolean;
 }
 
 interface BarridoEquivalenciasProps {
@@ -90,6 +92,64 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   const [editingTiempo, setEditingTiempo] = useState<number | null>(null);
   const [newTiempoName, setNewTiempoName] = useState('');
   const [energiaInputStr, setEnergiaInputStr] = useState('');
+  const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+
+  const handleDragStart = (e: React.DragEvent, idx: number) => {
+    setDraggedColIdx(idx);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e: React.DragEvent, idx: number) => {
+    e.preventDefault(); // Necesario para permitir onDrop
+  };
+
+  const handleDrop = (e: React.DragEvent, idx: number) => {
+    e.preventDefault();
+    if (draggedColIdx === null || draggedColIdx === idx) return;
+
+    const newTiempos = [...tiempos];
+    const [moved] = newTiempos.splice(draggedColIdx, 1);
+    newTiempos.splice(idx, 0, moved);
+
+    commit({ ...state, tiempos: newTiempos });
+    setDraggedColIdx(null);
+  };
+
+  // ─── Navegar celdas con teclado (Tabla Excel) ────────────────────────────────
+  const focusCell = useCallback((row: number, col: number) => {
+    const el = tableRef.current?.querySelector<HTMLInputElement>(
+      `input[data-row="${row}"][data-col="${col}"]`
+    );
+    if (el) { el.focus(); el.select(); }
+  }, []);
+
+  const handleCellKey = useCallback((e: React.KeyboardEvent<HTMLInputElement>, row: number, col: number, totalCols: number) => {
+    // col 0 = Porciones, col 1..N = tiempos
+    const totalRows = GRUPOS.length;
+    let nextRow = row;
+    let nextCol = col;
+    let handled = false;
+
+    if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
+      if (col < totalCols) { nextCol = col + 1; } else { nextCol = 0; nextRow = (row + 1) % totalRows; }
+      handled = true;
+    } else if (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
+      if (col > 0) { nextCol = col - 1; } else { nextCol = totalCols; nextRow = (row - 1 + totalRows) % totalRows; }
+      handled = true;
+    } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+      nextRow = (row + 1) % totalRows;
+      handled = true;
+    } else if (e.key === 'ArrowUp') {
+      nextRow = (row - 1 + totalRows) % totalRows;
+      handled = true;
+    }
+
+    if (handled) {
+      e.preventDefault();
+      focusCell(nextRow, nextCol);
+    }
+  }, [focusCell]);
 
   const { tiempos, porciones, distribucion, kcalManuales = {}, energiaTotalManual } = state;
 
@@ -137,7 +197,15 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       next.energiaTotalManual != null && next.energiaTotalManual > 0
         ? next.energiaTotalManual
         : Math.round(autoTotal);
-    const updated = { ...next, kcalTotal: totalFinal };
+    
+    // Validar si la distribución suma exactamente la porción para TODOS los grupos
+    const isValid = GRUPOS.every(({ key }) => {
+      const porcion = next.porciones[key] || 0;
+      const total = next.tiempos.reduce((s, t) => s + (next.distribucion[t]?.[key] || 0), 0);
+      return Math.abs(porcion - total) < 0.01; // Usar tolerancia en vez de ===
+    });
+
+    const updated = { ...next, kcalTotal: totalFinal, isValid };
     setState(updated);
     setTimeout(() => onChange(updated), 0);
   };
@@ -321,6 +389,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
         style={{ border: '2px solid #2a2a2a' }}
       >
         <table
+          ref={tableRef}
           className="w-full text-left text-[13px]"
           style={{
             minWidth: `${300 + tiempos.length * 90}px`,
@@ -364,19 +433,28 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
               </th>
               {tiempos.map((t, idx) => (
                 <th
-                  key={idx}
+                  key={t}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, idx)}
+                  onDragOver={(e) => handleDragOver(e, idx)}
+                  onDrop={(e) => handleDrop(e, idx)}
+                  className="relative group/th transition-all duration-300"
                   style={{
-                    padding: '8px 4px',
+                    padding: '16px 4px 8px 4px',
                     fontSize: '11px',
                     fontWeight: 700,
                     color: '#c0c0c0',
                     textTransform: 'uppercase',
                     textAlign: 'center',
                     borderRight: idx < tiempos.length - 1 ? '1px solid #2a2a2a' : '2px solid #333',
-                    backgroundColor: '#1a2030',
+                    backgroundColor: draggedColIdx === idx ? '#2a3a50' : '#1a2030',
                     width: '90px',
+                    cursor: 'grab',
                   }}
                 >
+                  <div className="absolute top-1 left-1/2 -translate-x-1/2 opacity-0 group-hover/th:opacity-100 transition-opacity cursor-grab hover:cursor-grabbing active:cursor-grabbing">
+                    <GripHorizontal className="w-[14px] h-[14px] text-[#666] hover:text-[#999]" />
+                  </div>
                   {editingTiempo === idx ? (
                     <input
                       autoFocus
@@ -475,6 +553,9 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       value={porcion || ''}
                       onChange={(e) => setPorcion(key, parseNum(e.target.value))}
                       onWheel={noScroll}
+                      onKeyDown={(e) => handleCellKey(e, rowIdx, 0, tiempos.length)}
+                      data-row={rowIdx}
+                      data-col={0}
                       placeholder="0"
                       className={cellCls}
                       style={{ height: '32px', color: '#aaa', fontWeight: 700 }}
@@ -486,7 +567,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                     const v = getCell(t, key);
                     return (
                       <td
-                        key={idx}
+                        key={t}
                         style={{
                           padding: '2px',
                           borderRight: idx < tiempos.length - 1 ? '1px solid #222' : '2px solid #333',
@@ -500,14 +581,20 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                           inputMode="decimal"
                           value={v || ''}
                           onChange={(e) => setCell(t, key, parseNum(e.target.value))}
+                          disabled={porcion <= 0}
                           onWheel={noScroll}
-                          placeholder="·"
+                          onKeyDown={(e) => handleCellKey(e, rowIdx, idx + 1, tiempos.length)}
+                          data-row={rowIdx}
+                          data-col={idx + 1}
+                          placeholder={porcion > 0 ? '·' : ''}
                           className={cellCls}
                           style={{
                             height: '32px',
                             backgroundColor: v > 0 ? '#1a2030' : 'transparent',
                             fontWeight: v > 0 ? 700 : 400,
                             color: v > 0 ? '#c8e0ff' : '#333',
+                            opacity: porcion <= 0 ? 0.2 : 1,
+                            cursor: porcion <= 0 ? 'not-allowed' : 'text',
                           }}
                         />
                       </td>
@@ -580,7 +667,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
                 return (
                   <td
-                    key={idx}
+                    key={t}
                     style={{
                       padding: '6px 4px',
                       textAlign: 'center',

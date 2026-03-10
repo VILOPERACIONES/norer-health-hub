@@ -45,17 +45,6 @@ const PlanView = () => {
     fetch();
   }, [pacienteId, planId]);
 
-  const handleDelete = async () => {
-    if (!window.confirm('¿ELIMINAR ESTE PROTOCOLO MAESTRO?')) return;
-    try {
-      await api.delete(`/api/pacientes/${pacienteId}/planes/${planId}`);
-      toast({ title: 'Protocolo eliminado' });
-      navigate(`/pacientes/${pacienteId}`);
-    } catch (err) {
-      toast({ title: 'Error', description: 'No se pudo eliminar el plan', variant: 'destructive' });
-    }
-  };
-
   const [showConfig, setShowConfig] = useState(false);
   const [savingMeta, setSavingMeta] = useState(false);
 
@@ -189,12 +178,6 @@ const PlanView = () => {
                   <Send className="h-[18px] w-[18px]" />
                 )}
                 {sending ? 'Enviando...' : 'Enviar al paciente'}
-              </button>
-              <button
-                onClick={handleDelete}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#3d1a1a]"
-              >
-                <Trash2 className="h-[18px] w-[18px]" /> Eliminar
               </button>
            </div>
         </div>
