@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Save, MoreHorizontal, X, ArrowUp, ArrowDown, ClipboardList, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import BarridoEquivalenciasComp from '@/components/BarridoEquivalencias';
 import api from '@/lib/api';
@@ -201,9 +201,9 @@ const CreateEditPlan = () => {
     setNombrePlan(template.nombre || '');
     setTipo(template.tipoPlan || template.tipo || 'Balanceada');
     setCalorias((template.calorias || 1800).toString());
-    setProteinas((template.proteinasPct || template.macros?.proteinas || 30).toString());
-    setCarbohidratos((template.carbohidratosPct || template.macros?.carbohidratos || 40).toString());
-    setGrasas((template.grasasPct || template.macros?.grasas || 30).toString());
+    setProteinas((template.proteinasPct || (template as any).macros?.proteinas || 30).toString());
+    setCarbohidratos((template.carbohidratosPct || (template as any).macros?.carbohidratos || 40).toString());
+    setGrasas((template.grasasPct || (template as any).macros?.grasas || 30).toString());
     
     // IMPORTANTE: Mapear los menús de la plantilla antes de setearlos
     setMenus(mapMenusFromBackend(template.menus));
@@ -248,7 +248,7 @@ const CreateEditPlan = () => {
     menus.forEach(m => {
       m.tiempos.forEach(t => {
         t.ingredientes.forEach(ing => {
-          const eq = ing.eqCantidad || 0;
+          const eq = Number(ing.eqCantidad) || 0;
           const grupo = ing.eqGrupo || '';
           const kcalPorEq = KCAL_EQ[grupo] ?? 0;
           total += eq * kcalPorEq;
@@ -323,7 +323,7 @@ const CreateEditPlan = () => {
         const url = isBasePlan ? `/api/planes` : `/api/pacientes/${pacienteId}/planes`;
         await api.post(url, body);
       }
-      toast({ title: isBasePlan ? 'PLANTILLA PERSISTIDA' : 'PROTOCOLO CLÍNICO PERSISTIDO' });
+      toast({ title: isBasePlan ? 'PLANTILLA PERSISTIDA' : 'PLAN ALIMENTICIO PERSISTIDO' });
       navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`);
     } catch (err: any) {
       toast({ title: 'Error de Persistencia', description: 'No se pudo sincronizar el plan maestro.', variant: 'destructive' });
@@ -355,7 +355,7 @@ const CreateEditPlan = () => {
               {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Base') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional')}
             </h1>
             <p className="text-text-secondary font-normal text-[14px] m-0">
-              {isBasePlan ? 'Definición de protocolo estándar para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
+              {isBasePlan ? 'Definición de plan base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
             </p>
           </div>
         </div>
@@ -378,7 +378,7 @@ const CreateEditPlan = () => {
                       onClick={() => loadTemplate(t)}
                       className="w-full text-left p-3 rounded-[8px] hover:bg-bg-elevated border border-transparent hover:border-border-default transition-all group"
                     >
-                      <p className="text-[14px] font-medium text-text-primary group-hover:text-brand-primary m-0">{t.nombre || 'Protocolo Sin Nombre'}</p>
+                      <p className="text-[14px] font-medium text-text-primary group-hover:text-brand-primary m-0">{t.nombre || 'Plan Alimenticio Sin Nombre'}</p>
                       <p className="text-[12px] font-normal text-text-muted mt-1 m-0">{t.calorias} Kcal · {t.tipo}</p>
                     </button>
                   ))}
@@ -560,124 +560,139 @@ const CreateEditPlan = () => {
         </div>
 
         {/* Sidebar Summary & Persistence */}
-        <div className="lg:col-span-4 space-y-6">
-          <div className="sticky top-24 space-y-6 animate-slide-up" style={{ animationDelay: '0.1s' }}>
+        <div className="lg:col-span-4 lg:relative">
+          <div className="lg:sticky lg:top-24 space-y-6 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pb-12 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-default hover:[&::-webkit-scrollbar-thumb]:bg-[#444] [&::-webkit-scrollbar-thumb]:rounded-full pr-1" style={{ animationDelay: '0.1s' }}>
             {isBasePlan ? (
-              <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden">
-                 <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0">Computo Metabólico</h3>
+              <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden shadow-sm">
+                 <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0 relative z-10">Balance Energético (Plantilla)</h3>
                  
-                 <div className="space-y-6 relative">
-                    {[
-                      { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: 'text-text-primary' },
-                      { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: 'text-text-primary' },
-                      { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: 'text-text-primary' },
-                    ].map((m) => (
-                      <div key={m.label} className="flex items-center justify-between border-b border-border-default pb-4">
-                        <span className="text-[14px] font-medium text-text-secondary">{m.label}</span>
-                        <div className="text-right space-y-1">
-                          <p className={`text-[18px] font-bold m-0 ${m.color}`}>{formatDecimal(m.gr)}<span className="text-[12px] ml-1 font-medium text-text-muted">Gr</span></p>
-                          <p className="text-[12px] font-normal text-text-muted m-0">{formatDecimal(m.grKg)} Gr/Kg</p>
-                        </div>
-                      </div>
-                    ))}
+                 <div className="space-y-6 relative z-10">
+                    <div className="bg-bg-elevated border border-border-subtle rounded-[8px] p-5 flex flex-col items-center justify-center">
+                       <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider mb-1">Carga Total Definida</span>
+                       <p className="text-[36px] font-black text-text-primary m-0 leading-none">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
+                    </div>
 
-                    <div className="pt-2">
-                       <div className="flex flex-col items-center">
-                          <span className="text-[12px] font-medium text-text-secondary mb-1 m-0">Carga Energética</span>
-                          <p className="text-[28px] font-bold text-text-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
-                       </div>
+                    <div className="space-y-4">
+                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest m-0 pb-1 border-b border-border-subtle">Distribución de Macros</p>
+                      {[
+                        { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c' },
+                        { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff' },
+                        { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842' },
+                      ].map((m) => (
+                        <div key={m.label} className="flex items-center justify-between">
+                          <span className="text-[13px] font-semibold text-text-primary">{m.label}</span>
+                          <div className="text-right flex items-end gap-2">
+                            <span className="text-[11px] font-medium text-text-muted">{formatDecimal(m.grKg)} g/kg</span>
+                            <span className="text-[14px] font-bold" style={{ color: m.color }}>{formatDecimal(m.gr)} g</span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                  </div>
               </div>
             ) : (
               <div className="space-y-6">
-                {/* ── Energía del BARRIDO (referencia) ── */}
-                {kcalBarrido && kcalBarrido > 0 && (
-                  <div className="bg-[#0a1628] border border-[#1e3a5f] rounded-[12px] p-4 flex flex-col items-center">
-                    <span className="text-[10px] font-bold text-[#5a8abf] uppercase tracking-widest mb-1">Energía del Barrido</span>
-                    <p className="text-[28px] font-bold text-[#90c2ff] m-0">{kcalBarrido}<span className="text-[13px] ml-1 font-medium text-[#5a8abf]">kcal</span></p>
-                    <span className="text-[10px] text-[#4a6a8f] mt-1">Según la valoración #{valData?.numeroValoracion}</span>
-                    {cal !== kcalBarrido && cal > 0 && (
-                      <div className={`mt-2 px-3 py-1 rounded-full text-[10px] font-bold ${
-                        cal > kcalBarrido ? 'bg-orange-900/30 text-orange-400 border border-orange-800/40' : 'bg-green-900/30 text-green-400 border border-green-800/40'
+                
+                {/* ── Resumen de Energía Consolidado ── */}
+                <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-5 shadow-sm">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Balance Energético</h3>
+                    {kcalMenuEstimado > 0 && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        Math.abs(kcalMenuEstimado - cal) < 50
+                          ? 'bg-green-500/10 text-green-500 border border-green-500/20'
+                          : 'bg-yellow-500/10 text-yellow-500 border border-yellow-500/20'
                       }`}>
-                        Plan: {cal > kcalBarrido ? '+' : ''}{cal - kcalBarrido} kcal vs barrido
-                      </div>
+                        ~{kcalMenuEstimado} kcal menús
+                      </span>
                     )}
                   </div>
-                )}
+                  
+                  <div className="flex flex-col items-center justify-center py-6 bg-bg-elevated rounded-[8px] border border-border-subtle mb-4">
+                    <span className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-1 shadow-sm">Carga del Plan</span>
+                    <p className="text-[36px] font-black text-brand-primary leading-none m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">kcal</span></p>
+                  </div>
 
-                {/* ── Energía del PLAN actual ── */}
-                <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-4 flex flex-col items-center">
-                  <span className="text-[10px] font-bold text-text-muted uppercase tracking-widest mb-1">Energía del Plan</span>
-                  <p className="text-[32px] font-bold text-brand-primary m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">kcal</span></p>
-                  {kcalMenuEstimado > 0 && (
-                    <div className={`mt-2 flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold ${
-                      Math.abs(kcalMenuEstimado - cal) < 50
-                        ? 'bg-green-900/30 text-green-400 border border-green-800/40'
-                        : 'bg-yellow-900/30 text-yellow-400 border border-yellow-800/40'
-                    }`}>
-                      <span>Menús aportan ~{kcalMenuEstimado} kcal</span>
+                  {kcalBarrido && kcalBarrido > 0 && (
+                    <div className="flex items-center justify-between p-3.5 bg-[#0a1628] rounded-[8px] border border-[#1e3a5f]">
+                      <div>
+                        <p className="text-[11px] font-bold text-[#5a8abf] m-0 uppercase tracking-widest leading-none mb-1.5">Ref. Barrido</p>
+                        <p className="text-[10px] text-[#4a6a8f] m-0 font-medium">Id: Val-{valData?.numeroValoracion}</p>
+                      </div>
+                      <div className="text-right flex flex-col items-end">
+                        <span className="text-[16px] font-bold text-[#90c2ff] m-0 leading-none">{kcalBarrido} <span className="text-[10px]">kcal</span></span>
+                        {cal !== kcalBarrido && cal > 0 && (
+                          <span className={`text-[10px] font-bold mt-1 ${
+                            cal > kcalBarrido ? 'text-orange-400' : 'text-green-400'
+                          }`}>
+                            {cal > kcalBarrido ? '+' : ''}{cal - kcalBarrido} <span className="font-normal opacity-80">vs ref</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
 
-                {/* ── Macros del plan ── */}
-                <div className="bg-bg-surface border border-border-subtle p-4 rounded-[12px] space-y-3">
-                  <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest m-0">Distribución Macronutrimental</p>
-                  {[
-                    { label: 'Proteína', pct: pPct, gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c', bar: 'bg-[#ef8c8c]', note: pPct >= 35 ? 'Hiperproteico' : pPct <= 15 ? 'Hipoproteico' : null },
-                    { label: 'Carbohidratos', pct: cPct, gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff', bar: 'bg-[#90c2ff]', note: cPct <= 10 ? 'Cetogénico' : cPct <= 25 ? 'Low-Carb' : null },
-                    { label: 'Grasas', pct: gPct, gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842', bar: 'bg-[#f5c842]', note: null },
-                  ].map(m => (
-                    <div key={m.label}>
-                      <div className="flex items-center justify-between mb-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[12px] font-semibold" style={{ color: m.color }}>{m.label}</span>
-                          {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-[#1a1a1a] border border-[#333] text-[#8a8a8a] font-medium">{m.note}</span>}
+                {/* ── Distribución Macronutrimental ── */}
+                <div className="bg-bg-surface border border-border-subtle p-5 rounded-[12px] shadow-sm">
+                  <h3 className="text-[14px] font-semibold text-text-primary mb-5 m-0">Distribución de Macros</h3>
+                  <div className="space-y-4">
+                    {[
+                      { label: 'Proteína', pct: pPct, gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c', bar: 'bg-[#ef8c8c]', note: pPct >= 35 ? 'Hiperproteico' : pPct <= 15 ? 'Hipoproteico' : null },
+                      { label: 'Carbohidratos', pct: cPct, gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff', bar: 'bg-[#90c2ff]', note: cPct <= 10 ? 'Cetogénico' : cPct <= 25 ? 'Low-Carb' : null },
+                      { label: 'Grasas', pct: gPct, gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842', bar: 'bg-[#f5c842]', note: null },
+                    ].map(m => (
+                      <div key={m.label}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-[13px] font-bold" style={{ color: m.color }}>{m.label}</span>
+                            {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-bg-elevated border border-border-subtle text-text-secondary font-semibold uppercase tracking-wider">{m.note}</span>}
+                          </div>
+                          <span className="text-[13px] font-bold text-text-primary bg-bg-elevated px-1.5 py-0.5 rounded-[4px]">{m.pct}%</span>
                         </div>
-                        <span className="text-[12px] font-bold text-text-primary">{m.pct}%</span>
+                        <div className="w-full h-2 bg-bg-elevated border border-border-subtle rounded-full overflow-hidden">
+                          <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(m.pct, 100)}%` }} />
+                        </div>
+                        <div className="flex justify-between mt-1">
+                          <span className="text-[11px] text-text-muted font-mono bg-bg-elevated px-1.5 rounded-[4px]">{formatDecimal(m.gr)} g/día</span>
+                          {pesoUltimo > 0 && <span className="text-[11px] text-text-muted font-mono bg-bg-elevated px-1.5 rounded-[4px]">{formatDecimal(m.grKg)} g/kg</span>}
+                        </div>
                       </div>
-                      <div className="w-full h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
-                        <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(m.pct, 100)}%` }} />
-                      </div>
-                      <div className="flex justify-between mt-1">
-                        <span className="text-[10px] text-text-muted font-mono">{formatDecimal(m.gr)} g/día</span>
-                        {pesoUltimo > 0 && <span className="text-[10px] text-text-muted font-mono">{formatDecimal(m.grKg)} g/kg</span>}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                   {macroSum !== 100 && (
-                    <p className="text-[11px] text-accent-red text-center m-0 pt-1 border-t border-[#2e1a1a]">Suma: {macroSum}% ≠ 100%</p>
+                    <div className="mt-4 p-2 bg-accent-red/10 border border-accent-red/20 rounded-[6px] text-center">
+                      <p className="text-[11px] font-bold text-accent-red m-0">Revisión requerida: Suma {macroSum}% ≠ 100%</p>
+                    </div>
                   )}
                 </div>
 
                 {/* ── Barrido estratégico (colapsable) ── */}
-                <div className="bg-[#111] border border-[#333] rounded-[12px] overflow-hidden">
+                <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden shadow-sm">
                   <button 
                     onClick={() => setShowBarridoRef(!showBarridoRef)}
-                    className="w-full flex flex-col items-start p-4 hover:bg-[#1a1a1a] transition-colors text-left"
+                    className="w-full flex flex-col items-start p-4 hover:bg-bg-elevated transition-colors text-left"
                   >
-                    <div className="w-full flex items-center justify-between mb-2">
-                      <h3 className="text-[14px] font-bold text-[#f0f0f0] m-0 flex items-center gap-2">
-                        <ClipboardList className="w-4 h-4 text-[#90c2ff]" /> 
+                    <div className="w-full flex items-center justify-between mb-1.5">
+                      <h3 className="text-[14px] font-semibold text-text-primary m-0 flex items-center gap-2">
+                        <ClipboardList className="w-[18px] h-[18px] text-text-secondary" /> 
                         Barrido Estratégico
                       </h3>
-                      {showBarridoRef ? <ChevronUp className="w-5 h-5 text-[#8a8a8a]" /> : <ChevronDown className="w-5 h-5 text-[#8a8a8a]" />}
+                      {showBarridoRef ? <ChevronUp className="w-[18px] h-[18px] text-text-muted" /> : <ChevronDown className="w-[18px] h-[18px] text-text-muted" />}
                     </div>
-                    <p className="text-[12px] text-[#8a8a8a] m-0">
-                      {valData?.numeroValoracion ? `Apoyo de cálculo - Consulta #${valData.numeroValoracion}` : 'Herramienta de apoyo (Scratchpad)'}
+                    <p className="text-[12px] text-text-muted m-0">
+                      {valData?.numeroValoracion ? `Revisar desglose de la consulta base` : 'Herramienta de apoyo (Scratchpad)'}
                     </p>
                   </button>
                   {showBarridoRef && (
-                    <div className="p-4 border-t border-[#333] bg-[#0a0a0a]">
+                    <div className="p-4 border-t border-border-subtle bg-bg-elevated">
                       {(() => {
                          let bd = valData?.barridoEquivalencias;
                          if (typeof bd === 'string') {
                            try { bd = JSON.parse(bd); } catch (e) {}
                          }
                          
-                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Aún no hay barrido guardado en esta consulta.</p>;
+                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-border-default rounded-[8px]">Sin datos de barrido previos registrados.</p>;
                          
                          const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
 
@@ -688,15 +703,15 @@ const CreateEditPlan = () => {
                             const kcalTiempo = distributionItems.reduce((s, [g, cant]) => s + Number(cant) * (KCAL_EQ[g] ?? 0), 0);
                             
                             return (
-                              <div key={t} className="bg-[#1a1a1a] p-3 rounded-[8px] border border-[#333]">
-                                <div className="flex items-center justify-between mb-2">
-                                  <h4 className="text-[12px] font-bold text-[#90c2ff] uppercase tracking-wider m-0">{t}</h4>
-                                  <span className="text-[10px] font-mono text-[#8a8a8a]">{Math.round(kcalTiempo)} kcal</span>
+                              <div key={t} className="bg-bg-surface p-3.5 rounded-[8px] border border-border-subtle mb-3 last:mb-0 shadow-sm">
+                                <div className="flex items-center justify-between mb-3 border-b border-border-default pb-2">
+                                  <h4 className="text-[12px] font-bold text-text-primary uppercase tracking-wider m-0">{t}</h4>
+                                  <span className="text-[11px] font-mono text-text-secondary bg-bg-elevated px-2 py-0.5 rounded-[4px]">{Math.round(kcalTiempo)} kcal</span>
                                 </div>
-                                <div className="flex flex-wrap gap-1.5">
+                                <div className="flex flex-wrap gap-2">
                                   {distributionItems.map(([g, cant]) => (
-                                    <span key={g} className="px-2 py-0.5 bg-[#111] border border-[#333] rounded text-[10px] font-medium text-[#e0e0e0]">
-                                      {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(1))} eq</span>
+                                    <span key={g} className="px-2 py-1 bg-bg-elevated border border-border-subtle rounded-[6px] text-[11px] font-medium text-text-secondary">
+                                      {gruposMap[g] || g}: <span className="font-bold text-text-primary">{parseFloat(Number(cant).toFixed(1))} eq</span>
                                     </span>
                                   ))}
                                 </div>
@@ -705,11 +720,11 @@ const CreateEditPlan = () => {
                          }).filter(Boolean);
 
                          if (renderedTiempos.length === 0) {
-                           return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">El barrido está vacío o todas las porciones son 0.</p>;
+                           return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-border-default rounded-[8px]">El barrido estratégico parece no tener porciones asignadas.</p>;
                          }
 
                          return (
-                           <div className="space-y-3">
+                           <div className="pt-1 pb-1">
                              {renderedTiempos}
                            </div>
                          )
@@ -720,26 +735,28 @@ const CreateEditPlan = () => {
               </div>
             )}
 
-            <div className="bg-bg-surface p-6 rounded-[12px] space-y-6 border border-border-subtle">
-              <h3 className="text-[14px] font-semibold text-text-primary m-0">Ajustes Finales</h3>
+            <div className="bg-bg-surface p-5 rounded-[12px] space-y-6 border border-border-subtle shadow-sm">
+              <h3 className="text-[14px] font-semibold text-text-primary m-0 flex items-center gap-2">
+                 <Settings className="w-[18px] h-[18px] text-text-secondary" /> Ajustes Finales
+              </h3>
               <div className="space-y-5">
                 {!isBasePlan && (
                   <div className="space-y-2">
-                    <label className="text-[12px] font-medium text-text-secondary">Próximo Seguimiento (Opcional)</label>
+                    <label className="text-[11px] font-bold text-text-secondary uppercase tracking-widest pl-1">Próximo Seguimiento (Opcional)</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
-                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
+                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-medium text-text-primary outline-none border border-border-subtle focus:border-border-default transition-colors w-full" />
+                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-medium text-text-primary outline-none border border-border-subtle focus:border-border-default transition-colors w-full" />
                     </div>
                   </div>
                 )}
                 
                 <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-text-secondary">Anotaciones Generales</label>
+                  <label className="text-[11px] font-bold text-text-secondary uppercase tracking-widest pl-1">Anotaciones Generales</label>
                   <textarea 
                     value={notas} 
                     onChange={(e) => setNotas(e.target.value)} 
-                    className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary border border-border-subtle focus:border-[#444] outline-none resize-y min-h-[120px] placeholder:text-text-muted"
-                    placeholder="Instrucciones, notas para el paciente..."
+                    className="w-full bg-bg-elevated rounded-[8px] p-3 text-[13px] font-normal text-text-primary border border-border-subtle focus:border-border-default transition-colors outline-none resize-y min-h-[100px] placeholder:text-text-muted"
+                    placeholder="Instrucciones, notas para el paciente, recomendaciones extras..."
                   />
                 </div>
               </div>
@@ -748,14 +765,14 @@ const CreateEditPlan = () => {
                 <button
                   onClick={handleSave}
                   disabled={saving || macroSum !== 100}
-                  className="w-full py-[12px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full py-3 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
                     <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
                   ) : (
                     <>
                       <Save className="h-[18px] w-[18px]" />
-                      {isEdit ? 'Guardar Cambios' : 'Crear Protocolo'}
+                      {isEdit ? 'Guardar Cambios' : 'Generar Plan Alimenticio'}
                     </>
                   )}
                 </button>

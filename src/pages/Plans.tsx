@@ -61,13 +61,13 @@ const Plans = () => {
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4">
           <div>
             <h1 className="text-[26px] font-bold text-text-primary m-0">Biblioteca de Plantillas</h1>
-            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de planes base y protocolos</p>
+            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de menús y planes base</p>
           </div>
           <button 
             onClick={() => navigate('/planes/nuevo')} 
             className="flex items-center gap-2 bg-white text-black rounded-[8px] px-[18px] py-[10px] text-[14px] font-bold transition-all hover:bg-white/90 uppercase"
           >
-            <Plus className="h-[18px] w-[18px]" /> Nuevo Protocolo
+            <Plus className="h-[18px] w-[18px]" /> Nuevo Plan
           </button>
         </header>
 
@@ -84,7 +84,7 @@ const Plans = () => {
               />
             </div>
             <div className="text-[14px] font-medium text-text-secondary">
-              {filteredPlanes.length} Protocolos
+              {filteredPlanes.length} Menús
             </div>
           </div>
 
@@ -129,7 +129,7 @@ const Plans = () => {
                           <button 
                             onClick={() => navigate(`/planes/${p.id}/editar`)}
                             className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-muted rounded-[8px] transition-colors"
-                            title="Editar Protocolo"
+                            title="Editar Plan"
                           >
                             <Edit3 className="w-[18px] h-[18px]" />
                           </button>

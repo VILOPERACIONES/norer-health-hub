@@ -72,7 +72,8 @@ const Requirements = () => {
 
   const energeticData = useMemo(() => {
     const w = parseFloat(peso) || 0;
-    const h = (paciente?.valoraciones?.[0]?.talla || 1.75) * 100; // cm
+    const rawH = parseFloat(String(paciente?.valoraciones?.[0]?.talla || paciente?.valoraciones?.[0]?.estatura || '1.75'));
+    const h = rawH < 10 ? rawH * 100 : rawH; // cm
     const a = edad || 25;
     
     let tmb = 0;
@@ -141,7 +142,7 @@ const Requirements = () => {
     }
   };
 
-  if (!paciente) return <div className="p-20 text-center animate-pulse font-black uppercase tracking-widest">Iniciando Protocolo de Requerimientos...</div>;
+  if (!paciente) return <div className="p-20 text-center animate-pulse font-black uppercase tracking-widest">Calculando requerimientos...</div>;
 
   return (
     <div className="min-h-screen animate-fade-in pb-20 px-6 max-w-[1400px] mx-auto">
@@ -155,7 +156,7 @@ const Requirements = () => {
              <p className="text-text-secondary font-normal text-[14px] m-0">Ajuste técnico y macronutrientes</p>
            </div>
            <button onClick={handleSave} className="flex items-center gap-2 px-[18px] py-[10px] bg-brand-primary text-bg-base font-medium text-[14px] hover:bg-[#e0e0e0] rounded-[8px] transition-colors">
-              <Save className="w-[18px] h-[18px]" /> Sincronizar Protocolo
+              <Save className="w-[18px] h-[18px]" /> Sincronizar Plan
            </button>
         </header>
 

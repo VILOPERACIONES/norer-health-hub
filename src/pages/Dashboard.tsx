@@ -13,6 +13,8 @@ import { useAuthStore } from '@/store/auth';
 const Dashboard = () => {
   const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [topClientes, setTopClientes] = useState<{
     id: string;
     nombre: string;
@@ -323,7 +325,7 @@ const Dashboard = () => {
                     </td>
                   </tr>
                 ) : (
-                  alertas.map((a, i) => {
+                  alertas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((a, i) => {
                     let statusColor = "text-emerald-500";
                     let StatusIcon = Check;
                     let statusText = "Enviado";
@@ -370,32 +372,56 @@ const Dashboard = () => {
 
           <div className="px-5 py-3 border-t border-[#2a2a2a] flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111111]">
              <div className="text-[12px] font-medium text-[#8a8a8a]">
-                Mostrando {alertas.length > 0 ? '1' : '0'} a {Math.min(10, alertas.length)} Resultados de {alertas.length}
+                Mostrando {alertas.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, alertas.length)} Resultados de {alertas.length}
              </div>
              
              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                 <div className="flex items-center gap-3">
                    <span className="text-[12px] font-medium text-[#8a8a8a]">Filas por página</span>
-                   <div className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] cursor-pointer transition-colors">
-                      <span className="text-[12px] font-medium text-[#f0f0f0] select-none">10</span>
-                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8a8a]" />
-                   </div>
+                   <select 
+                      className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] outline-none text-[12px] font-medium text-[#f0f0f0] cursor-pointer transition-colors"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                   >
+                     <option value={5}>5</option>
+                     <option value={10}>10</option>
+                     <option value={20}>20</option>
+                   </select>
                 </div>
                 
                 <div className="flex items-center gap-1">
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" disabled>
+                   <button 
+                      onClick={() => setCurrentPage(1)}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
+                      disabled={currentPage === 1}
+                   >
                       <ChevronsLeft className="w-4 h-4" />
                    </button>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" disabled>
+                   <button 
+                      onClick={() => setCurrentPage(max => Math.max(1, max - 1))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
+                      disabled={currentPage === 1}
+                   >
                       <ChevronLeft className="w-4 h-4" />
                    </button>
                    <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
-                      1 / {Math.max(1, Math.ceil(alertas.length / 10))}
+                      {currentPage} / {Math.max(1, Math.ceil(alertas.length / itemsPerPage))}
                    </span>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" disabled={alertas.length <= 10}>
+                   <button 
+                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(alertas.length / itemsPerPage), min + 1))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
+                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                   >
                       <ChevronRight className="w-4 h-4" />
                    </button>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" disabled={alertas.length <= 10}>
+                   <button 
+                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(alertas.length / itemsPerPage)))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
+                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                   >
                       <ChevronsRight className="w-4 h-4" />
                    </button>
                 </div>

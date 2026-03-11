@@ -104,8 +104,12 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
       {isOpen && (
         <div className="p-6 bg-bg-surface text-text-primary animate-slide-down">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-            <MetricItem label="ESTATURA" value={`${val.estatura || val.talla || '—'} cm`} />
-            <MetricItem label="IMC" value={formatDecimal(val.imc)} />
+            <MetricItem label="ESTATURA" value={`${(() => {
+              const raw = parseFloat(String(val.estatura || val.talla));
+              if (!raw) return '—';
+              return raw < 10 ? Math.round(raw * 100) : raw;
+            })()} cm`} />
+            <MetricItem label="IMC" value={String(formatDecimal(val.imc))} />
             <MetricItem label="% GRASA" value={`${(val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || '—'}%`} />
             <MetricItem label="MASA MAGRA" value={`${(val as any).masaMagra || '—'} kg`} />
           </div>

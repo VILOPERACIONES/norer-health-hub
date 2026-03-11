@@ -55,10 +55,9 @@ const NewAssessment = () => {
         const { data } = await api.get(`/api/pacientes/${pacienteId}`);
         const p = data?.data || data;
         // Pre-llenar estatura desde el perfil del paciente
-        if (p?.estatura) setEstatura(String(p.estatura));
-        else if (p?.talla) {
-          // Si viene en metros, convertir a cm
-          const t = parseFloat(p.talla);
+        const rawEstatura = p?.estatura || p?.talla;
+        if (rawEstatura) {
+          const t = parseFloat(rawEstatura);
           setEstatura(String(t < 10 ? Math.round(t * 100) : t));
         }
         // Calcular número de valoración
@@ -122,7 +121,7 @@ const NewAssessment = () => {
       hora,
       numeroValoracion,
       pesoActual: pesoNum,
-      estatura: estaturaNum,
+      estatura: estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum,
       imc: parseFloat(imc.toFixed(2)),
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),

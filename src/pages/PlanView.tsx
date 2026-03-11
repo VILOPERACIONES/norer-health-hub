@@ -124,13 +124,13 @@ const PlanView = () => {
   if (loading) return (
     <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
       <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
-      <p className="text-[14px] font-medium text-text-muted">Sincronizando protocolo...</p>
+      <p className="text-[14px] font-medium text-text-muted">Sincronizando plan...</p>
     </div>
   );
   
   if (!plan) return (
      <div className="h-[80vh] flex flex-col items-center justify-center gap-6">
-      <p className="text-[16px] font-medium text-text-muted">Protocolo no localizado</p>
+      <p className="text-[16px] font-medium text-text-muted">Plan alimenticio no localizado</p>
       <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[14px] font-medium text-text-primary hover:text-text-secondary transition-colors underline underline-offset-4">Volver al expediente</button>
     </div>
   );

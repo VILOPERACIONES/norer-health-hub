@@ -138,7 +138,11 @@ const EditPatient = () => {
             email: p.email || '',
             fechaNacimiento: p.fechaNacimiento ? p.fechaNacimiento.split('T')[0] : '',
             sexo: p.sexo || 'F',
-            talla: p.estatura || p.talla || '',
+            talla: (() => {
+              const raw = parseFloat(p.estatura || p.talla || '0');
+              if (!raw) return '';
+              return String(raw < 10 ? Math.round(raw * 100) : raw);
+            })(),
             
             objetivo: ej.objetivo || '',
             gymOrigen: ej.gymOrigen || '',

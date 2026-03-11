@@ -133,7 +133,11 @@ const NewPatient = () => {
       fechaNacimiento: form.fechaNacimiento,
       sexo: form.sexo,
       edad,
-      estatura: form.talla,
+      estatura: (() => {
+        const raw = parseFloat(form.talla);
+        if (!raw) return '';
+        return String(raw < 10 ? Math.round(raw * 100) : raw);
+      })(),
       fechaActual: new Date().toISOString(),
       
       ejercicio: {

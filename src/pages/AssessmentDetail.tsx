@@ -266,7 +266,11 @@ const AssessmentDetail = () => {
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">Estatura</p>
             <p className="text-[20px] font-bold text-text-primary m-0">
-              {val.estatura || val.talla || '—'}<span className="text-[14px] font-medium text-text-muted ml-1">cm</span>
+              {(() => {
+                const raw = parseFloat(val.estatura || val.talla);
+                if (!raw) return '—';
+                return raw < 10 ? Math.round(raw * 100) : raw;
+              })()}<span className="text-[14px] font-medium text-text-muted ml-1">cm</span>
             </p>
           </div>
           <div className="space-y-1">
