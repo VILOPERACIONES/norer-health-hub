@@ -61,7 +61,8 @@ const CreateEditPlan = () => {
         ingredientes: (t.ingredientes || []).map((i: any) => ({
           ...i,
           cantidad: parseFloat(i.cantidad) || 0,
-          eqCantidad: parseFloat(i.eqCantidad) || 0
+          eqCantidad: parseFloat(i.eqCantidad) || 0,
+          platillo: i.platillo || ''
         }))
       }))
     })) || [emptyMenu('Menú 1'), emptyMenu('Menú 2')];
@@ -344,7 +345,7 @@ const CreateEditPlan = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full px-6 lg:px-10 mt-2">
+    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full px-2 sm:px-4 lg:px-6 mt-2">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
         <div className="space-y-2">
           <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
@@ -503,34 +504,80 @@ const CreateEditPlan = () => {
                          </button>
                       </div>
 
-                      <div className="space-y-4">
-                        {tiempo.ingredientes.map((ing, ii) => (
-                          <SmaeIngredientePicker
-                            key={ii}
-                            ingrediente={ing}
-                            index={ii}
-                            onUpdate={(updates) =>
-                              updateTiempo(mi, ti, (t) => ({
-                                ...t,
-                                ingredientes: t.ingredientes.map((x, j) =>
-                                  j === ii ? { ...x, ...updates } : x
-                                ),
-                              }))
-                            }
-                            onRemove={() =>
-                              updateTiempo(mi, ti, (t) => ({
-                                ...t,
-                                ingredientes: t.ingredientes.filter((_, j) => j !== ii),
-                              }))
-                            }
-                          />
+                      <div className="space-y-6">
+                        {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
+                           <div key={`${mi}-${ti}-${pIndex}`} className="p-3 bg-bg-surface border border-border-default rounded-[8px]">
+                              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border-subtle border-dashed">
+                                 <span className="text-text-muted text-[11px] font-bold uppercase tracking-wider">Platillo:</span>
+                                 <input 
+                                    className="bg-transparent border-none outline-none font-semibold text-text-primary placeholder:text-text-muted text-[13px] w-full"
+                                    value={pName}
+                                    onChange={(e) => {
+                                      const newName = e.target.value;
+                                      updateTiempo(mi, ti, t => ({
+                                         ...t,
+                                         ingredientes: t.ingredientes.map(ing => (ing.platillo || '') === pName ? { ...ing, platillo: newName } : ing)
+                                      }))
+                                    }}
+                                    placeholder="Ej: Sándwich de Pollo (Opcional)"
+                                 />
+                                 {pName && (
+                                   <button 
+                                      onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
+                                      className="text-[10px] text-text-muted hover:text-accent-red ml-auto whitespace-nowrap"
+                                   >
+                                     Borrar platillo
+                                   </button>
+                                 )}
+                              </div>
+                              <div className="space-y-4">
+                                {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
+                                  <SmaeIngredientePicker
+                                    key={ii}
+                                    ingrediente={ing}
+                                    index={ii}
+                                    onUpdate={(updates) =>
+                                      updateTiempo(mi, ti, (t) => ({
+                                        ...t,
+                                        ingredientes: t.ingredientes.map((x, j) =>
+                                          j === ii ? { ...x, ...updates } : x
+                                        ),
+                                      }))
+                                    }
+                                    onRemove={() =>
+                                      updateTiempo(mi, ti, (t) => ({
+                                        ...t,
+                                        ingredientes: t.ingredientes.filter((_, j) => j !== ii),
+                                      }))
+                                    }
+                                  />
+                                ) : null)}
+                                
+                                <button
+                                  onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: pName }] }))}
+                                  className="w-full py-2 bg-transparent border border-dashed border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
+                                >
+                                  + Agregar Alimento
+                                </button>
+                              </div>
+                           </div>
                         ))}
                         
                         <button
-                          onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, emptyIngrediente()] }))}
-                          className="w-full py-2 bg-transparent border border-dashed border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
+                          onClick={() => {
+                             // Generar nombre de platillo nuevo evitando colisiones
+                             let nuevoNombreBase = "Nuevo Platillo";
+                             let nuevoNombre = nuevoNombreBase;
+                             let cnt = 1;
+                             while (tiempo.ingredientes.some(i => i.platillo === nuevoNombre)) {
+                                nuevoNombre = `${nuevoNombreBase} ${cnt}`;
+                                cnt++;
+                             }
+                             updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
+                          }}
+                          className="w-full py-2 bg-transparent border border-dashed border-border-default text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
                         >
-                          + Agregar Alimento
+                          + Crear Nuevo Platillo
                         </button>
                       </div>
                     </div>

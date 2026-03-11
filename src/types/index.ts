@@ -203,6 +203,7 @@ export interface Ingrediente {
   eqGrupo?: string;
   nota?: string;
   orden?: number;
+  platillo?: string;
 }
 
 export interface DashboardMetricas {

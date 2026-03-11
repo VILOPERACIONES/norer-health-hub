@@ -214,7 +214,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
               }}
               onFocus={() => results.length > 0 && setShowDropdown(true)}
               placeholder="Buscar alimento SMAE o escribir libre..."
-              className="w-full pl-8 pr-3 py-2 bg-bg-base rounded-[6px] text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
+              className="w-full pl-8 pr-28 py-2 bg-bg-base rounded-[6px] text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
             />
             {selectedAlimento && (
               <span
