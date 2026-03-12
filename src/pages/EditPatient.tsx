@@ -138,7 +138,11 @@ const EditPatient = () => {
             email: p.email || '',
             fechaNacimiento: p.fechaNacimiento ? p.fechaNacimiento.split('T')[0] : '',
             sexo: p.sexo || 'F',
-            talla: p.estatura || p.talla || '',
+            talla: (() => {
+              const raw = parseFloat(p.estatura || p.talla || '0');
+              if (!raw) return '';
+              return String(raw < 10 ? Math.round(raw * 100) : raw);
+            })(),
             
             objetivo: ej.objetivo || '',
             gymOrigen: ej.gymOrigen || '',
@@ -248,15 +252,15 @@ const EditPatient = () => {
 
   if (loading) {
     return (
-      <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
-        <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
-        <p className="text-[14px] font-medium text-text-muted">Cargando expediente para edición...</p>
+      <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+        <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+        <p className="text-[14px] text-[#8a8a8a]">Cargando expediente para edición...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-none pb-24 px-6">
+    <div className="space-y-10 animate-fade-in max-w-none pb-24">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
         <div className="space-y-2">
           <button onClick={() => navigate(`/pacientes/${id}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
@@ -328,7 +332,7 @@ const EditPatient = () => {
             disabled={saving}
             className="flex items-center gap-2 bg-brand-primary text-bg-base px-[24px] py-[12px] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] disabled:opacity-50"
           >
-            {saving ? <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
+            {saving ? <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
             {saving ? 'Guardando...' : 'Actualizar Información'}
           </button>
         </div>

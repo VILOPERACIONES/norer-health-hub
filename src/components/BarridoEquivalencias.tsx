@@ -440,8 +440,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                   onDrop={(e) => handleDrop(e, idx)}
                   className="relative group/th transition-all duration-300"
                   style={{
-                    padding: '16px 4px 8px 4px',
-                    fontSize: '11px',
+                    padding: '8px 2px 4px 2px',
+                    fontSize: '10px',
                     fontWeight: 700,
                     color: '#c0c0c0',
                     textTransform: 'uppercase',
@@ -523,9 +523,9 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                   <td
                     className="sticky left-0 z-10"
                     style={{
-                      padding: '0 14px',
-                      height: '36px',
-                      fontSize: '12px',
+                      padding: '0 10px',
+                      height: '28px',
+                      fontSize: '11px',
                       fontWeight: 600,
                       color: '#d0d0d0',
                       backgroundColor: hdrBg,
@@ -558,7 +558,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       data-col={0}
                       placeholder="0"
                       className={cellCls}
-                      style={{ height: '32px', color: '#aaa', fontWeight: 700 }}
+                      style={{ height: '24px', color: '#aaa', fontWeight: 700, fontSize: '11px' }}
                     />
                   </td>
 
@@ -589,9 +589,10 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                           placeholder={porcion > 0 ? '·' : ''}
                           className={cellCls}
                           style={{
-                            height: '32px',
+                            height: '24px',
                             backgroundColor: v > 0 ? '#1a2030' : 'transparent',
                             fontWeight: v > 0 ? 700 : 400,
+                            fontSize: '11px',
                             color: v > 0 ? '#c8e0ff' : '#333',
                             opacity: porcion <= 0 ? 0.2 : 1,
                             cursor: porcion <= 0 ? 'not-allowed' : 'text',
@@ -615,9 +616,9 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                         display: 'inline-flex',
                         alignItems: 'center',
                         gap: '3px',
-                        padding: '2px 8px',
+                        padding: '1px 6px',
                         borderRadius: '4px',
-                        fontSize: '13px',
+                        fontSize: '11px',
                         fontWeight: 700,
                         fontFamily: 'monospace',
                         backgroundColor:

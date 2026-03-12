@@ -3,7 +3,7 @@ import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
-import { formatDate, formatDateShort, formatDecimal } from '@/lib/format';
+import { formatDate, formatDateShort, formatDecimal, getBadgeForValuation } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
@@ -85,13 +85,14 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {!planId ? (
-               <span className="px-2 py-0.5 bg-[#2d1a1a] text-accent-red rounded-full text-[10px] font-medium border border-accent-red/20 uppercase tracking-wider">Plan Histórico Ausente</span>
-            ) : estadoEnvio === 'pendiente' ? (
-               <span className="px-2 py-0.5 bg-[#2d221a] text-accent-orange rounded-full text-[10px] font-medium border border-[#f59e0b]/20 uppercase tracking-wider">Plan Pendiente</span>
-            ) : (
-               <span className="px-2 py-0.5 bg-[#1a2d1a] text-accent-green rounded-full text-[10px] font-medium border border-accent-green/20 uppercase tracking-wider">Plan Enviado</span>
-            )}
+            {(() => {
+              const bg = getBadgeForValuation(val);
+              return (
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium border uppercase tracking-wider ${bg.cls}`}>
+                  {bg.text}
+                </span>
+              );
+            })()}
           </div>
 
           <div className="h-4 w-[1px] bg-border-subtle hidden md:block" />
@@ -104,8 +105,12 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
       {isOpen && (
         <div className="p-6 bg-bg-surface text-text-primary animate-slide-down">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-            <MetricItem label="ESTATURA" value={`${val.estatura || val.talla || '—'} cm`} />
-            <MetricItem label="IMC" value={formatDecimal(val.imc)} />
+            <MetricItem label="ESTATURA" value={`${(() => {
+              const raw = parseFloat(String(val.estatura || val.talla));
+              if (!raw) return '—';
+              return raw < 10 ? Math.round(raw * 100) : raw;
+            })()} cm`} />
+            <MetricItem label="IMC" value={String(formatDecimal(val.imc))} />
             <MetricItem label="% GRASA" value={`${(val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || '—'}%`} />
             <MetricItem label="MASA MAGRA" value={`${(val as any).masaMagra || '—'} kg`} />
           </div>
@@ -240,8 +245,8 @@ const PatientProfile = () => {
   };
 
   if (loading || !paciente) return (
-    <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
-      <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
       <p className="text-[14px] font-medium text-text-muted">Cargando expediente...</p>
     </div>
   );
@@ -259,7 +264,7 @@ const PatientProfile = () => {
   return (
     <div className="min-h-screen bg-bg-base text-text-primary font-sans pb-24 animate-fade-in selection:bg-brand-primary selection:text-bg-base">
       {/* HEADER */}
-      <header className="w-full border-b border-border-subtle px-6 pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
+      <header className="w-full border-b border-border-subtle pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
         <div className="flex items-start gap-4">
           <button 
             onClick={() => navigate('/pacientes')} 
@@ -269,9 +274,16 @@ const PatientProfile = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <div className="flex flex-col">
-            <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
-              {paciente.nombre} {paciente.apellido}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
+                {paciente.nombre} {paciente.apellido}
+              </h1>
+              {currentVal && (
+                <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium border ${getBadgeForValuation(currentVal).cls}`}>
+                  {getBadgeForValuation(currentVal).text}
+                </span>
+              )}
+            </div>
             <p className="text-[14px] font-medium text-text-secondary mt-1 m-0">
                Expediente Clínico · ID {id?.slice(-8).toUpperCase()}
             </p>
@@ -300,7 +312,7 @@ const PatientProfile = () => {
         </div>
       </header>
 
-      <div className="max-w-full px-6 py-6 space-y-10">
+      <div className="max-w-full py-6 space-y-10">
         {/* INFO BAR */}
         <section className="flex flex-wrap bg-bg-surface border border-border-subtle rounded-[12px] p-2">
           <InfoItem label="Edad" value={`${calcAge(paciente.fechaNacimiento)} Años`} icon={Clock} />

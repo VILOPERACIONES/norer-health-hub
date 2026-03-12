@@ -40,16 +40,14 @@ const Patients = () => {
   };
 
   if (loading && pacientes.length === 0) return (
-    <div className="min-h-screen bg-secondary/30 flex items-center justify-center">
-      <div className="flex flex-col items-center gap-6">
-        <Activity className="h-10 w-10 text-slate-900 animate-pulse" />
-        <div className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.6em] animate-pulse">Cargando Directorio Clínico</div>
-      </div>
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+      <p className="text-[14px] text-[#8a8a8a]">Cargando Directorio Clínico...</p>
     </div>
   );
 
   return (
-    <div className="space-y-8 animate-fade-in pb-32 max-w-none px-6">
+    <div className="space-y-8 animate-fade-in pb-32 max-w-none">
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pt-4">
         <div>

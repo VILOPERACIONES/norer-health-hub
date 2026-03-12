@@ -81,14 +81,27 @@ const ProfileSettings = () => {
 
   if (fetching) return (
     <div className="h-[40vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-6 h-6 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin" />
       <p className="text-[13px] font-medium text-text-muted">Cargando perfil...</p>
     </div>
   );
 
+  if (user?.id === 'super-admin') {
+    return (
+      <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-8 flex flex-col items-center justify-center text-center animate-fade-in w-full min-h-[40vh]">
+        <div className="w-16 h-16 bg-brand-primary/10 rounded-full flex items-center justify-center mb-4">
+          <UserCircle className="w-8 h-8 text-brand-primary" />
+        </div>
+        <h2 className="text-[20px] font-bold text-text-primary mb-2">Perfil de Servidor (.env)</h2>
+        <p className="text-[14px] text-text-muted max-w-md">
+          Al tener los privilegios máximos de la aplicación, tus datos de acceso y configuraciones personales están incrustados directamente y bajo control estricto a nivel de código para tu propia seguridad, y por lo tanto, no requieres administrarlos desde aquí.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-6 space-y-6 animate-fade-in w-full">
-      
       {/* DATOS PERSONALES */}
       <div className="space-y-4">
         <div className="flex items-center gap-3 border-b border-border-default pb-3">
@@ -109,10 +122,11 @@ const ProfileSettings = () => {
             <div className="relative">
               <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
               <input 
-                className="w-full bg-bg-elevated rounded-[8px] pl-10 pr-4 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-text-primary outline-none transition-all placeholder:text-white/10"
+                className="w-full bg-bg-elevated rounded-[8px] pl-10 pr-4 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-text-primary outline-none transition-all placeholder:text-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 value={form.nombre}
                 onChange={e => update('nombre', e.target.value)}
                 placeholder="Dr. Ej. Eyder"
+                disabled={user?.id === 'super-admin'}
               />
             </div>
           </div>
@@ -124,10 +138,11 @@ const ProfileSettings = () => {
             <div className="relative">
               <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
               <input 
-                className="w-full bg-bg-elevated rounded-[8px] pl-10 pr-4 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-text-primary outline-none transition-all placeholder:text-white/10"
+                className="w-full bg-bg-elevated rounded-[8px] pl-10 pr-4 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-text-primary outline-none transition-all placeholder:text-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
                 value={form.telefono}
                 onChange={e => update('telefono', e.target.value)}
                 placeholder="Ej. 123 456 7890"
+                disabled={user?.id === 'super-admin'}
               />
             </div>
           </div>
@@ -189,11 +204,6 @@ const ProfileSettings = () => {
             />
           </div>
         </div>
-        {user?.id === 'super-admin' && (
-          <p className="text-[11px] text-text-muted italic px-1">
-            * El súper admin no cambia su contraseña desde aquí.
-          </p>
-        )}
       </div>
 
       <div className="pt-6 flex justify-end">

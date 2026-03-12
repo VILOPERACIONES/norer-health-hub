@@ -116,7 +116,7 @@ const Login = () => {
               className="w-full bg-white text-black font-black text-[11px] uppercase tracking-[0.3em] py-4 rounded-none hover:bg-white/90 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
             >
               {loading ? (
-                <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black text-white dark:text-black rounded-full animate-spin" />
               ) : (
                 <>
                   <ShieldCheck className="w-4 h-4" /> AUTENTICAR

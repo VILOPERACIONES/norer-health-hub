@@ -211,7 +211,7 @@ const ModalAlimento = ({
               disabled={saving || !form.nombre.trim() || !form.pesoGramos}
               className="flex items-center gap-2 px-5 py-2 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50"
             >
-              {saving ? <div className="w-4 h-4 border-2 border-bg-base/30 border-t-bg-base rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
+              {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
               {inicial ? 'Actualizar' : 'Agregar'}
             </button>
           </div>
@@ -299,7 +299,7 @@ const EquivalenciasSMAE = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 px-6 pt-6">
+    <div className="space-y-8 animate-fade-in pb-20 pt-6">
       {/* HEADER */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border-subtle pb-6">
         <div className="space-y-1">
@@ -371,7 +371,7 @@ const EquivalenciasSMAE = () => {
       {/* TABLA */}
       {loading ? (
         <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-8 h-8 border-2 border-border-subtle border-t-text-primary rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin" />
           <p className="text-[14px] text-text-muted">Cargando catálogo SMAE...</p>
         </div>
       ) : filtrados.length === 0 ? (

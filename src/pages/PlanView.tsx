@@ -8,10 +8,12 @@ import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 
-const PlanView = () => {
-  const { id: pacienteId, planId } = useParams();
+export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const pacienteId = propPacienteId;
+  const planId = propPlanId;
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -123,47 +125,49 @@ const PlanView = () => {
 
   if (loading) return (
     <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
-      <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
-      <p className="text-[14px] font-medium text-text-muted">Sincronizando protocolo...</p>
+      <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin" />
+      <p className="text-[14px] font-medium text-[#8a8a8a]">Sincronizando plan...</p>
     </div>
   );
   
   if (!plan) return (
      <div className="h-[80vh] flex flex-col items-center justify-center gap-6">
-      <p className="text-[16px] font-medium text-text-muted">Protocolo no localizado</p>
-      <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="text-[14px] font-medium text-text-primary hover:text-text-secondary transition-colors underline underline-offset-4">Volver al expediente</button>
+      <p className="text-[16px] font-medium text-[#8a8a8a]">Plan alimenticio no localizado</p>
+      <button onClick={() => onFinish ? onFinish() : navigate(`/pacientes/${pacienteId}`)} className="text-[14px] font-medium text-white hover:text-[#c0c0c0] transition-colors underline underline-offset-4">Volver al expediente</button>
     </div>
   );
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-none pb-24 px-6">
+    <div className="space-y-10 animate-fade-in max-w-none pb-24">
       <div className="flex flex-col gap-6 pt-6">
-        <button onClick={() => navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group">
-          <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
-        </button>
+        {(!onFinish || onFinish) && (
+          <button onClick={() => onFinish ? onFinish() : navigate(`/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-[#c0c0c0] hover:text-white transition-colors w-fit group">
+            <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> {onFinish ? 'Finalizar Plan y Salir' : 'Volver al expediente'}
+          </button>
+        )}
         
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 animate-slide-up">
            <div className="space-y-1">
-              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">Plan {plan.tipoPlan || plan.tipo}</h1>
-              <p className="text-text-secondary font-normal text-[14px] m-0">Configuración integral de macronutrientes y suplementación</p>
+              <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">Plan {plan.tipoPlan || plan.tipo}</h1>
+              <p className="text-[#c0c0c0] font-normal text-[14px] m-0">Configuración integral de macronutrientes y suplementación</p>
            </div>
            
            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222]"
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#181818] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222]"
               >
                 <Edit2 className="h-[18px] w-[18px]" /> Editar
               </button>
               <button
                 onClick={() => setShowConfig(true)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818]"
               >
                 <Settings2 className="h-[18px] w-[18px]" /> Configurar PDF
               </button>
               <button
                 onClick={handlePdf}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[14px] font-medium transition-colors hover:bg-bg-elevated"
+                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818]"
               >
                 <FileText className="h-[18px] w-[18px]" /> Descargar
               </button>
@@ -173,7 +177,7 @@ const PlanView = () => {
                 className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-accent-green hover:text-[#000] disabled:opacity-50"
               >
                 {sending ? (
-                  <div className="w-[18px] h-[18px] border-2 border-accent-green/30 border-t-accent-green rounded-full animate-spin" />
+                  <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />
                 ) : (
                   <Send className="h-[18px] w-[18px]" />
                 )}
@@ -183,70 +187,70 @@ const PlanView = () => {
         </div>
       </div>
 
-      <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] animate-slide-up">
+      <div className="bg-[#111111] border border-[#2a2a2a] p-6 rounded-[12px] animate-slide-up">
          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="space-y-1">
-               <p className="text-[12px] font-medium text-text-muted m-0">Calorías Diarias</p>
-               <p className="text-[22px] font-bold text-text-primary m-0">{plan.calorias}<span className="text-[14px] font-medium text-text-secondary ml-1">Kcal</span></p>
+               <p className="text-[12px] font-medium text-[#8a8a8a] m-0">Calorías Diarias</p>
+               <p className="text-[22px] font-bold text-white m-0">{plan.calorias}<span className="text-[14px] font-medium text-[#c0c0c0] ml-1">Kcal</span></p>
             </div>
             <div className="space-y-1">
-               <p className="text-[12px] font-medium text-text-muted m-0">Proteínas</p>
-               <p className="text-[22px] font-bold text-text-primary m-0">{plan.proteinasPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
+               <p className="text-[12px] font-medium text-[#8a8a8a] m-0">Proteínas</p>
+               <p className="text-[22px] font-bold text-white m-0">{plan.proteinasPct}<span className="text-[14px] font-medium text-[#c0c0c0] ml-1">%</span></p>
             </div>
             <div className="space-y-1">
-               <p className="text-[12px] font-medium text-text-muted m-0">Carbohidratos</p>
-               <p className="text-[22px] font-bold text-text-primary m-0">{plan.carbohidratosPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
+               <p className="text-[12px] font-medium text-[#8a8a8a] m-0">Carbohidratos</p>
+               <p className="text-[22px] font-bold text-white m-0">{plan.carbohidratosPct}<span className="text-[14px] font-medium text-[#c0c0c0] ml-1">%</span></p>
             </div>
             <div className="space-y-1">
-               <p className="text-[12px] font-medium text-text-muted m-0">Lípidos</p>
-               <p className="text-[22px] font-bold text-text-primary m-0">{plan.grasasPct}<span className="text-[14px] font-medium text-text-secondary ml-1">%</span></p>
+               <p className="text-[12px] font-medium text-[#8a8a8a] m-0">Lípidos</p>
+               <p className="text-[22px] font-bold text-white m-0">{plan.grasasPct}<span className="text-[14px] font-medium text-[#c0c0c0] ml-1">%</span></p>
             </div>
          </div>
       </div>
 
       {(plan.notasGenerales || plan.notas) && (
-        <div className="bg-bg-elevated p-6 rounded-[12px] border border-border-subtle">
-           <div className="flex items-center gap-2 mb-3 text-text-secondary">
-             <FileText className="w-[18px] h-[18px] text-text-primary" />
-             <h3 className="text-[16px] font-semibold text-text-primary m-0">Recomendaciones Generales</h3>
+        <div className="bg-[#181818] p-6 rounded-[12px] border border-[#2a2a2a]">
+           <div className="flex items-center gap-2 mb-3 text-[#c0c0c0]">
+             <FileText className="w-[18px] h-[18px] text-white" />
+             <h3 className="text-[16px] font-semibold text-white m-0">Recomendaciones Generales</h3>
            </div>
-          <p className="text-[14px] font-normal leading-relaxed text-text-secondary m-0">{plan.notasGenerales || plan.notas}</p>
+          <p className="text-[14px] font-normal leading-relaxed text-[#c0c0c0] m-0">{plan.notasGenerales || plan.notas}</p>
         </div>
       )}
 
       {/* Menus Grid */}
       <div className="grid lg:grid-cols-2 gap-6">
         {plan.menus.map((menu, i) => (
-          <div key={i} className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] flex flex-col h-full hover:border-[#444] transition-colors">
-            <div className="flex items-center gap-3 mb-6 border-b border-border-subtle pb-4">
+          <div key={i} className="bg-[#111111] border border-[#2a2a2a] p-6 rounded-[12px] flex flex-col h-full hover:border-[#444] transition-colors">
+            <div className="flex items-center gap-3 mb-6 border-b border-[#2a2a2a] pb-4">
               <div className="w-1.5 h-5 bg-brand-primary rounded-full" />
-              <h3 className="text-[18px] font-semibold text-text-primary m-0">{menu.nombre}</h3>
+              <h3 className="text-[18px] font-semibold text-white m-0">{menu.nombre}</h3>
             </div>
             
             <div className="space-y-6 flex-1">
               {menu.tiempos.map((t, j) => (
-                <div key={j} className="group/tiempo p-4 bg-bg-elevated rounded-[8px] border border-border-subtle">
+                <div key={j} className="group/tiempo p-4 bg-[#181818] rounded-[8px] border border-[#2a2a2a]">
                   <div className="flex items-center gap-2 mb-4">
-                     <Clock className="w-4 h-4 text-text-muted" />
-                     <span className="text-[14px] font-semibold text-text-primary m-0">{t.nombre}</span>
+                     <Clock className="w-4 h-4 text-[#8a8a8a]" />
+                     <span className="text-[14px] font-semibold text-white m-0">{t.nombre}</span>
                   </div>
                    <ul className="space-y-3">
                      {t.ingredientes.map((ing, k) => (
                        <li key={k} className="flex flex-col gap-1">
                           <div className="flex items-start gap-2">
                              <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-text-muted" />
-                             <span className="text-[14px] font-medium text-text-secondary m-0 leading-tight">
-                                {ing.cantidad} {ing.unidad} <span className="text-text-primary">{ing.descripcion}</span>
+                             <span className="text-[14px] font-medium text-[#c0c0c0] m-0 leading-tight">
+                                {ing.cantidad} {ing.unidad} <span className="text-white">{ing.descripcion}</span>
                              </span>
                           </div>
                           <div className="flex flex-wrap gap-x-4 gap-y-1 ml-[14px]">
                              {ing.eqCantidad && (
-                                <p className="text-[12px] font-medium text-text-muted m-0">
+                                <p className="text-[12px] font-medium text-[#8a8a8a] m-0">
                                    Eq: {ing.eqCantidad} {ing.eqGrupo}
                                  </p>
                              )}
                              {ing.nota && (
-                                <p className="text-[12px] font-normal italic text-text-muted m-0">
+                                <p className="text-[12px] font-normal italic text-[#8a8a8a] m-0">
                                    * {ing.nota}
                                 </p>
                              )}
@@ -254,17 +258,17 @@ const PlanView = () => {
                        </li>
                      ))}
                    </ul>
-                  {t.nota && <p className="text-[13px] font-normal text-text-muted mt-4 p-3 bg-bg-base rounded-[6px] border border-border-subtle italic m-0">{t.nota}</p>}
+                  {t.nota && <p className="text-[13px] font-normal text-[#8a8a8a] mt-4 p-3 bg-[#0a0a0a] rounded-[6px] border border-[#2a2a2a] italic m-0">{t.nota}</p>}
                 </div>
               ))}
             </div>
             
             {plan.proximaSesion && plan.menus.length === 1 && (
-               <div className="mt-6 pt-6 border-t border-border-default">
-                  <div className="flex items-center gap-3 p-4 bg-bg-elevated rounded-[8px] border border-border-subtle">
-                     <Lock className="h-[18px] w-[18px] text-text-secondary" />
-                     <p className="text-[14px] font-medium text-text-primary m-0">
-                        Siguiente cita: <span className="font-normal text-text-secondary">{formatDate(plan.proximaSesion)}</span>
+               <div className="mt-6 pt-6 border-t border-[#333]">
+                  <div className="flex items-center gap-3 p-4 bg-[#181818] rounded-[8px] border border-[#2a2a2a]">
+                     <Lock className="h-[18px] w-[18px] text-[#c0c0c0]" />
+                     <p className="text-[14px] font-medium text-white m-0">
+                        Siguiente cita: <span className="font-normal text-[#c0c0c0]">{formatDate(plan.proximaSesion)}</span>
                      </p>
                   </div>
                </div>
@@ -274,9 +278,9 @@ const PlanView = () => {
       </div>
 
       {plan.proximaSesion && plan.menus.length > 1 && (
-        <div className="bg-bg-elevated border border-border-subtle py-4 px-6 rounded-[12px] flex items-center justify-center animate-slide-up">
-          <p className="text-[14px] font-medium text-text-primary m-0">
-            Próxima cita de seguimiento: <span className="font-normal text-text-secondary">{formatDate(plan.proximaSesion)}</span>
+        <div className="bg-[#181818] border border-[#2a2a2a] py-4 px-6 rounded-[12px] flex items-center justify-center animate-slide-up">
+          <p className="text-[14px] font-medium text-white m-0">
+            Próxima cita de seguimiento: <span className="font-normal text-[#c0c0c0]">{formatDate(plan.proximaSesion)}</span>
           </p>
         </div>
       )}
@@ -293,4 +297,7 @@ const PlanView = () => {
   );
 };
 
-export default PlanView;
+export default function PlanView() {
+  const { id: pacienteId, planId } = useParams();
+  return <PlanEnvioForm pacienteId={pacienteId} planId={planId} />;
+}

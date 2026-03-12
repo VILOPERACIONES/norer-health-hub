@@ -19,6 +19,7 @@ import CreateEditPlan from "@/pages/CreateEditPlan";
 import PlanView from "@/pages/PlanView";
 import Requirements from "@/pages/Requirements";
 import Plans from "@/pages/Plans";
+import Pending from "@/pages/Pending";
 import Settings from "@/pages/Settings";
 import EquivalenciasSMAE from "@/pages/EquivalenciasSMAE";
 import NotFound from "@/pages/NotFound";
@@ -103,6 +104,7 @@ const App = () => {
               
               {/* Rutas de Planes */}
               <Route path="planes" element={<PermissionGuard module="planes"><Plans /></PermissionGuard>} />
+              <Route path="pendientes" element={<PermissionGuard module="planes"><Pending /></PermissionGuard>} />
               <Route path="planes/nuevo" element={<PermissionGuard module="planes"><CreateEditPlan /></PermissionGuard>} />
               <Route path="planes/:planId/editar" element={<PermissionGuard module="planes"><CreateEditPlan /></PermissionGuard>} />
               

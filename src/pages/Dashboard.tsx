@@ -13,6 +13,8 @@ import { useAuthStore } from '@/store/auth';
 const Dashboard = () => {
   const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
   const [alertas, setAlertas] = useState<Alerta[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
   const [topClientes, setTopClientes] = useState<{
     id: string;
     nombre: string;
@@ -155,18 +157,16 @@ const Dashboard = () => {
   ];
 
   if (loading && !metricas) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-6">
-        <Activity className="h-10 w-10 text-[#f0f0f0] animate-pulse" />
-        <div className="text-[11px] font-bold text-[#8a8a8a] uppercase tracking-[0.6em] animate-pulse">Iniciando Dashboard</div>
-      </div>
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+      <p className="text-[14px] text-[#8a8a8a]">Iniciando Dashboard...</p>
     </div>
   );
 
   return (
     <div 
-      className="flex flex-col gap-8 animate-fade-in max-w-none px-6 md:px-10 overflow-hidden -mt-6 -mb-12 -mx-6 md:-mx-8 h-[calc(100vh-60px)] lg:h-[100vh]" 
-      style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a', paddingBottom: '24px', paddingTop: '32px' }}
+      className="flex flex-col gap-6 animate-fade-in max-w-none overflow-hidden h-full" 
+      style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a' }}
     >
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -323,19 +323,16 @@ const Dashboard = () => {
                     </td>
                   </tr>
                 ) : (
-                  alertas.map((a, i) => {
-                    let statusColor = "text-emerald-500";
-                    let StatusIcon = Check;
+                  alertas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((a, i) => {
+                    let statusColor = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
                     let statusText = "Enviado";
 
                     if (a.tipoRiesgo === 'Sin Plan Asignado') {
-                      statusColor = "text-rose-500"; 
-                      StatusIcon = Clock;
-                      statusText = "Plan Sin Asignar";
+                      statusColor = "text-rose-500 bg-rose-500/10 border-rose-500/20"; 
+                      statusText = "Pendiente de plan";
                     } else if (a.tipoRiesgo === 'Plan Sin Enviar') {
-                      statusColor = "text-[#f59e0b]";
-                      StatusIcon = Clock;
-                      statusText = "Sin Enviar";
+                      statusColor = "text-amber-500 bg-amber-500/10 border-amber-500/20";
+                      statusText = "Plan en Proceso"; // or "Listo para enviar" depending on where it stuck, let's put Plan en Proceso/Pendiente
                     }
 
                     const dateStr = a.fechaPlan ? new Date(a.fechaPlan).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -353,8 +350,8 @@ const Dashboard = () => {
                           <span className="text-[13px] font-medium text-[#f0f0f0]">{a.nombre}</span>
                         </td>
                         <td className="px-3 py-[14px]">
-                             <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${statusColor}`}>
-                               <StatusIcon className={`w-3.5 h-3.5 ${statusColor}`} /> {statusText}
+                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border uppercase tracking-wider ${statusColor}`}>
+                               {statusText}
                              </span>
                         </td>
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
@@ -370,32 +367,56 @@ const Dashboard = () => {
 
           <div className="px-5 py-3 border-t border-[#2a2a2a] flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111111]">
              <div className="text-[12px] font-medium text-[#8a8a8a]">
-                Mostrando {alertas.length > 0 ? '1' : '0'} a {Math.min(10, alertas.length)} Resultados de {alertas.length}
+                Mostrando {alertas.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, alertas.length)} Resultados de {alertas.length}
              </div>
              
              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                 <div className="flex items-center gap-3">
                    <span className="text-[12px] font-medium text-[#8a8a8a]">Filas por página</span>
-                   <div className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] cursor-pointer transition-colors">
-                      <span className="text-[12px] font-medium text-[#f0f0f0] select-none">10</span>
-                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8a8a]" />
-                   </div>
+                   <select 
+                      className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] outline-none text-[12px] font-medium text-[#f0f0f0] cursor-pointer transition-colors"
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                   >
+                     <option value={5}>5</option>
+                     <option value={10}>10</option>
+                     <option value={20}>20</option>
+                   </select>
                 </div>
                 
                 <div className="flex items-center gap-1">
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" disabled>
+                   <button 
+                      onClick={() => setCurrentPage(1)}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
+                      disabled={currentPage === 1}
+                   >
                       <ChevronsLeft className="w-4 h-4" />
                    </button>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" disabled>
+                   <button 
+                      onClick={() => setCurrentPage(max => Math.max(1, max - 1))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
+                      disabled={currentPage === 1}
+                   >
                       <ChevronLeft className="w-4 h-4" />
                    </button>
                    <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
-                      1 / {Math.max(1, Math.ceil(alertas.length / 10))}
+                      {currentPage} / {Math.max(1, Math.ceil(alertas.length / itemsPerPage))}
                    </span>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" disabled={alertas.length <= 10}>
+                   <button 
+                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(alertas.length / itemsPerPage), min + 1))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
+                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                   >
                       <ChevronRight className="w-4 h-4" />
                    </button>
-                   <button className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" disabled={alertas.length <= 10}>
+                   <button 
+                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(alertas.length / itemsPerPage)))}
+                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
+                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                   >
                       <ChevronsRight className="w-4 h-4" />
                    </button>
                 </div>

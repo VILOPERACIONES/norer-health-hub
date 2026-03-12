@@ -47,27 +47,27 @@ const Plans = () => {
   );
 
   if (loading) return (
-    <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
-      <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
-      <p className="text-[14px] font-medium text-text-muted">Cargando plantillas...</p>
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+      <p className="text-[14px] text-[#8a8a8a]">Cargando plantillas...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen text-text-primary animate-fade-in pb-12 px-6">
+    <div className="min-h-screen text-text-primary animate-fade-in pb-12">
       <div className="w-full space-y-8">
         
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4">
           <div>
             <h1 className="text-[26px] font-bold text-text-primary m-0">Biblioteca de Plantillas</h1>
-            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de planes base y protocolos</p>
+            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de menús y planes base</p>
           </div>
           <button 
             onClick={() => navigate('/planes/nuevo')} 
             className="flex items-center gap-2 bg-white text-black rounded-[8px] px-[18px] py-[10px] text-[14px] font-bold transition-all hover:bg-white/90 uppercase"
           >
-            <Plus className="h-[18px] w-[18px]" /> Nuevo Protocolo
+            <Plus className="h-[18px] w-[18px]" /> Nuevo Plan
           </button>
         </header>
 
@@ -84,7 +84,7 @@ const Plans = () => {
               />
             </div>
             <div className="text-[14px] font-medium text-text-secondary">
-              {filteredPlanes.length} Protocolos
+              {filteredPlanes.length} Menús
             </div>
           </div>
 
@@ -129,7 +129,7 @@ const Plans = () => {
                           <button 
                             onClick={() => navigate(`/planes/${p.id}/editar`)}
                             className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-muted rounded-[8px] transition-colors"
-                            title="Editar Protocolo"
+                            title="Editar Plan"
                           >
                             <Edit3 className="w-[18px] h-[18px]" />
                           </button>
