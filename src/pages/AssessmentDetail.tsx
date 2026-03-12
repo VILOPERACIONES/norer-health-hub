@@ -104,7 +104,7 @@ const PlanSection = ({
             <div className="p-6 max-h-[60vh] overflow-y-auto space-y-3">
               {loadingPlantillas ? (
                 <div className="flex justify-center py-10">
-                  <div className="w-6 h-6 border-2 border-border-subtle border-t-text-primary rounded-full animate-spin" />
+                  <div className="w-6 h-6 border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin" />
                 </div>
               ) : plantillas.length === 0 ? (
                 <p className="text-[14px] text-text-secondary text-center py-8">No hay plantillas disponibles</p>
@@ -194,7 +194,7 @@ const AssessmentDetail = () => {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-text-muted border-t-text-primary animate-spin mb-4" />
+      <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin mb-4" />
       <p className="text-[14px] font-medium text-text-muted">Cargando valoración...</p>
     </div>
   );
@@ -229,7 +229,7 @@ const AssessmentDetail = () => {
   const imcDisplay = imcNum > 0 ? imcNum.toFixed(2) : '—';
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 w-full px-6 lg:px-10">
+    <div className="space-y-8 animate-fade-in pb-20 w-full">
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 pb-6 border-b border-border-subtle">
         <div className="space-y-2">
@@ -368,7 +368,7 @@ const AssessmentDetail = () => {
                 className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {savingBarrido ? (
-                  <div className="w-4 h-4 border-2 border-bg-base/30 border-t-bg-base rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />
                 ) : (
                   <Check className="w-4 h-4" />
                 )}

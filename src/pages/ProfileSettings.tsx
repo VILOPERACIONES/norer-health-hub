@@ -81,7 +81,7 @@ const ProfileSettings = () => {
 
   if (fetching) return (
     <div className="h-[40vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-6 h-6 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
+      <div className="w-6 h-6 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin" />
       <p className="text-[13px] font-medium text-text-muted">Cargando perfil...</p>
     </div>
   );

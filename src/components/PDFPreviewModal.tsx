@@ -174,7 +174,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
               disabled={loading}
               className="w-full bg-[#90c2ff] hover:bg-[#a6cdff] text-black font-semibold rounded-[8px] py-2.5 px-4 text-[13px] transition-colors flex items-center justify-center gap-2"
             >
-              {loading ? <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
+              {loading ? <div className="w-4 h-4 border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
               Guardar Configuración
             </button>
           </div>
@@ -184,7 +184,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
         <div className="flex-1 bg-[#222] p-4 flex flex-col items-center justify-center relative">
           {loadingPdf && (
             <div className="absolute inset-0 z-10 bg-black/50 backdrop-blur-sm flex flex-col items-center justify-center text-white">
-              <div className="w-8 h-8 border-4 border-white border-t-transparent rounded-full animate-spin mb-4" />
+              <div className="w-8 h-8 border-4 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin mb-4" />
               <p className="font-medium animate-pulse">Renderizando PDF Oficial...</p>
             </div>
           )}

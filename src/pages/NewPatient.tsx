@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen } from 'lucide-react';
+import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, ChevronDown } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 
@@ -71,21 +71,33 @@ const TextArea = ({ label, value, onChange, placeholder }: any) => (
   </div>
 );
 
-const FormSection = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-  <div className="bg-bg-surface p-8 rounded-[12px] border border-border-subtle shadow-none animate-slide-up">
-    <div className="flex items-center gap-3 mb-8 border-b border-border-subtle pb-4">
-      <div className="p-2 bg-bg-elevated border border-border-default rounded-[8px]">
-        <Icon className="h-[18px] w-[18px] text-text-secondary" />
+const FormSection = ({ title, icon: Icon, children, defaultOpen = true }: { title: string, icon: any, children: React.ReactNode, defaultOpen?: boolean }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+  return (
+  <div className="bg-bg-surface rounded-[12px] border border-border-subtle shadow-none animate-slide-up overflow-hidden">
+    <div 
+      className={`flex items-center justify-between p-8 cursor-pointer hover:bg-bg-elevated/30 transition-colors ${isOpen ? 'border-b border-border-subtle pb-6' : ''}`}
+      onClick={() => setIsOpen(!isOpen)}
+    >
+      <div className="flex items-center gap-3">
+        <div className="p-2 bg-bg-elevated border border-border-default rounded-[8px]">
+          <Icon className="h-[18px] w-[18px] text-text-secondary" />
+        </div>
+        <h3 className="text-[16px] font-semibold text-text-primary m-0">
+          {title}
+        </h3>
       </div>
-      <h3 className="text-[16px] font-semibold text-text-primary m-0">
-        {title}
-      </h3>
+      <div className="p-1.5 rounded-full bg-bg-elevated border border-border-default text-text-secondary">
+        <ChevronDown className={`h-4 w-4 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+      </div>
     </div>
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
-      {children}
-    </div>
+    {isOpen && (
+      <div className="p-8 pt-6 grid sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-slide-down">
+        {children}
+      </div>
+    )}
   </div>
-);
+)};
 
 const NewPatient = () => {
   const navigate = useNavigate();
@@ -187,7 +199,7 @@ const NewPatient = () => {
   };
 
   return (
-    <div className="space-y-10 animate-fade-in max-w-none pb-24 px-6">
+    <div className="space-y-10 animate-fade-in max-w-none pb-24">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
         <div className="space-y-2">
           <button onClick={() => navigate('/pacientes')} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
@@ -218,7 +230,7 @@ const NewPatient = () => {
           <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
         </FormSection>
 
-        <FormSection title="Dinámica Deportiva" icon={Activity}>
+        <FormSection title="Dinámica Deportiva" icon={Activity} defaultOpen={false}>
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
           <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
           <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />
@@ -232,7 +244,7 @@ const NewPatient = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Anamnesis y Suplementación" icon={Shield}>
+        <FormSection title="Anamnesis y Suplementación" icon={Shield} defaultOpen={false}>
           <TextArea label="Historial de Suplementos (Fase Actual)" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} placeholder="Describa los productos que consume el paciente actualmente..." />
           <TextArea label="Propuesta Inicial de Suplementación" value={form.recomSuplementos} onChange={(v: string) => update('recomSuplementos', v)} placeholder="Recomendaciones basadas en el objetivo..." />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 col-span-full">
@@ -242,7 +254,7 @@ const NewPatient = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Perfil Clínico" icon={Heart}>
+        <FormSection title="Perfil Clínico" icon={Heart} defaultOpen={false}>
           <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
           <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
           <Select label="Tránsito Intestinal" value={form.estrenimiento} onChange={(v: string) => update('estrenimiento', v)} options={['No', 'Leve', 'Frecuente']} />
@@ -259,7 +271,7 @@ const NewPatient = () => {
             disabled={saving}
             className="flex items-center gap-2 bg-brand-primary text-bg-base px-[24px] py-[12px] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] disabled:opacity-50"
           >
-            {saving ? <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
+            {saving ? <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
             {saving ? 'Guardando expediente...' : 'Guardar y registrar expediente'}
           </button>
         </div>

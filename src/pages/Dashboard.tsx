@@ -157,18 +157,16 @@ const Dashboard = () => {
   ];
 
   if (loading && !metricas) return (
-    <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-      <div className="flex flex-col items-center gap-6">
-        <Activity className="h-10 w-10 text-[#f0f0f0] animate-pulse" />
-        <div className="text-[11px] font-bold text-[#8a8a8a] uppercase tracking-[0.6em] animate-pulse">Iniciando Dashboard</div>
-      </div>
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+      <p className="text-[14px] text-[#8a8a8a]">Iniciando Dashboard...</p>
     </div>
   );
 
   return (
     <div 
-      className="flex flex-col gap-8 animate-fade-in max-w-none px-6 md:px-10 overflow-hidden -mt-6 -mb-12 -mx-6 md:-mx-8 h-[calc(100vh-60px)] lg:h-[100vh]" 
-      style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a', paddingBottom: '24px', paddingTop: '32px' }}
+      className="flex flex-col gap-6 animate-fade-in max-w-none overflow-hidden h-full" 
+      style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a' }}
     >
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -326,18 +324,15 @@ const Dashboard = () => {
                   </tr>
                 ) : (
                   alertas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((a, i) => {
-                    let statusColor = "text-emerald-500";
-                    let StatusIcon = Check;
+                    let statusColor = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
                     let statusText = "Enviado";
 
                     if (a.tipoRiesgo === 'Sin Plan Asignado') {
-                      statusColor = "text-rose-500"; 
-                      StatusIcon = Clock;
-                      statusText = "Plan Sin Asignar";
+                      statusColor = "text-rose-500 bg-rose-500/10 border-rose-500/20"; 
+                      statusText = "Pendiente de plan";
                     } else if (a.tipoRiesgo === 'Plan Sin Enviar') {
-                      statusColor = "text-[#f59e0b]";
-                      StatusIcon = Clock;
-                      statusText = "Sin Enviar";
+                      statusColor = "text-amber-500 bg-amber-500/10 border-amber-500/20";
+                      statusText = "Plan en Proceso"; // or "Listo para enviar" depending on where it stuck, let's put Plan en Proceso/Pendiente
                     }
 
                     const dateStr = a.fechaPlan ? new Date(a.fechaPlan).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -355,8 +350,8 @@ const Dashboard = () => {
                           <span className="text-[13px] font-medium text-[#f0f0f0]">{a.nombre}</span>
                         </td>
                         <td className="px-3 py-[14px]">
-                             <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${statusColor}`}>
-                               <StatusIcon className={`w-3.5 h-3.5 ${statusColor}`} /> {statusText}
+                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border uppercase tracking-wider ${statusColor}`}>
+                               {statusText}
                              </span>
                         </td>
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">

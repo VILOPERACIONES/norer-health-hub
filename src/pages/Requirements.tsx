@@ -145,7 +145,7 @@ const Requirements = () => {
   if (!paciente) return <div className="p-20 text-center animate-pulse font-black uppercase tracking-widest">Calculando requerimientos...</div>;
 
   return (
-    <div className="min-h-screen animate-fade-in pb-20 px-6 max-w-[1400px] mx-auto">
+    <div className="min-h-screen animate-fade-in pb-20 max-w-[1400px] mx-auto">
       <div className="space-y-8 pt-6">
         <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pb-6">
            <div className="space-y-2">

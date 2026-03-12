@@ -24,16 +24,29 @@ const emptyIngrediente = (): Ingrediente => ({
   nota: '' 
 });
 
-const CreateEditPlan = () => {
-  const { id: pacienteId, planId } = useParams();
+export const CreateEditPlanForm = ({ 
+  pacienteId: propPacienteId, 
+  planId: propPlanId, 
+  valoracionId: propValoracionId, 
+  onSaved, 
+  onCancel 
+}: { 
+  pacienteId?: string, 
+  planId?: string, 
+  valoracionId?: string, 
+  onSaved?: (planId: string) => void, 
+  onCancel?: () => void 
+}) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const location = useLocation();
-  const searchParams = new URLSearchParams(location.search);
-  const valoracionId = searchParams.get('valoracionId');
   
-  const isEdit = !!planId;
-  const isBasePlan = !pacienteId; // Si no hay pacienteId, es una plantilla base
+  const isEdit = !!propPlanId;
+  const isBasePlan = !propPacienteId; 
+  
+  const pacienteId = propPacienteId;
+  const planId = propPlanId;
+  const valoracionId = propValoracionId;
+  
   const [saving, setSaving] = useState(false);
   const [pesoUltimo, setPesoUltimo] = useState(0);
 
@@ -277,6 +290,44 @@ const CreateEditPlan = () => {
     }));
   };
 
+  const moveTiempo = (menuIdx: number, tiempoIdx: number, dir: -1 | 1) => {
+    updateMenu(menuIdx, (m) => {
+      const tiempos = [...m.tiempos];
+      if (tiempoIdx + dir < 0 || tiempoIdx + dir >= tiempos.length) return m;
+      const t = tiempos[tiempoIdx];
+      tiempos[tiempoIdx] = tiempos[tiempoIdx + dir];
+      tiempos[tiempoIdx + dir] = t;
+      return { ...m, tiempos };
+    });
+  };
+
+  const movePlatillo = (menuIdx: number, tiempoIdx: number, platilloName: string, dir: -1 | 1) => {
+    updateTiempo(menuIdx, tiempoIdx, (t) => {
+      const platillos = Array.from(new Set(t.ingredientes.map(i => i.platillo || '')));
+      const pIndex = platillos.indexOf(platilloName);
+      if (pIndex + dir < 0 || pIndex + dir >= platillos.length) return t;
+
+      const targetPlatillo = platillos[pIndex + dir];
+      
+      platillos[pIndex] = targetPlatillo;
+      platillos[pIndex + dir] = platilloName;
+      
+      const groups: Record<string, any[]> = {};
+      t.ingredientes.forEach(ing => {
+        const p = ing.platillo || '';
+        if (!groups[p]) groups[p] = [];
+        groups[p].push(ing);
+      });
+      
+      let newIngredientes: any[] = [];
+      platillos.forEach(p => {
+        if (groups[p]) newIngredientes = newIngredientes.concat(groups[p]);
+      });
+      
+      return { ...t, ingredientes: newIngredientes };
+    });
+  };
+
   const handleSave = async () => {
     if (macroSum !== 100) {
       toast({ title: 'ERROR ESTRATÉGICO', description: 'La distribución de macronutrientes debe sumar el 100% de la carga energética.', variant: 'destructive' });
@@ -317,15 +368,23 @@ const CreateEditPlan = () => {
     }
 
     try {
+      let serverData;
       if (isEdit) {
         const url = isBasePlan ? `/api/planes/${planId}` : `/api/pacientes/${pacienteId}/planes/${planId}`;
-        await api.put(url, body);
+        const { data } = await api.put(url, body);
+        serverData = data?.data || data;
       } else {
         const url = isBasePlan ? `/api/planes` : `/api/pacientes/${pacienteId}/planes`;
-        await api.post(url, body);
+        const { data } = await api.post(url, body);
+        serverData = data?.data || data;
       }
       toast({ title: isBasePlan ? 'PLANTILLA PERSISTIDA' : 'PLAN ALIMENTICIO PERSISTIDO' });
-      navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`);
+      
+      if (onSaved) {
+        onSaved(serverData?.id || planId);
+      } else {
+        navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`);
+      }
     } catch (err: any) {
       toast({ title: 'Error de Persistencia', description: 'No se pudo sincronizar el plan maestro.', variant: 'destructive' });
     } finally {
@@ -345,17 +404,19 @@ const CreateEditPlan = () => {
   };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full px-2 sm:px-4 lg:px-6 mt-2">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6">
+    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
         <div className="space-y-2">
-          <button onClick={() => navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4">
-            <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver
-          </button>
+          {(!onSaved || onCancel) && (
+            <button onClick={() => onCancel ? onCancel() : navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-[#c0c0c0] hover:text-white transition-colors w-fit group mb-4">
+              <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> {onCancel ? 'Salir Sin Guardar' : 'Volver'}
+            </button>
+          )}
           <div className="animate-slide-up space-y-1">
-            <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
+            <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">
               {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Base') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional')}
             </h1>
-            <p className="text-text-secondary font-normal text-[14px] m-0">
+            <p className="text-[#c0c0c0] font-normal text-[14px] m-0">
               {isBasePlan ? 'Definición de plan base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
             </p>
           </div>
@@ -365,25 +426,25 @@ const CreateEditPlan = () => {
           <div className="relative">
             <button 
               onClick={() => setShowTemplates(!showTemplates)}
-              className="px-[18px] py-[10px] bg-bg-surface border border-border-default text-text-primary text-[14px] font-medium rounded-[8px] hover:bg-bg-elevated transition-colors flex items-center gap-2"
+              className="px-[18px] py-[10px] bg-[#111111] border border-[#333] text-white text-[14px] font-medium rounded-[8px] hover:bg-[#181818] transition-colors flex items-center gap-2"
             >
               <ClipboardList className="h-[18px] w-[18px]" /> Usar plantilla base
             </button>
             {showTemplates && (
-              <div className="absolute top-full right-0 mt-2 w-[350px] bg-bg-surface border border-border-default rounded-[12px] shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
-                <p className="text-[14px] font-medium text-text-muted m-0">Seleccionar plantilla</p>
+              <div className="absolute top-full right-0 mt-2 w-[350px] bg-[#111111] border border-[#333] rounded-[12px] shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
+                <p className="text-[14px] font-medium text-[#8a8a8a] m-0">Seleccionar plantilla</p>
                 <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar pr-2">
                   {availableTemplates.map(t => (
                     <button 
                       key={t.id} 
                       onClick={() => loadTemplate(t)}
-                      className="w-full text-left p-3 rounded-[8px] hover:bg-bg-elevated border border-transparent hover:border-border-default transition-all group"
+                      className="w-full text-left p-3 rounded-[8px] hover:bg-[#181818] border border-transparent hover:border-[#333] transition-all group"
                     >
-                      <p className="text-[14px] font-medium text-text-primary group-hover:text-brand-primary m-0">{t.nombre || 'Plan Alimenticio Sin Nombre'}</p>
-                      <p className="text-[12px] font-normal text-text-muted mt-1 m-0">{t.calorias} Kcal · {t.tipo}</p>
+                      <p className="text-[14px] font-medium text-white group-hover:text-brand-primary m-0">{t.nombre || 'Plan Alimenticio Sin Nombre'}</p>
+                      <p className="text-[12px] font-normal text-[#8a8a8a] mt-1 m-0">{t.calorias} Kcal · {t.tipo}</p>
                     </button>
                   ))}
-                  {availableTemplates.length === 0 && <p className="p-4 text-center text-[14px] font-normal text-text-muted">Sin plantillas disponibles</p>}
+                  {availableTemplates.length === 0 && <p className="p-4 text-center text-[14px] font-normal text-[#8a8a8a]">Sin plantillas disponibles</p>}
                 </div>
               </div>
             )}
@@ -404,27 +465,27 @@ const CreateEditPlan = () => {
         <div className="lg:col-span-8 space-y-6">
         
           {/* Configuración Metabólica */}
-          <div className="bg-bg-surface p-6 rounded-[12px] animate-slide-up border border-border-subtle">
-            <h3 className="text-[16px] font-semibold text-text-primary mb-6 flex items-center gap-2 m-0">
+          <div className="bg-[#111111] p-6 rounded-[12px] animate-slide-up border border-[#2a2a2a]">
+            <h3 className="text-[16px] font-semibold text-white mb-6 flex items-center gap-2 m-0">
                Requerimientos Esenciales
             </h3>
             
             <div className="grid sm:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary">Identificador / Objetivo</label>
+                <label className="text-[12px] font-medium text-[#c0c0c0]">Identificador / Objetivo</label>
                 <input 
                   value={nombrePlan} 
                   onChange={(e) => setNombrePlan(e.target.value)} 
                   placeholder="Ej: Balanceado 1800 kcal"
-                  className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors"
+                  className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[14px] font-normal text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors"
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary">Enfoque Nutricional</label>
+                <label className="text-[12px] font-medium text-[#c0c0c0]">Enfoque Nutricional</label>
                 <select 
                   value={tipo} 
                   onChange={(e) => setTipo(e.target.value)} 
-                  className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors appearance-none"
+                  className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[14px] font-normal text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors appearance-none"
                   style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
                 >
                   <option value="Balanceada">Balanceada</option>
@@ -439,25 +500,25 @@ const CreateEditPlan = () => {
 
             <div className="grid sm:grid-cols-1 gap-6 mt-6">
                <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary">Energía Total (Kcal)</label>
+                <label className="text-[12px] font-medium text-[#c0c0c0]">Energía Total (Kcal)</label>
                 <div className="flex flex-col gap-3">
-                  <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[18px] font-semibold text-text-primary outline-none border border-border-subtle focus:border-[#444] transition-colors" />
+                  <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[18px] font-semibold text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors" />
                 </div>
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-6 mt-8 pt-6 border-t border-border-subtle">
+            <div className="grid grid-cols-3 gap-6 mt-8 pt-6 border-t border-[#2a2a2a]">
               <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Proteína %</label>
-                <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
+                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Proteína %</label>
+                <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Carbohidratos %</label>
-                <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
+                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Carbohidratos %</label>
+                <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
               </div>
               <div className="space-y-2">
-                <label className="text-[12px] font-medium text-text-secondary text-center w-full block">Grasas %</label>
-                <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-text-primary outline-none border border-border-subtle focus:border-[#444]" />
+                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Grasas %</label>
+                <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
               </div>
             </div>
 
@@ -473,17 +534,17 @@ const CreateEditPlan = () => {
           {/* Menús Personalizados */}
           <div className="grid lg:grid-cols-2 gap-6 items-start">
             {menus.map((menu, mi) => (
-              <div key={mi} className="bg-bg-surface rounded-[12px] animate-slide-up border border-border-subtle overflow-hidden flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
-                <div className="bg-bg-elevated border-b border-border-subtle px-6 py-4 flex items-center justify-between">
+              <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] overflow-hidden flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
+                <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 flex items-center justify-between">
                   <input
                     value={menu.nombre}
                     onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
-                    className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-text-primary selection:bg-brand-primary placeholder:text-text-muted"
+                    className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-white selection:bg-brand-primary placeholder:text-[#8a8a8a]"
                     placeholder="Nombre del menú"
                   />
                   <button
                      onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
-                     className="p-2 text-text-muted hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
+                     className="p-2 text-[#8a8a8a] hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -491,26 +552,35 @@ const CreateEditPlan = () => {
 
                 <div className="p-6 space-y-6 flex-1 flex flex-col">
                   {menu.tiempos.map((tiempo, ti) => (
-                    <div key={ti} className="p-4 rounded-[8px] border border-border-subtle bg-bg-elevated group relative">
+                    <div key={ti} className="p-4 rounded-[8px] border border-[#2a2a2a] bg-[#181818] group relative">
                       <div className="flex items-center justify-between mb-4">
                          <input
                            value={tiempo.nombre}
                            onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value }))}
-                           className="text-[14px] font-semibold text-text-primary bg-transparent border-none outline-none w-[70%]"
+                           className="text-[14px] font-semibold text-white bg-transparent border-none outline-none w-[70%]"
                            placeholder="Nombre del tiempo"
                          />
-                         <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-text-muted hover:text-accent-red rounded-[6px] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[#2e1a1a]">
-                           <Trash2 className="h-3.5 w-3.5" />
-                         </button>
+                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                           <button onClick={() => moveTiempo(mi, ti, -1)} disabled={ti === 0} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                             <ChevronUp className="h-3.5 w-3.5" />
+                           </button>
+                           <button onClick={() => moveTiempo(mi, ti, 1)} disabled={ti === menu.tiempos.length - 1} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                             <ChevronDown className="h-3.5 w-3.5" />
+                           </button>
+                           <div className="w-[1px] h-4 bg-[#333] hidden sm:block mx-1"></div>
+                           <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-[#8a8a8a] hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors">
+                             <Trash2 className="h-3.5 w-3.5" />
+                           </button>
+                         </div>
                       </div>
 
                       <div className="space-y-6">
                         {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
-                           <div key={`${mi}-${ti}-${pIndex}`} className="p-3 bg-bg-surface border border-border-default rounded-[8px]">
-                              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border-subtle border-dashed">
-                                 <span className="text-text-muted text-[11px] font-bold uppercase tracking-wider">Platillo:</span>
+                           <div key={`${mi}-${ti}-${pIndex}`} className="p-3 bg-[#111111] border border-[#333] rounded-[8px]">
+                              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
+                                 <span className="text-[#8a8a8a] text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
                                  <input 
-                                    className="bg-transparent border-none outline-none font-semibold text-text-primary placeholder:text-text-muted text-[13px] w-full"
+                                    className="bg-transparent border-none outline-none font-semibold text-white placeholder:text-[#8a8a8a] text-[13px] w-full min-w-0"
                                     value={pName}
                                     onChange={(e) => {
                                       const newName = e.target.value;
@@ -521,14 +591,23 @@ const CreateEditPlan = () => {
                                     }}
                                     placeholder="Ej: Sándwich de Pollo (Opcional)"
                                  />
-                                 {pName && (
-                                   <button 
-                                      onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
-                                      className="text-[10px] text-text-muted hover:text-accent-red ml-auto whitespace-nowrap"
-                                   >
-                                     Borrar platillo
+                                 
+                                 <div className="flex items-center gap-1 ml-auto shrink-0">
+                                   <button onClick={() => movePlatillo(mi, ti, pName, -1)} disabled={pIndex === 0} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
+                                     <ChevronUp className="h-3 w-3" />
                                    </button>
-                                 )}
+                                   <button onClick={() => movePlatillo(mi, ti, pName, 1)} disabled={pIndex === Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).length - 1} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
+                                     <ChevronDown className="h-3 w-3" />
+                                   </button>
+                                   {pName && (
+                                     <button 
+                                        onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
+                                        className="text-[10px] uppercase font-bold text-[#8a8a8a] hover:text-accent-red ml-1 px-1.5 py-1 rounded-[4px] hover:bg-[#2e1a1a] whitespace-nowrap transition-colors tracking-wider"
+                                     >
+                                       Borrar
+                                     </button>
+                                   )}
+                                 </div>
                               </div>
                               <div className="space-y-4">
                                 {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
@@ -555,7 +634,7 @@ const CreateEditPlan = () => {
                                 
                                 <button
                                   onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: pName }] }))}
-                                  className="w-full py-2 bg-transparent border border-dashed border-border-subtle hover:border-border-default text-text-secondary hover:text-text-primary text-[12px] font-medium rounded-[6px] transition-colors"
+                                  className="w-full py-2 bg-transparent border border-dashed border-[#2a2a2a] hover:border-[#333] text-[#c0c0c0] hover:text-white text-[12px] font-medium rounded-[6px] transition-colors"
                                 >
                                   + Agregar Alimento
                                 </button>
@@ -575,7 +654,7 @@ const CreateEditPlan = () => {
                              }
                              updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
                           }}
-                          className="w-full py-2 bg-transparent border border-dashed border-border-default text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
+                          className="w-full py-2 bg-transparent border border-dashed border-[#333] text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
                         >
                           + Crear Nuevo Platillo
                         </button>
@@ -588,7 +667,7 @@ const CreateEditPlan = () => {
                     onClick={() => updateMenu(mi, (m) => ({
                       ...m, tiempos: [...m.tiempos, { nombre: 'Nuevo Tiempo', ingredientes: [], nota: '' }]
                     }))}
-                    className="w-full py-3 mt-4 border border-dashed border-border-default hover:border-text-secondary rounded-[8px] text-[13px] font-medium text-text-muted hover:text-text-primary transition-colors"
+                    className="w-full py-3 mt-4 border border-dashed border-[#333] hover:border-text-secondary rounded-[8px] text-[13px] font-medium text-[#8a8a8a] hover:text-white transition-colors"
                   >
                     + Agregar Tiempo de Comida
                   </button>
@@ -598,7 +677,7 @@ const CreateEditPlan = () => {
             
             <button
                onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
-               className="h-[100%] min-h-[400px] border-2 border-dashed border-border-default rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-text-muted hover:text-text-primary hover:bg-bg-elevated hover:border-text-muted transition-all group"
+               className="h-[100%] min-h-[400px] border-2 border-dashed border-[#333] rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-[#8a8a8a] hover:text-white hover:bg-[#181818] hover:border-text-muted transition-all group"
             >
               <Plus className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
               <span className="text-[14px] font-medium">Agregar Menú Alternativo</span>
@@ -608,28 +687,28 @@ const CreateEditPlan = () => {
 
         {/* Sidebar Summary & Persistence */}
         <div className="lg:col-span-4 lg:relative">
-          <div className="lg:sticky lg:top-24 space-y-6 lg:max-h-[calc(100vh-120px)] lg:overflow-y-auto lg:pb-12 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-default hover:[&::-webkit-scrollbar-thumb]:bg-[#444] [&::-webkit-scrollbar-thumb]:rounded-full pr-1" style={{ animationDelay: '0.1s' }}>
+          <div className="space-y-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-default hover:[&::-webkit-scrollbar-thumb]:bg-[#444] [&::-webkit-scrollbar-thumb]:rounded-full pr-1" style={{ animationDelay: '0.1s' }}>
             {isBasePlan ? (
-              <div className="bg-bg-surface border border-border-subtle p-6 rounded-[12px] relative overflow-hidden shadow-sm">
-                 <h3 className="text-[14px] font-semibold text-text-primary mb-6 m-0 relative z-10">Balance Energético (Plantilla)</h3>
+              <div className="bg-[#111111] border border-[#2a2a2a] p-6 rounded-[12px] relative overflow-hidden shadow-sm">
+                 <h3 className="text-[14px] font-semibold text-white mb-6 m-0 relative z-10">Balance Energético (Plantilla)</h3>
                  
                  <div className="space-y-6 relative z-10">
-                    <div className="bg-bg-elevated border border-border-subtle rounded-[8px] p-5 flex flex-col items-center justify-center">
-                       <span className="text-[11px] font-bold text-text-secondary uppercase tracking-wider mb-1">Carga Total Definida</span>
-                       <p className="text-[36px] font-black text-text-primary m-0 leading-none">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">Kcal</span></p>
+                    <div className="bg-[#181818] border border-[#2a2a2a] rounded-[8px] p-5 flex flex-col items-center justify-center">
+                       <span className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-wider mb-1">Carga Total Definida</span>
+                       <p className="text-[36px] font-black text-white m-0 leading-none">{cal}<span className="text-[14px] ml-1 font-medium text-[#8a8a8a]">Kcal</span></p>
                     </div>
 
                     <div className="space-y-4">
-                      <p className="text-[11px] font-bold text-text-muted uppercase tracking-widest m-0 pb-1 border-b border-border-subtle">Distribución de Macros</p>
+                      <p className="text-[11px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 pb-1 border-b border-[#2a2a2a]">Distribución de Macros</p>
                       {[
                         { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c' },
                         { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff' },
                         { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842' },
                       ].map((m) => (
                         <div key={m.label} className="flex items-center justify-between">
-                          <span className="text-[13px] font-semibold text-text-primary">{m.label}</span>
+                          <span className="text-[13px] font-semibold text-white">{m.label}</span>
                           <div className="text-right flex items-end gap-2">
-                            <span className="text-[11px] font-medium text-text-muted">{formatDecimal(m.grKg)} g/kg</span>
+                            <span className="text-[11px] font-medium text-[#8a8a8a]">{formatDecimal(m.grKg)} g/kg</span>
                             <span className="text-[14px] font-bold" style={{ color: m.color }}>{formatDecimal(m.gr)} g</span>
                           </div>
                         </div>
@@ -641,9 +720,9 @@ const CreateEditPlan = () => {
               <div className="space-y-6">
                 
                 {/* ── Resumen de Energía Consolidado ── */}
-                <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-5 shadow-sm">
+                <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] p-5 shadow-sm">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Balance Energético</h3>
+                    <h3 className="text-[14px] font-semibold text-white m-0">Balance Energético</h3>
                     {kcalMenuEstimado > 0 && (
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                         Math.abs(kcalMenuEstimado - cal) < 50
@@ -655,9 +734,9 @@ const CreateEditPlan = () => {
                     )}
                   </div>
                   
-                  <div className="flex flex-col items-center justify-center py-6 bg-bg-elevated rounded-[8px] border border-border-subtle mb-4">
-                    <span className="text-[11px] font-bold text-text-secondary uppercase tracking-widest mb-1 shadow-sm">Carga del Plan</span>
-                    <p className="text-[36px] font-black text-brand-primary leading-none m-0">{cal}<span className="text-[14px] ml-1 font-medium text-text-muted">kcal</span></p>
+                  <div className="flex flex-col items-center justify-center py-6 bg-[#181818] rounded-[8px] border border-[#2a2a2a] mb-4">
+                    <span className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-widest mb-1 shadow-sm">Carga del Plan</span>
+                    <p className="text-[36px] font-black text-brand-primary leading-none m-0">{cal}<span className="text-[14px] ml-1 font-medium text-[#8a8a8a]">kcal</span></p>
                   </div>
 
                   {kcalBarrido && kcalBarrido > 0 && (
@@ -681,8 +760,8 @@ const CreateEditPlan = () => {
                 </div>
 
                 {/* ── Distribución Macronutrimental ── */}
-                <div className="bg-bg-surface border border-border-subtle p-5 rounded-[12px] shadow-sm">
-                  <h3 className="text-[14px] font-semibold text-text-primary mb-5 m-0">Distribución de Macros</h3>
+                <div className="bg-[#111111] border border-[#2a2a2a] p-5 rounded-[12px] shadow-sm">
+                  <h3 className="text-[14px] font-semibold text-white mb-5 m-0">Distribución de Macros</h3>
                   <div className="space-y-4">
                     {[
                       { label: 'Proteína', pct: pPct, gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c', bar: 'bg-[#ef8c8c]', note: pPct >= 35 ? 'Hiperproteico' : pPct <= 15 ? 'Hipoproteico' : null },
@@ -693,16 +772,16 @@ const CreateEditPlan = () => {
                         <div className="flex items-center justify-between mb-1.5">
                           <div className="flex items-center gap-2">
                             <span className="text-[13px] font-bold" style={{ color: m.color }}>{m.label}</span>
-                            {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-bg-elevated border border-border-subtle text-text-secondary font-semibold uppercase tracking-wider">{m.note}</span>}
+                            {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-[#181818] border border-[#2a2a2a] text-[#c0c0c0] font-semibold uppercase tracking-wider">{m.note}</span>}
                           </div>
-                          <span className="text-[13px] font-bold text-text-primary bg-bg-elevated px-1.5 py-0.5 rounded-[4px]">{m.pct}%</span>
+                          <span className="text-[13px] font-bold text-white bg-[#181818] px-1.5 py-0.5 rounded-[4px]">{m.pct}%</span>
                         </div>
-                        <div className="w-full h-2 bg-bg-elevated border border-border-subtle rounded-full overflow-hidden">
+                        <div className="w-full h-2 bg-[#181818] border border-[#2a2a2a] rounded-full overflow-hidden">
                           <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(m.pct, 100)}%` }} />
                         </div>
                         <div className="flex justify-between mt-1">
-                          <span className="text-[11px] text-text-muted font-mono bg-bg-elevated px-1.5 rounded-[4px]">{formatDecimal(m.gr)} g/día</span>
-                          {pesoUltimo > 0 && <span className="text-[11px] text-text-muted font-mono bg-bg-elevated px-1.5 rounded-[4px]">{formatDecimal(m.grKg)} g/kg</span>}
+                          <span className="text-[11px] text-[#8a8a8a] font-mono bg-[#181818] px-1.5 rounded-[4px]">{formatDecimal(m.gr)} g/día</span>
+                          {pesoUltimo > 0 && <span className="text-[11px] text-[#8a8a8a] font-mono bg-[#181818] px-1.5 rounded-[4px]">{formatDecimal(m.grKg)} g/kg</span>}
                         </div>
                       </div>
                     ))}
@@ -715,31 +794,31 @@ const CreateEditPlan = () => {
                 </div>
 
                 {/* ── Barrido estratégico (colapsable) ── */}
-                <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden shadow-sm">
+                <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] overflow-hidden shadow-sm">
                   <button 
                     onClick={() => setShowBarridoRef(!showBarridoRef)}
-                    className="w-full flex flex-col items-start p-4 hover:bg-bg-elevated transition-colors text-left"
+                    className="w-full flex flex-col items-start p-4 hover:bg-[#181818] transition-colors text-left"
                   >
                     <div className="w-full flex items-center justify-between mb-1.5">
-                      <h3 className="text-[14px] font-semibold text-text-primary m-0 flex items-center gap-2">
-                        <ClipboardList className="w-[18px] h-[18px] text-text-secondary" /> 
+                      <h3 className="text-[14px] font-semibold text-white m-0 flex items-center gap-2">
+                        <ClipboardList className="w-[18px] h-[18px] text-[#c0c0c0]" /> 
                         Barrido Estratégico
                       </h3>
-                      {showBarridoRef ? <ChevronUp className="w-[18px] h-[18px] text-text-muted" /> : <ChevronDown className="w-[18px] h-[18px] text-text-muted" />}
+                      {showBarridoRef ? <ChevronUp className="w-[18px] h-[18px] text-[#8a8a8a]" /> : <ChevronDown className="w-[18px] h-[18px] text-[#8a8a8a]" />}
                     </div>
-                    <p className="text-[12px] text-text-muted m-0">
+                    <p className="text-[12px] text-[#8a8a8a] m-0">
                       {valData?.numeroValoracion ? `Revisar desglose de la consulta base` : 'Herramienta de apoyo (Scratchpad)'}
                     </p>
                   </button>
                   {showBarridoRef && (
-                    <div className="p-4 border-t border-border-subtle bg-bg-elevated">
+                    <div className="p-4 border-t border-[#2a2a2a] bg-[#181818]">
                       {(() => {
                          let bd = valData?.barridoEquivalencias;
                          if (typeof bd === 'string') {
                            try { bd = JSON.parse(bd); } catch (e) {}
                          }
                          
-                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-border-default rounded-[8px]">Sin datos de barrido previos registrados.</p>;
+                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-[#8a8a8a] m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Sin datos de barrido previos registrados.</p>;
                          
                          const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
 
@@ -750,15 +829,15 @@ const CreateEditPlan = () => {
                             const kcalTiempo = distributionItems.reduce((s, [g, cant]) => s + Number(cant) * (KCAL_EQ[g] ?? 0), 0);
                             
                             return (
-                              <div key={t} className="bg-bg-surface p-3.5 rounded-[8px] border border-border-subtle mb-3 last:mb-0 shadow-sm">
-                                <div className="flex items-center justify-between mb-3 border-b border-border-default pb-2">
-                                  <h4 className="text-[12px] font-bold text-text-primary uppercase tracking-wider m-0">{t}</h4>
-                                  <span className="text-[11px] font-mono text-text-secondary bg-bg-elevated px-2 py-0.5 rounded-[4px]">{Math.round(kcalTiempo)} kcal</span>
+                              <div key={t} className="bg-[#111111] p-3.5 rounded-[8px] border border-[#2a2a2a] mb-3 last:mb-0 shadow-sm">
+                                <div className="flex items-center justify-between mb-3 border-b border-[#333] pb-2">
+                                  <h4 className="text-[12px] font-bold text-white uppercase tracking-wider m-0">{t}</h4>
+                                  <span className="text-[11px] font-mono text-[#c0c0c0] bg-[#181818] px-2 py-0.5 rounded-[4px]">{Math.round(kcalTiempo)} kcal</span>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
                                   {distributionItems.map(([g, cant]) => (
-                                    <span key={g} className="px-2 py-1 bg-bg-elevated border border-border-subtle rounded-[6px] text-[11px] font-medium text-text-secondary">
-                                      {gruposMap[g] || g}: <span className="font-bold text-text-primary">{parseFloat(Number(cant).toFixed(1))} eq</span>
+                                    <span key={g} className="px-2 py-1 bg-[#181818] border border-[#2a2a2a] rounded-[6px] text-[11px] font-medium text-[#c0c0c0]">
+                                      {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(1))} eq</span>
                                     </span>
                                   ))}
                                 </div>
@@ -767,7 +846,7 @@ const CreateEditPlan = () => {
                          }).filter(Boolean);
 
                          if (renderedTiempos.length === 0) {
-                           return <p className="text-[12px] text-text-muted m-0 p-4 text-center border border-dashed border-border-default rounded-[8px]">El barrido estratégico parece no tener porciones asignadas.</p>;
+                           return <p className="text-[12px] text-[#8a8a8a] m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">El barrido estratégico parece no tener porciones asignadas.</p>;
                          }
 
                          return (
@@ -782,27 +861,27 @@ const CreateEditPlan = () => {
               </div>
             )}
 
-            <div className="bg-bg-surface p-5 rounded-[12px] space-y-6 border border-border-subtle shadow-sm">
-              <h3 className="text-[14px] font-semibold text-text-primary m-0 flex items-center gap-2">
-                 <Settings className="w-[18px] h-[18px] text-text-secondary" /> Ajustes Finales
+            <div className="bg-[#111111] p-5 rounded-[12px] space-y-6 border border-[#2a2a2a] shadow-sm">
+              <h3 className="text-[14px] font-semibold text-white m-0 flex items-center gap-2">
+                 <Settings className="w-[18px] h-[18px] text-[#c0c0c0]" /> Ajustes Finales
               </h3>
               <div className="space-y-5">
                 {!isBasePlan && (
                   <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-text-secondary uppercase tracking-widest pl-1">Próximo Seguimiento (Opcional)</label>
+                    <label className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-widest pl-1">Próximo Seguimiento (Opcional)</label>
                     <div className="grid grid-cols-2 gap-3">
-                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-medium text-text-primary outline-none border border-border-subtle focus:border-border-default transition-colors w-full" />
-                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-bg-elevated rounded-[8px] px-3 py-2 text-[14px] font-medium text-text-primary outline-none border border-border-subtle focus:border-border-default transition-colors w-full" />
+                      <input type="date" value={proximaSesion} onChange={(e) => setProximaSesion(e.target.value)} className="bg-[#181818] rounded-[8px] px-3 py-2 text-[14px] font-medium text-white outline-none border border-[#2a2a2a] focus:border-[#333] transition-colors w-full" />
+                      <input type="time" value={proximaSesionHora} onChange={(e) => setProximaSesionHora(e.target.value)} className="bg-[#181818] rounded-[8px] px-3 py-2 text-[14px] font-medium text-white outline-none border border-[#2a2a2a] focus:border-[#333] transition-colors w-full" />
                     </div>
                   </div>
                 )}
                 
                 <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-text-secondary uppercase tracking-widest pl-1">Anotaciones Generales</label>
+                  <label className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-widest pl-1">Anotaciones Generales</label>
                   <textarea 
                     value={notas} 
                     onChange={(e) => setNotas(e.target.value)} 
-                    className="w-full bg-bg-elevated rounded-[8px] p-3 text-[13px] font-normal text-text-primary border border-border-subtle focus:border-border-default transition-colors outline-none resize-y min-h-[100px] placeholder:text-text-muted"
+                    className="w-full bg-[#181818] rounded-[8px] p-3 text-[13px] font-normal text-white border border-[#2a2a2a] focus:border-[#333] transition-colors outline-none resize-y min-h-[100px] placeholder:text-[#8a8a8a]"
                     placeholder="Instrucciones, notas para el paciente, recomendaciones extras..."
                   />
                 </div>
@@ -815,7 +894,7 @@ const CreateEditPlan = () => {
                   className="w-full py-3 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? (
-                    <div className="w-[18px] h-[18px] border-2 border-bg-base/20 border-t-bg-base rounded-full animate-spin" />
+                    <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />
                   ) : (
                     <>
                       <Save className="h-[18px] w-[18px]" />
@@ -832,4 +911,17 @@ const CreateEditPlan = () => {
   );
 };
 
-export default CreateEditPlan;
+export default function CreateEditPlan() {
+  const { id: pacienteId, planId } = useParams();
+  const location = useLocation();
+  const searchParams = new URLSearchParams(location.search);
+  const valoracionId = searchParams.get('valoracionId') || undefined;
+  
+  return (
+    <CreateEditPlanForm 
+      pacienteId={pacienteId} 
+      planId={planId} 
+      valoracionId={valoracionId} 
+    />
+  );
+}

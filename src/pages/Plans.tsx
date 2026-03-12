@@ -47,14 +47,14 @@ const Plans = () => {
   );
 
   if (loading) return (
-    <div className="h-[80vh] flex flex-col items-center justify-center gap-6 animate-pulse">
-      <div className="w-8 h-8 rounded-full border-2 border-border-subtle border-t-text-primary animate-spin" />
-      <p className="text-[14px] font-medium text-text-muted">Cargando plantillas...</p>
+    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
+      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
+      <p className="text-[14px] text-[#8a8a8a]">Cargando plantillas...</p>
     </div>
   );
 
   return (
-    <div className="min-h-screen text-text-primary animate-fade-in pb-12 px-6">
+    <div className="min-h-screen text-text-primary animate-fade-in pb-12">
       <div className="w-full space-y-8">
         
         {/* Header */}
