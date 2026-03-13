@@ -6,11 +6,11 @@ import { useAuthStore } from '@/store/auth';
 import { useThemeStore } from '@/store/theme';
 
 const navItems = [
-  { to: '/dashboard', icon: BarChart3, label: 'PANEL' },
+  { to: '/dashboard', icon: BarChart3, label: 'RESUMEN' },
   { to: '/pacientes', icon: Users, label: 'PACIENTES' },
-  { to: '/planes', icon: ClipboardList, label: 'PLANES' },
+  { to: '/planes', icon: ClipboardList, label: 'MENÚS' },
   { to: '/pendientes', icon: ListTodo, label: 'PENDIENTES' },
-  { to: '/equivalencias', icon: BookOpen, label: 'SMAE' },
+  { to: '/equivalencias', icon: BookOpen, label: 'EQUIVALENCIAS' },
   { to: '/configuracion', icon: Settings, label: 'AJUSTES' },
 ];
 

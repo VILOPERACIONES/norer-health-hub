@@ -60,14 +60,14 @@ const Plans = () => {
         {/* Header */}
         <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 pt-4">
           <div>
-            <h1 className="text-[26px] font-bold text-text-primary m-0">Biblioteca de Plantillas</h1>
-            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de menús y planes base</p>
+            <h1 className="text-[26px] font-bold text-text-primary m-0">Biblioteca de Menús</h1>
+            <p className="text-[14px] font-normal text-text-secondary mt-1">Gestión de menús base</p>
           </div>
           <button 
             onClick={() => navigate('/planes/nuevo')} 
             className="flex items-center gap-2 bg-white text-black rounded-[8px] px-[18px] py-[10px] text-[14px] font-bold transition-all hover:bg-white/90 uppercase"
           >
-            <Plus className="h-[18px] w-[18px]" /> Nuevo Plan
+            <Plus className="h-[18px] w-[18px]" /> Nuevo Menú
           </button>
         </header>
 
@@ -77,7 +77,7 @@ const Plans = () => {
             <div className="relative w-full md:w-[450px]">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-text-muted" />
               <input 
-                placeholder="Buscar plantilla..." 
+                placeholder="Buscar menú..." 
                 className="w-full bg-bg-elevated border border-border-subtle rounded-[8px] pl-12 pr-4 py-[10px] text-[14px] font-normal text-text-primary outline-none focus:border-[#444] transition-all placeholder:text-text-muted"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
@@ -93,7 +93,7 @@ const Plans = () => {
             <table className="w-full border-collapse">
               <thead>
                 <tr className="border-b border-border-subtle text-left bg-bg-surface">
-                  <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Plan de alimentación</th>
+                  <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Nombre del Menú</th>
                   <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Energía</th>
                   <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Enfoque estratégico</th>
                   <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Fecha de Creación</th>
@@ -104,7 +104,7 @@ const Plans = () => {
                 {filteredPlanes.length === 0 ? (
                    <tr>
                     <td colSpan={5} className="py-20 text-center">
-                      <p className="text-[14px] text-text-secondary">No se encontraron plantillas</p>
+                      <p className="text-[14px] text-text-secondary">No se encontraron menús</p>
                     </td>
                   </tr>
                 ) : (

@@ -46,6 +46,7 @@ export interface Paciente {
   ultimaValoracion?: Valoracion;
   valoraciones?: Valoracion[];
   talla?: number; 
+  peso?: number | string;
   edad?: number;
 }
 

@@ -12,13 +12,13 @@ import {
 // --- Sub-componentes Estilo Moderno & Premium ---
 
 const InfoItem = ({ label, value, icon: Icon }: { label: string, value: string | number, icon: any }) => (
-  <div className="flex items-center gap-4 py-3 border-r border-border-subtle last:border-r-0 px-6 first:pl-0 group">
-    <div className="flex-shrink-0 p-2 bg-bg-elevated border border-border-subtle rounded-[8px] group-hover:bg-[#222] transition-colors">
+  <div className="flex items-center gap-4 py-4 px-6 border-r border-border-subtle/50 last:border-r-0 group hover:bg-bg-surface/50 transition-colors">
+    <div className="flex-shrink-0 p-2.5 bg-bg-elevated border border-border-subtle rounded-[10px] group-hover:bg-[#222] transition-colors">
       <Icon className="h-4 w-4 text-text-secondary group-hover:text-text-primary transition-colors" />
     </div>
-    <div className="flex flex-col">
-      <span className="text-[11px] font-medium text-text-muted uppercase tracking-widest leading-none mb-1.5">{label}</span>
-      <span className="text-[14px] font-semibold text-text-primary uppercase tracking-tight truncate max-w-[160px]">{value}</span>
+    <div className="flex flex-col min-w-0">
+      <span className="text-[10px] font-medium text-text-muted uppercase tracking-[0.1em] leading-none mb-1.5">{label}</span>
+      <span className="text-[13px] font-semibold text-text-primary uppercase tracking-tight truncate" title={String(value)}>{value}</span>
     </div>
   </div>
 );
@@ -120,33 +120,51 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
               onClick={() => onVerDetalles(val.id)}
               className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-[#222] transition-colors"
             >
-              <ClipboardList className="h-[18px] w-[18px]" /> Ver detalles clínicos
+              <ClipboardList className="h-[18px] w-[18px]" /> Ver Consulta
             </button>
-            {!planId ? (
-              <button 
-                onClick={() => onAsignarPlan(val.id)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a0f00] text-accent-orange text-[12px] font-medium border border-accent-orange/30 rounded-[8px] hover:bg-[#2a1a00] transition-colors"
-              >
-                <Plus className="h-[18px] w-[18px]" /> Asignar plan
-              </button>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                <button 
-                  onClick={() => onVerPlan(planId)}
-                  className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-bg-elevated"
-                >
-                  <FileText className="h-[18px] w-[18px]" /> {estadoEnvio === 'enviado' ? 'Ver plan' : 'Ver y preparar envío'}
-                </button>
-                {estadoEnvio === 'pendiente' && (
-                  <button 
-                    onClick={() => onEditPlan(planId)}
-                    className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-secondary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-[#222] hover:text-text-primary"
+            {(() => {
+              const bg = getBadgeForValuation(val);
+              
+              if (!planId) {
+                if (bg.text === 'Pendiente de plan') {
+                  return (
+                    <button  
+                      onClick={() => onVerDetalles(val.id + '#barrido')}
+                      className="flex items-center gap-2 px-[18px] py-[10px] bg-rose-500 text-white text-[12px] font-bold border border-rose-600 rounded-[8px] hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/10"
+                    >
+                      <Plus className="h-[18px] w-[18px]" /> Calcular Equivalencias
+                    </button>
+                  );
+                }
+                return (
+                  <button  
+                    onClick={() => onAsignarPlan(val.id)}
+                    className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a0f00] text-accent-orange text-[12px] font-medium border border-accent-orange/30 rounded-[8px] hover:bg-[#2a1a00] transition-colors"
                   >
-                    <Edit className="h-[18px] w-[18px]" /> Editar
+                    <Plus className="h-[18px] w-[18px]" /> Asignar menú
                   </button>
-                )}
-              </div>
-            )}
+                );
+              }
+
+              return (
+                <div className="flex flex-wrap gap-2">
+                  <button 
+                    onClick={() => onVerPlan(planId)}
+                    className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-bg-elevated"
+                  >
+                    <FileText className="h-[18px] w-[18px]" /> {estadoEnvio === 'enviado' ? 'Ver plan' : 'Ver y preparar envío'}
+                  </button>
+                  {estadoEnvio === 'pendiente' && (
+                    <button 
+                      onClick={() => onEditPlan(planId)}
+                      className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-secondary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-[#222] hover:text-text-primary"
+                    >
+                      <Edit className="h-[18px] w-[18px]" /> Editar
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -161,13 +179,13 @@ const MetricItem = ({ label, value, alert }: { label: string, value: string, ale
   </div>
 );
 
-const ClinicalSection = ({ title, data, icon: Icon }: { title: string, data: Record<string, any>, icon?: any }) => (
-  <div className="space-y-6 bg-bg-elevated p-6 rounded-[12px] border border-border-subtle">
+const ClinicalSection = ({ title, data, icon: Icon, className = "" }: { title: string, data: Record<string, any>, icon?: any, className?: string }) => (
+  <div className={`bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 group hover:bg-bg-elevated/40 transition-colors ${className}`}>
     <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
       {Icon && <Icon className="h-4 w-4 text-text-secondary" />}
       <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">{title}</h4>
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
       {Object.entries(data).map(([key, value]) => (
         <div key={key} className="space-y-1 group">
           <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
@@ -289,7 +307,13 @@ const PatientProfile = () => {
             </p>
           </div>
         </div>
-        <div className="flex gap-3 w-full md:w-auto mt-2 md:mt-0">
+        <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2 md:mt-0">
+          <button
+            onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] bg-white text-black text-[14px] font-bold rounded-[8px] hover:bg-[#e0e0e0] transition-colors shadow-sm"
+          >
+            <Plus className="h-[18px] w-[18px]" strokeWidth={3} /> Nueva Consulta
+          </button>
           <button
             onClick={() => setShowFullExpediente(!showFullExpediente)}
             className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] text-[14px] font-medium transition-colors rounded-[8px] border ${showFullExpediente ? 'bg-bg-elevated border-border-subtle text-text-primary' : 'bg-transparent border-border-default text-text-primary hover:bg-bg-elevated'}`}
@@ -305,7 +329,8 @@ const PatientProfile = () => {
           </button>
           <button
             onClick={handleDelete}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[14px] py-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#3d1a1a]"
+            className="flex items-center justify-center p-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#3d1a1a]"
+            title="Borrar Expediente"
           >
             <Trash2 className="h-4 w-4" />
           </button>
@@ -314,12 +339,11 @@ const PatientProfile = () => {
 
       <div className="max-w-full py-6 space-y-10">
         {/* INFO BAR */}
-        <section className="flex flex-wrap bg-bg-surface border border-border-subtle rounded-[12px] p-2">
+        <section className="grid grid-cols-2 lg:grid-cols-5 bg-bg-surface border border-border-subtle rounded-[14px] overflow-hidden shadow-sm">
           <InfoItem label="Edad" value={`${calcAge(paciente.fechaNacimiento)} Años`} icon={Clock} />
           <InfoItem label="Sexo" value={paciente.sexo === 'F' ? 'Femenino' : 'Masculino'} icon={User} />
           <InfoItem label="Teléfono" value={paciente.telefono} icon={Phone} />
           <InfoItem label="Email" value={paciente.email || '—'} icon={Mail} />
-          <InfoItem label="Suscripción" value={paciente.nivelMembresia || 'Ninguna'} icon={Shield} />
           <InfoItem label="Registro" value={formatDate(paciente.fechaRegistro)} icon={Calendar} />
         </section>
 
@@ -338,7 +362,7 @@ const PatientProfile = () => {
               </button>
             </div>
 
-            <div className="grid lg:grid-cols-2 gap-8">
+            <div className="grid lg:grid-cols-2 gap-8 mt-6">
               <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
                 'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
                 'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
@@ -359,41 +383,32 @@ const PatientProfile = () => {
                 'Tabaco': paciente.antecedentes?.tabaco || 'N/A',
               }} />
 
-              <ClinicalSection title="Hábitos (Usualmente vs Ayer)" icon={Clock} data={{
-                'Desayuno': `${(paciente as any).habitos?.desayuno?.usualmente || (paciente as any).consumoCalorico?.usalmenteDesayuno || 'N/A'} (Ayer: ${(paciente as any).habitos?.desayuno?.ayer || (paciente as any).consumoCalorico?.ayerDesayuno || '—'})`,
-                'Colación 1': `${(paciente as any).habitos?.colacion1?.usualmente || (paciente as any).consumoCalorico?.usalmenteColacion1 || 'N/A'} (Ayer: ${(paciente as any).habitos?.colacion1?.ayer || (paciente as any).consumoCalorico?.ayerColacion1 || '—'})`,
-                'Almuerzo': `${(paciente as any).habitos?.almuerzo?.usualmente || (paciente as any).consumoCalorico?.usalmenteAlmuerzo || 'N/A'} (Ayer: ${(paciente as any).habitos?.almuerzo?.ayer || (paciente as any).consumoCalorico?.ayerAlmuerzo || '—'})`,
-                'Colación 2': `${(paciente as any).habitos?.colacion2?.usualmente || (paciente as any).consumoCalorico?.usalmenteColacion2 || 'N/A'} (Ayer: ${(paciente as any).habitos?.colacion2?.ayer || (paciente as any).consumoCalorico?.ayerColacion2 || '—'})`,
-                'Cena': `${(paciente as any).habitos?.cena?.usualmente || (paciente as any).consumoCalorico?.usalmenteCena || 'N/A'} (Ayer: ${(paciente as any).habitos?.cena?.ayer || (paciente as any).consumoCalorico?.ayerCena || '—'})`,
-              }} />
-
-              <ClinicalSection title="Suplementación y Notas" icon={Shield} data={{
-                'Historial Suplementos': paciente.antecedentes?.historialProductos || 'N/A',
-                'Propuesta Nutriólogo': paciente.antecedentes?.recomendacionSuplementos || 'N/A',
-                'Preferencias (Gusta)': paciente.antecedentes?.alimentosGustan || 'N/A',
-                'Aversiones (No gusta)': paciente.antecedentes?.alimentosNoGustan || 'N/A',
-                'Signos y Síntomas': paciente.antecedentes?.signosYSintomas || 'N/A'
-              }} />
+               <ClinicalSection 
+                title="Suplementación y Notas" 
+                icon={Shield} 
+                className="lg:col-span-2"
+                data={{
+                  'Historial Suplementos': paciente.antecedentes?.historialProductos || 'N/A',
+                  'Propuesta Nutriólogo': paciente.antecedentes?.recomendacionSuplementos || 'N/A',
+                  'Preferencias (Gusta)': paciente.antecedentes?.alimentosGustan || 'N/A',
+                  'Aversiones (No gusta)': paciente.antecedentes?.alimentosNoGustan || 'N/A',
+                  'Signos y Síntomas': paciente.antecedentes?.signosYSintomas || 'N/A'
+                }} 
+              />
             </div>
           </div>
         )}
 
-        <div className="flex justify-between items-center pt-4">
+        <div className="flex justify-between items-center pt-4 border-t border-border-subtle/50">
            <div>
-             <h2 className="text-[18px] font-semibold text-text-primary m-0 mb-1">Indicadores Críticos</h2>
+             <h2 className="text-[18px] font-semibold text-text-primary m-0 mb-1 tracking-tight">Indicadores Críticos</h2>
              <p className="text-[14px] text-text-secondary m-0">Métricas principales de progreso físico</p>
            </div>
-           <button
-             onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
-             className="flex items-center gap-2 px-[18px] py-[10px] bg-brand-primary text-bg-base text-[14px] font-medium rounded-[8px] hover:bg-[#e0e0e0] transition-colors"
-           >
-             <Plus className="h-[18px] w-[18px]" /> Nueva Valoración
-           </button>
         </div>
 
         {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || '--'} KG`} icon={Activity} />
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
           <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
           <KpiCardCompact label="Porcentaje Grasa" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Heart} />
         </section>

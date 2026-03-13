@@ -28,16 +28,24 @@ export const formatDecimal = (n: number | string | null | undefined, decimals = 
 export const getBadgeForValuation = (val: any) => {
   if (!val) return { text: 'Sin Registro', cls: 'bg-gray-500/10 text-gray-500 border-gray-500/20' };
   
+  if (val.estadoFlujo) {
+    if (val.estadoFlujo === 'Pendiente de plan') return { text: 'Pendiente de plan', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
+    if (val.estadoFlujo === 'Plan en Proceso') return { text: 'Plan en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Listo para enviar', cls: 'bg-green-500/10 text-green-500 border-green-500/20' };
+    if (val.estadoFlujo === 'Enviado') return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+  }
+  
   const plan = val.plan;
   const planId = val.planId || plan?.id;
   const estadoEnvio = val.estadoEnvio || plan?.estadoEnvio || 'pendiente';
+  const hasBarrido = val.hasBarrido;
   
-  if (!planId) {
+  if (!hasBarrido && !planId) {
     // Las mediciones y pliegues ya fueron tomadas pero aún no se han asignado las equivalencias.
     return { text: 'Pendiente de plan', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
   }
   
-  if (plan && (!plan.menus || plan.menus.length === 0) && estadoEnvio !== 'enviado') {
+  if (!planId || (plan && (!plan.menus || plan.menus.length === 0) && estadoEnvio !== 'enviado')) {
     // Las equivalencias ya fueron asignadas, pero aún no se asigna un menú.
     return { text: 'Plan en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
   }

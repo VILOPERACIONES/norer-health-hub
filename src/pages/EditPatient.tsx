@@ -111,6 +111,7 @@ const EditPatient = () => {
     alcohol: 'No', tabaco: 'No', agua: '',
     signosSintomas: '',
     talla: '',
+    peso: '',
   });
 
   useEffect(() => {
@@ -143,6 +144,14 @@ const EditPatient = () => {
               if (!raw) return '';
               return String(raw < 10 ? Math.round(raw * 100) : raw);
             })(),
+            peso: (() => {
+              // Prioridad 1: pesoActual de la última valoración
+              const pesoValoracion = p.ultimaValoracion?.pesoActual;
+              if (pesoValoracion != null && pesoValoracion !== '') return pesoValoracion.toString();
+              // Prioridad 2: peso guardado en el expediente del paciente
+              if (p.peso != null && p.peso !== '') return p.peso.toString();
+              return '';
+            })(),
             
             objetivo: ej.objetivo || '',
             gymOrigen: ej.gymOrigen || '',
@@ -158,8 +167,8 @@ const EditPatient = () => {
 
             historialProductos: ant.historialProductos || '',
             recomSuplementos: ant.recomendacionSuplementos || ant.recomSuplementos || '',
-            alimentosNoGusta: ant.alimentosNoGusta || '',
-            alimentosGusta: ant.alimentosGusta || '',
+            alimentosNoGusta: ant.alimentosNoGustan || ant.alimentosNoGusta || '',
+            alimentosGusta: ant.alimentosGustan || ant.alimentosGusta || '',
             alergico: ant.alergias || ant.alergico || '',
             patologia: ant.patologia || '',
             cirugias: ant.cirugias || '',
@@ -207,6 +216,7 @@ const EditPatient = () => {
       sexo: form.sexo,
       edad,
       estatura: form.talla,
+      peso: parseFloat(form.peso) || null,
       
       ejercicio: {
         objetivo: form.objetivo,
@@ -288,6 +298,7 @@ const EditPatient = () => {
           </div>
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
           <Input label="Estatura (cm)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="175" />
+          <Input label="Peso Actual (kg)" value={form.peso} onChange={(v: string) => update('peso', v)} placeholder="70.5" type="number" />
           <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
         </FormSection>
 

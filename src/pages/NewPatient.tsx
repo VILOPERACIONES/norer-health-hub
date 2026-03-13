@@ -116,6 +116,7 @@ const NewPatient = () => {
     alcohol: 'No', tabaco: 'No', agua: '',
     signosSintomas: '',
     talla: '',
+    peso: '',
   });
 
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
@@ -150,6 +151,7 @@ const NewPatient = () => {
         if (!raw) return '';
         return String(raw < 10 ? Math.round(raw * 100) : raw);
       })(),
+      peso: parseFloat(form.peso) || null,
       fechaActual: new Date().toISOString(),
       
       ejercicio: {
@@ -227,6 +229,7 @@ const NewPatient = () => {
           </div>
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
           <Input label="Estatura (cm)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="175" />
+          <Input label="Peso Inicial (kg)" value={form.peso} onChange={(v: string) => update('peso', v)} placeholder="70.5" type="number" />
           <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
         </FormSection>
 
