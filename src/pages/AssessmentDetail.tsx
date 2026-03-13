@@ -11,10 +11,12 @@ const PlanSection = ({
   pacienteId,
   valoracionId,
   planLigado,
+  hasEquivalencias,
 }: {
   pacienteId: string;
   valoracionId: string;
   planLigado?: { id: string; nombre?: string; tipoPlan?: string };
+  hasEquivalencias: boolean;
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -72,6 +74,21 @@ const PlanSection = ({
             >
               Cambiar plan
             </button>
+          </div>
+        </div>
+      ) : !hasEquivalencias ? (
+        // ── BLOQUEADO: se requieren equivalencias primero ──────────────────────────────
+        <div className="flex items-start gap-4 p-5 bg-amber-500/5 border border-amber-500/20 rounded-[10px]">
+          <div className="shrink-0 mt-0.5 p-2 rounded-[8px] bg-amber-500/10 text-amber-400">
+            <AlertCircle className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-[14px] font-semibold text-amber-400 m-0 mb-1">
+              Se requieren equivalencias para agregar el plan
+            </p>
+            <p className="text-[13px] font-normal text-text-secondary m-0 leading-relaxed">
+              Completa primero el <span className="font-semibold text-text-primary">Barrido de Equivalencias</span> de esta consulta y guárdalo. Una vez asignadas las equivalencias, podrás crear o asignar un plan alimenticio.
+            </p>
           </div>
         </div>
       ) : (
@@ -246,8 +263,21 @@ const AssessmentDetail = () => {
               </span>
               <span className="text-text-muted text-[13px] font-normal">Consulta #{val.numeroValoracion || '—'}</span>
             </div>
-            <h1 className="text-[26px] font-bold text-text-primary tracking-tight m-0">Detalles de Consulta</h1>
-            <p className="text-text-secondary font-normal text-[14px] m-0">
+            {val.paciente ? (
+              <h1 className="text-[28px] font-bold text-text-primary tracking-tight m-0">
+                {val.paciente.nombre} {val.paciente.apellido}
+              </h1>
+            ) : (
+              <h1 className="text-[28px] font-bold text-text-primary tracking-tight m-0">Detalles de Consulta</h1>
+            )}
+            
+            {val.paciente && (
+              <p className="text-[18px] font-semibold text-text-primary mt-1 tracking-tight">
+                Detalles de Consulta
+              </p>
+            )}
+
+            <p className="text-text-secondary font-normal text-[14px] m-0 mt-2">
               {formatDate(val.fecha)} {val.hora ? `· ${val.hora}` : ''} · ID: {val.id?.slice(-12).toUpperCase()}
             </p>
           </div>
@@ -392,6 +422,7 @@ const AssessmentDetail = () => {
           pacienteId={pacienteId!}
           valoracionId={valoracionId!}
           planLigado={val.plan || (val.planId ? { id: val.planId } : undefined)}
+          hasEquivalencias={!!barridoData && ((barridoData.kcalTotal || 0) > 0 || Object.values(barridoData.porciones || {}).some((v: any) => Number(v) > 0))}
         />
       </div>
     </div>

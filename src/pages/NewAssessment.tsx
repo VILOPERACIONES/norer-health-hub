@@ -6,6 +6,7 @@ import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
+import { Phase4Delivery } from './Phase4Delivery';
 
 const Field = ({
   label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '',
@@ -49,9 +50,12 @@ const NewAssessment = () => {
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
+  const [isGrasaModified, setIsGrasaModified] = useState(false);
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<any>(null);
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
 
   const totalSteps = 4;
   const STEPS = [
@@ -61,34 +65,78 @@ const NewAssessment = () => {
     { id: 4, label: 'Opciones de Envío' }
   ];
 
-  // Load drafts
+  // Detect drafts but don't apply automatically
   useEffect(() => {
     const draftStr = localStorage.getItem(`draft_assessment_${pacienteId}`);
     if (draftStr) {
       try {
         const draft = JSON.parse(draftStr);
-        if (draft.step) setStep(Math.min(draft.step, 2)); // Dont restore draft into steps 3/4
-        if (draft.peso) setPeso(draft.peso);
-        if (draft.estatura) setEstatura(draft.estatura);
-        if (draft.pctGrasa) setPctGrasa(draft.pctGrasa);
-        if (draft.comentarios) setComentarios(draft.comentarios);
-        if (draft.temario) setTemario(draft.temario);
-        if (draft.barridoData) setBarridoData(draft.barridoData);
-        if (draft.fecha) setFecha(draft.fecha);
-        if (draft.hora) setHora(draft.hora);
-        toast({ title: 'Borrador recuperado', description: 'Se ha restaurado tu progreso previo.' });
+        setPendingDraft(draft);
+        setShowDraftPrompt(true);
       } catch (e) {
         console.error('Error parsing draft:', e);
       }
     }
-  }, [pacienteId, toast]);
+  }, [pacienteId]);
+
+  const applyDraft = () => {
+    if (!pendingDraft) return;
+    const d = pendingDraft;
+    if (d.step) setStep(Math.min(d.step, 2));
+    if (d.peso) setPeso(d.peso);
+    if (d.estatura) setEstatura(d.estatura);
+    if (d.pctGrasa) setPctGrasa(d.pctGrasa);
+    if (d.comentarios) setComentarios(d.comentarios);
+    if (d.temario) setTemario(d.temario);
+    if (d.barridoData) setBarridoData(d.barridoData);
+    if (d.fecha) setFecha(d.fecha);
+    if (d.hora) setHora(d.hora);
+    setIsGrasaModified(true);
+    setShowDraftPrompt(false);
+    toast({ title: 'Progreso restaurado', description: 'Has vuelto a donde te quedaste.' });
+  };
+
+  const discardDraft = () => {
+    localStorage.removeItem(`draft_assessment_${pacienteId}`);
+    setPendingDraft(null);
+    setShowDraftPrompt(false);
+    // After discarding, we refill with patient base data
+    reFillWithBaseData();
+    toast({ title: 'Borrador descartado', description: 'Iniciando con datos del expediente.' });
+  };
+
+  const reFillWithBaseData = () => {
+    if (!paciente) return;
+    const p = paciente;
+    const vals = p?.valoraciones || [];
+    let lastVal = null;
+    if (vals.length > 0) {
+       lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+    }
+
+    // Peso
+    let pVal = lastVal?.pesoActual || lastVal?.peso || p?.peso || '';
+    if (pVal) setPeso(String(pVal));
+
+    // Estatura
+    let eVal = lastVal?.estatura || lastVal?.talla || p?.estatura || p?.talla || '';
+    if (eVal) {
+      const eNum = parseFloat(String(eVal));
+      setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
+    }
+
+    // Grasa
+    let gVal = lastVal?.pctGrasa2comp || lastVal?.pctGrasa || '';
+    if (gVal) setPctGrasa(String(gVal));
+  };
 
   // Save drafts
   useEffect(() => {
     if (step > 2) return; // Only save draft for steps 1 and 2
+    if (!isGrasaModified) return; // Only start saving draft once fat % is touched
     const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, pacienteId]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, pacienteId, isGrasaModified]);
 
   useEffect(() => {
     const fetchPatient = async () => {
@@ -97,20 +145,28 @@ const NewAssessment = () => {
         const p = data?.data || data;
         setPaciente(p);
         
-        // Solo pre-llenar si no hay borrador para sobreescribirlo
+        // Solo pre-llenar si no hay borrador activo o pendiente de decisión
         if (!localStorage.getItem(`draft_assessment_${pacienteId}`)) {
           const vals = p?.valoraciones || [];
-          let tValue = 0;
+          let lastVal = null;
           if (vals.length > 0) {
-             const lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
-             if (lastVal.estatura && parseFloat(lastVal.estatura) > 0) tValue = parseFloat(lastVal.estatura);
+             lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
           }
-          if (!tValue) {
-             tValue = parseFloat(p?.estatura || p?.talla || '0');
+
+          // Peso
+          let pVal = lastVal?.pesoActual || lastVal?.peso || p?.peso || '';
+          if (pVal) setPeso(String(pVal));
+
+          // Estatura
+          let eVal = lastVal?.estatura || lastVal?.talla || p?.estatura || p?.talla || '';
+          if (eVal) {
+            const eNum = parseFloat(String(eVal));
+            setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
           }
-          if (tValue > 0) {
-            setEstatura(String(tValue < 10 ? Math.round(tValue * 100) : tValue));
-          }
+
+          // Grasa
+          let gVal = lastVal?.pctGrasa2comp || lastVal?.pctGrasa || '';
+          if (gVal) setPctGrasa(String(gVal));
         }
         
         const vals = p?.valoraciones || [];
@@ -193,8 +249,35 @@ const NewAssessment = () => {
   };
 
   return (
-    <div className="animate-fade-in w-full h-[calc(100vh-60px)] font-sans flex flex-col pb-2" style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="animate-fade-in w-full h-[calc(100vh-60px)] font-sans flex flex-col pb-2 relative" style={{ backgroundColor: '#0a0a0a' }}>
       
+      {/* DRAFT PROMPT MODAL */}
+      {showDraftPrompt && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in p-4">
+          <div className="norder-glass rounded-[24px] p-8 max-w-md w-full shadow-2xl animate-scale-in text-center relative overflow-hidden">
+            <div className="w-16 h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6 border border-white/10">
+              <Plus className="h-8 w-8 text-white rotate-45" />
+            </div>
+            <h3 className="text-[20px] font-bold text-white mb-2 leading-tight">¿Continuar con la sesión anterior?</h3>
+            <p className="text-[14px] text-[#8a8a8a] mb-8">Detectamos un borrador sin finalizar para este paciente. ¿Deseas recuperar los datos o iniciar una consulta nueva?</p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={applyDraft}
+                className="w-full py-4 bg-white text-black rounded-[12px] text-[14px] font-bold hover:bg-[#e0e0e0] transition-colors"
+              >
+                Restaurar Sesión
+              </button>
+              <button 
+                onClick={discardDraft}
+                className="w-full py-4 bg-[#1a1a1a] text-[#8a8a8a] border border-white/10 rounded-[12px] text-[14px] font-bold hover:bg-[#222] hover:text-white transition-colors"
+              >
+                Descartar y Empezar de Cero
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-none w-full mx-auto flex flex-col flex-1 overflow-hidden min-h-0">
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 pb-2 text-[#f0f0f0]">
@@ -210,13 +293,16 @@ const NewAssessment = () => {
                   <div className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] mt-0.5">
                     <span>{paciente.fechaNacimiento ? `${Math.floor((Date.now() - new Date(paciente.fechaNacimiento.includes('T') ? paciente.fechaNacimiento.split('T')[0] : paciente.fechaNacimiento).getTime()) / 31557600000)} años` : '—'}</span>
                     <span>·</span>
-                    <span>Última visita {(() => {
-                      const vals = paciente.valoraciones || [];
-                      if (vals.length === 0) return 'Ninguna';
-                      const lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
-                      const d = new Date(lastVal.fecha);
-                      return `${d.getDate()} ${d.toLocaleString('es-ES', { month: 'short' })} ${d.getFullYear()}`;
-                   })()}</span>
+                     <span>Última visita {(() => {
+                       const vals = paciente.valoraciones || [];
+                       if (vals.length === 0) return 'Ninguna';
+                       const lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+                       // Parche timezone: anclar a T12:00:00 para evitar restar días en UTC-6
+                       const rawFecha = lastVal.fecha || '';
+                       const cleanFecha = rawFecha.includes('T') ? rawFecha.split('T')[0] + 'T12:00:00' : rawFecha;
+                       const d = new Date(cleanFecha);
+                       return `${d.getDate()} ${d.toLocaleString('es-ES', { month: 'short' })} ${d.getFullYear()}`;
+                    })()}</span>
                    <span>·</span>
                    <span className="uppercase">ID {pacienteId?.slice(-6)}</span>
                   </div>
@@ -269,7 +355,7 @@ const NewAssessment = () => {
                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
                      
-                     <Field label="% Grasa Corp." value={pctGrasa} onChange={setPctGrasa} placeholder="Ej. 24.3" />
+                     <Field label="% Grasa Corp." value={pctGrasa} onChange={(v) => { setPctGrasa(v); setIsGrasaModified(true); }} placeholder="Ej. 24.3" />
                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
                    </div>
                  </div>
@@ -371,10 +457,10 @@ const NewAssessment = () => {
 
           {/* FASE 4: OPCIONES DE ENVIO (PDF / WHATSAPP) */}
           {step === 4 && (
-            <div className="space-y-4 animate-slide-up mt-4">
-               <PlanEnvioForm 
-                 pacienteId={pacienteId} 
-                 planId={planIdGuardado || undefined}
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar animate-slide-up mt-4">
+               <Phase4Delivery 
+                 pacienteId={pacienteId!} 
+                 planId={planIdGuardado!}
                  onFinish={() => navigate(`/pacientes/${pacienteId}`)}
                />
             </div>

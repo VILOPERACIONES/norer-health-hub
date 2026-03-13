@@ -49,6 +49,7 @@ export const CreateEditPlanForm = ({
   
   const [saving, setSaving] = useState(false);
   const [pesoUltimo, setPesoUltimo] = useState(0);
+  const [pacienteNombre, setPacienteNombre] = useState<string | null>(null);
 
   const [nombrePlan, setNombrePlan] = useState('');
   const [tipo, setTipo] = useState('Balanceada');
@@ -80,6 +81,19 @@ export const CreateEditPlanForm = ({
       }))
     })) || [emptyMenu('Menú 1'), emptyMenu('Menú 2')];
   };
+
+  useEffect(() => {
+    if (pacienteId) {
+      api.get(`/api/pacientes/${pacienteId}`)
+         .then(res => {
+           const p = res.data?.data || res.data;
+           if (p) {
+             setPacienteNombre(`${p.nombre} ${p.apellido || ''}`.trim());
+           }
+         })
+         .catch(e => console.error("Error loading patient name", e));
+    }
+  }, [pacienteId]);
 
   useEffect(() => {
     // Si estamos editando un plan existente
@@ -414,10 +428,10 @@ export const CreateEditPlanForm = ({
           )}
           <div className="animate-slide-up space-y-1">
             <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">
-              {isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Base') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional')}
+              {pacienteNombre ? pacienteNombre : isBasePlan ? (isEdit ? 'Editar Plantilla' : 'Nueva Plantilla Base') : (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional')}
             </h1>
-            <p className="text-[#c0c0c0] font-normal text-[14px] m-0">
-              {isBasePlan ? 'Definición de plan base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
+            <p className="text-[#c0c0c0] font-normal text-[14px] m-0 uppercase tracking-widest">
+              {pacienteNombre ? (isEdit ? 'Personalizar Plan' : 'Configurar Plan Nutricional') : isBasePlan ? 'Definición de plan base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
             </p>
           </div>
         </div>

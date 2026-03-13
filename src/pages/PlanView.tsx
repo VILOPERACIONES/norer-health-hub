@@ -16,14 +16,18 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
   const planId = propPlanId;
   const [plan, setPlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
+  const [pacienteNombre, setPacienteNombre] = useState('');
 
   useEffect(() => {
     const fetch = async () => {
       try {
-        const { data } = await api.get(`/api/pacientes/${pacienteId}/planes/${planId}`);
-        let serverData = data?.data || data;
+        // Cargar plan y paciente en paralelo
+        const [planRes, pacRes] = await Promise.all([
+          api.get(`/api/pacientes/${pacienteId}/planes/${planId}`),
+          api.get(`/api/pacientes/${pacienteId}`).catch(() => null),
+        ]);
+        let serverData = planRes.data?.data || planRes.data;
         if (serverData) {
-          // Normalización para visualización
           serverData.menus = serverData.menus?.map((m: any) => ({
             ...m,
             tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => ({
@@ -37,6 +41,10 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
             }))
           })) || [];
           setPlan(serverData);
+        }
+        if (pacRes) {
+          const p = pacRes.data?.data || pacRes.data;
+          if (p) setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim());
         }
       } catch (err) {
         console.error('Error cargando plan:', err);
@@ -147,9 +155,16 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
         )}
         
         <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-6 animate-slide-up">
-           <div className="space-y-1">
-              <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">Plan {plan.tipoPlan || plan.tipo}</h1>
-              <p className="text-[#c0c0c0] font-normal text-[14px] m-0">Configuración integral de macronutrientes y suplementación</p>
+           <div className="space-y-0.5">
+              {/* Nombre del Paciente como título principal */}
+              {pacienteNombre && (
+                <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">
+                  {pacienteNombre}
+                </h1>
+              )}
+              <p className="text-[#8a8a8a] font-medium text-[13px] m-0 uppercase tracking-widest">
+                Plan alimenticio &mdash; {plan.tipoPlan || plan.tipo}
+              </p>
            </div>
            
            <div className="flex flex-wrap gap-3">

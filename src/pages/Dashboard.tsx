@@ -9,6 +9,7 @@ import {
 import api from '@/lib/api';
 import type { DashboardMetricas, Alerta } from '@/types';
 import { useAuthStore } from '@/store/auth';
+import { getBadgeForValuation } from '@/lib/format';
 
 const Dashboard = () => {
   const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
@@ -19,8 +20,9 @@ const Dashboard = () => {
     id: string;
     nombre: string;
     valoraciones: number;
-    nivelMembresia?: string | null;
   }[]>([]);
+  // Datos para la tabla "Últimos Pacientes" — misma lógica que Pending.tsx
+  const [ultimosPendientes, setUltimosPendientes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -30,33 +32,61 @@ const Dashboard = () => {
       setLoading(true);
       try {
         // Intentar endpoint dedicado de top-clientes primero
-        const [metRes, alertRes] = await Promise.all([
+        const [metRes, alertRes, pacRes] = await Promise.all([
           api.get('/api/dashboard/metricas'),
           api.get('/api/dashboard/alertas'),
+          api.get('/api/pacientes'),
         ]);
 
         setMetricas(metRes.data?.data || metRes.data);
         setAlertas(alertRes.data?.data || alertRes.data || []);
 
-        // Top clientes: preferir endpoint dedicado, fallback a /api/pacientes
+        // ── Construir "Últimos Pacientes" con la misma lógica de Pending.tsx ──
+        const pacientesData: any[] = pacRes.data?.data || pacRes.data || [];
+        const pendItems: any[] = [];
+        pacientesData.forEach((pac: any) => {
+          const valArr: any[] = pac.valoraciones || [];
+          valArr.forEach((val: any) => {
+            // Inyectar plan si no viene dentro de la valoración
+            if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
+              const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
+              if (planAsociado) {
+                val.plan = planAsociado;
+                val.planId = planAsociado.id;
+                val.estadoEnvio = planAsociado.estadoEnvio;
+              }
+            }
+            const statusInfo = getBadgeForValuation(val);
+            if (statusInfo.text !== 'Enviado') {
+              pendItems.push({
+                pacienteId: pac.id,
+                nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
+                fecha: val.fecha,
+                numeroValoracion: val.numeroValoracion,
+                val,
+                statusInfo,
+              });
+            }
+          });
+        });
+        // Ordenar por fecha más reciente primero
+        pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+        setUltimosPendientes(pendItems);
+
+        // Top clientes: preferir endpoint dedicado, fallback desde pacientesData
         try {
           const topRes = await api.get('/api/dashboard/top-clientes');
           const topData = topRes.data?.data || topRes.data || [];
-          // El endpoint debe devolver [{ nombre, valoraciones }] ya ordenado
           setTopClientes(topData.slice(0, 10));
         } catch {
-          // Fallback: calcular desde la lista de pacientes
-          const pacRes = await api.get('/api/pacientes');
-          const pacientesData = pacRes.data?.data || pacRes.data || [];
           const top = pacientesData
             .map((p: any) => ({
               id: p.id,
               nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
-              // Soportar múltiples formatos que el backend puede devolver
               valoraciones:
-                p._count?.valoraciones ??          // Prisma includeCount
-                p.totalValoraciones ??              // campo calculado
-                p.numeroValoraciones ??             // alias posible
+                p._count?.valoraciones ??
+                p.totalValoraciones ??
+                p.numeroValoraciones ??
                 (Array.isArray(p.valoraciones) ? p.valoraciones.length : 0),
             }))
             .filter((p: any) => p.valoraciones > 0)
@@ -75,10 +105,11 @@ const Dashboard = () => {
 
   const userName = user?.nombre?.split(' ')[0] || 'Especialista';
 
-  // Conteos derivados de alertas
-  const planesSinAsignar = alertas.filter((a: any) => a.tipoRiesgo === 'Sin Plan Asignado').length;
-  const planesSinEnviar  = alertas.filter((a: any) => a.tipoRiesgo === 'Plan Sin Enviar').length;
-  const planesPendientes = planesSinAsignar + planesSinEnviar;
+  // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
+  const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de plan').length;
+  const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Plan en Proceso').length;
+  const planesSinEnviar  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Listo para enviar').length;
+  const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
   const r = metricas?.resumen as any;
@@ -130,14 +161,14 @@ const Dashboard = () => {
       subColor: 'text-[#8a8a8a]',
     },
     {
-      label: 'Planes pendientes',
+      label: 'Menús pendientes',
       value: planesPendientes,
       icon: MessageSquare,
       badge: {
         text: `${pctPendientes}%`,
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
       },
-      sub: `${planesSinAsignar} sin asignar · ${planesSinEnviar} sin enviar`,
+      sub: `${planesSinAsignar} sin equiv. · ${planesEnProceso} sin menú · ${planesSinEnviar} por enviar`,
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
     },
     {
@@ -172,7 +203,7 @@ const Dashboard = () => {
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
         <div>
           <h1 className="text-[28px] font-bold text-[#f0f0f0] m-0 tracking-tight">
-            Bienvenido de vuelta, {userName}! 👋
+            Bienvenido de vuelta, {userName}! 
           </h1>
           <p className="text-[14px] font-normal text-[#8a8a8a] mt-1">
             Work Hard. Play Hard.
@@ -254,11 +285,6 @@ const Dashboard = () => {
                     idx === 2 ? 'text-[#92400e]' :
                     'text-[#444]';
 
-                  const membresiaBadge = cliente.nivelMembresia === 'premium'
-                    ? { text: 'PRO', cls: 'bg-[#1a1f2e] text-[#90c2ff] border-[#3b5bdb]/30' }
-                    : cliente.nivelMembresia === 'basica'
-                    ? { text: 'BASE', cls: 'bg-[#1a2e1a] text-[#6ee7b7] border-[#064e3b]/30' }
-                    : null;
 
                   return (
                     <li
@@ -276,11 +302,6 @@ const Dashboard = () => {
                         <p className="text-[13px] font-medium text-[#f0f0f0] m-0 truncate group-hover:text-white transition-colors">
                           {cliente.nombre}
                         </p>
-                        {membresiaBadge && (
-                          <span className={`text-[9px] font-bold border rounded-[3px] px-1 py-0.5 ${membresiaBadge.cls}`}>
-                            {membresiaBadge.text}
-                          </span>
-                        )}
                       </div>
 
                       {/* Conteo */}
@@ -299,7 +320,7 @@ const Dashboard = () => {
         <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col h-full overflow-hidden">
           <div className="px-5 py-4 border-b border-[#2a2a2a]">
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
-              Ultimos Pacientes
+              Últimos Pacientes
             </h2>
           </div>
 
@@ -311,48 +332,39 @@ const Dashboard = () => {
                     <Square className="w-4 h-4 text-[#444] inline-block" />
                   </th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Nombre de Paciente</th>
-                  <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Status</th>
+                  <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Estatus</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Fecha de Consulta</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
-                {alertas.length === 0 ? (
+                {ultimosPendientes.length === 0 ? (
                   <tr>
                     <td colSpan={4} className="py-12 text-center">
-                      <p className="text-[13px] text-[#8a8a8a]">Sin pacientes recientes o alertas.</p>
+                      <p className="text-[13px] text-[#8a8a8a]">Sin pacientes pendientes. Todo al día ✨</p>
                     </td>
                   </tr>
                 ) : (
-                  alertas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((a, i) => {
-                    let statusColor = "text-emerald-500 bg-emerald-500/10 border-emerald-500/20";
-                    let statusText = "Enviado";
-
-                    if (a.tipoRiesgo === 'Sin Plan Asignado') {
-                      statusColor = "text-rose-500 bg-rose-500/10 border-rose-500/20"; 
-                      statusText = "Pendiente de plan";
-                    } else if (a.tipoRiesgo === 'Plan Sin Enviar') {
-                      statusColor = "text-amber-500 bg-amber-500/10 border-amber-500/20";
-                      statusText = "Plan en Proceso"; // or "Listo para enviar" depending on where it stuck, let's put Plan en Proceso/Pendiente
-                    }
-
-                    const dateStr = a.fechaPlan ? new Date(a.fechaPlan).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
-                    
+                  ultimosPendientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, i) => {
+                    const dateStr = item.fecha
+                      ? new Date(item.fecha.includes('T') ? item.fecha.split('T')[0] + 'T12:00:00' : item.fecha)
+                          .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : '—';
                     return (
-                      <tr 
-                        key={a.pacienteId || i} 
+                      <tr
+                        key={`${item.pacienteId}-${item.val.id || i}`}
                         className="hover:bg-[#1a1a1a] transition-colors cursor-pointer group whitespace-nowrap"
-                        onClick={() => navigate(`/pacientes/${a.pacienteId}#historial`)}
+                        onClick={() => navigate(`/pacientes/${item.pacienteId}`)}
                       >
                         <td className="pl-5 pr-3 py-[14px] text-center w-12">
                           <Square className="w-4 h-4 text-[#444] inline-block opacity-50 group-hover:opacity-100 transition-opacity" />
                         </td>
                         <td className="px-3 py-[14px]">
-                          <span className="text-[13px] font-medium text-[#f0f0f0]">{a.nombre}</span>
+                          <span className="text-[13px] font-medium text-[#f0f0f0]">{item.nombre}</span>
                         </td>
                         <td className="px-3 py-[14px]">
-                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border uppercase tracking-wider ${statusColor}`}>
-                               {statusText}
-                             </span>
+                          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[12px] font-medium border uppercase tracking-wider ${item.statusInfo.cls}`}>
+                            {item.statusInfo.text}
+                          </span>
                         </td>
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
                           {dateStr}
@@ -367,7 +379,7 @@ const Dashboard = () => {
 
           <div className="px-5 py-3 border-t border-[#2a2a2a] flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111111]">
              <div className="text-[12px] font-medium text-[#8a8a8a]">
-                Mostrando {alertas.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, alertas.length)} Resultados de {alertas.length}
+                Mostrando {ultimosPendientes.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, ultimosPendientes.length)} Resultados de {ultimosPendientes.length}
              </div>
              
              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
@@ -403,19 +415,19 @@ const Dashboard = () => {
                       <ChevronLeft className="w-4 h-4" />
                    </button>
                    <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
-                      {currentPage} / {Math.max(1, Math.ceil(alertas.length / itemsPerPage))}
+                      {currentPage} / {Math.max(1, Math.ceil(ultimosPendientes.length / itemsPerPage))}
                    </span>
                    <button 
-                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(alertas.length / itemsPerPage), min + 1))}
+                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(ultimosPendientes.length / itemsPerPage), min + 1))}
                       className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                      disabled={currentPage >= Math.ceil(ultimosPendientes.length / itemsPerPage)}
                    >
                       <ChevronRight className="w-4 h-4" />
                    </button>
                    <button 
-                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(alertas.length / itemsPerPage)))}
+                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(ultimosPendientes.length / itemsPerPage)))}
                       className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(alertas.length / itemsPerPage)}
+                      disabled={currentPage >= Math.ceil(ultimosPendientes.length / itemsPerPage)}
                    >
                       <ChevronsRight className="w-4 h-4" />
                    </button>
