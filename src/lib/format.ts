@@ -30,9 +30,9 @@ export const getBadgeForValuation = (val: any) => {
   
   if (val.estadoFlujo) {
     if (val.estadoFlujo === 'Pendiente de plan') return { text: 'Pendiente de plan', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
-    if (val.estadoFlujo === 'Plan en Proceso') return { text: 'Plan en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
-    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Listo para enviar', cls: 'bg-green-500/10 text-green-500 border-green-500/20' };
-    if (val.estadoFlujo === 'Enviado') return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+    if (val.estadoFlujo === 'Plan en Proceso')   return { text: 'Plan en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Plan en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' }; // fusionado
+    if (val.estadoFlujo === 'Enviado')           return { text: 'Enviado',           cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
   }
   
   const plan = val.plan;
@@ -41,19 +41,20 @@ export const getBadgeForValuation = (val: any) => {
   const hasBarrido = val.hasBarrido;
   
   if (!hasBarrido && !planId) {
-    // Las mediciones y pliegues ya fueron tomadas pero aún no se han asignado las equivalencias.
     return { text: 'Pendiente de plan', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
   }
   
   if (!planId || (plan && (!plan.menus || plan.menus.length === 0) && estadoEnvio !== 'enviado')) {
-    // Las equivalencias ya fueron asignadas, pero aún no se asigna un menú.
     return { text: 'Plan en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
   }
   
   if (estadoEnvio === 'pendiente') {
-    // El PDF ya fue configurado, pero aún no se le da click a enviar al paciente.
-    return { text: 'Listo para enviar', cls: 'bg-green-500/10 text-green-500 border-green-500/20' };
+    // Plan completo pero aún no enviado → sigue siendo "en proceso"
+    return { text: 'Plan en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
   }
   
+  // Verde únicamente cuando el plan ya fue enviado al paciente.
   return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
 };
+
+

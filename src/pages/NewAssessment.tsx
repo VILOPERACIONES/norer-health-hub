@@ -51,6 +51,7 @@ const NewAssessment = () => {
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
+  const [proximaSesion, setProximaSesion] = useState('');
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
@@ -91,6 +92,7 @@ const NewAssessment = () => {
     if (d.barridoData) setBarridoData(d.barridoData);
     if (d.fecha) setFecha(d.fecha);
     if (d.hora) setHora(d.hora);
+    if (d.proximaSesion) setProximaSesion(d.proximaSesion);
     setIsGrasaModified(true);
     setShowDraftPrompt(false);
     toast({ title: 'Progreso restaurado', description: 'Has vuelto a donde te quedaste.' });
@@ -134,7 +136,7 @@ const NewAssessment = () => {
   useEffect(() => {
     if (step > 2) return; // Only save draft for steps 1 and 2
     if (!isGrasaModified) return; // Only start saving draft once fat % is touched
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora };
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
   }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, pacienteId, isGrasaModified]);
 
@@ -203,7 +205,7 @@ const NewAssessment = () => {
 
   const clearDraft = () => localStorage.removeItem(`draft_assessment_${pacienteId}`);
 
-  const handleSave = async (redirectAPlan = false) => {
+  const handleSave = async (redirectAPlan: boolean | 'equivalencias' = false) => {
     if (!peso) { toast({ title: 'Campo requerido', description: 'El peso actual es obligatorio.', variant: 'destructive' }); return; }
     if (!estatura) { toast({ title: 'Campo requerido', description: 'La estatura es obligatoria.', variant: 'destructive' }); return; }
 
@@ -216,6 +218,8 @@ const NewAssessment = () => {
       imc: parseFloat(imc.toFixed(2)),
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
+      // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
+      // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
 
     if (pctGrasa) {
@@ -237,7 +241,7 @@ const NewAssessment = () => {
 
       if (redirectAPlan && valoracionId) {
         setValoracionIdGuardada(valoracionId);
-        setStep(3);
+        setStep(redirectAPlan === 'equivalencias' ? 2 : 3);
       } else {
         navigate(`/pacientes/${pacienteId}`);
       }
@@ -357,6 +361,22 @@ const NewAssessment = () => {
                      
                      <Field label="% Grasa Corp." value={pctGrasa} onChange={(v) => { setPctGrasa(v); setIsGrasaModified(true); }} placeholder="Ej. 24.3" />
                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+
+                     {/* Próxima consulta — full width */}
+                     <div className="sm:col-span-2">
+                       <Field
+                         label="Próxima Consulta"
+                         value={proximaSesion}
+                         onChange={setProximaSesion}
+                         type="datetime-local"
+                       />
+                       {proximaSesion && (
+                         <p className="mt-1 text-[10px] text-[#5a5a5a]">
+                           {'Registrada para: '}
+                           {new Date(proximaSesion).toLocaleString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                         </p>
+                       )}
+                     </div>
                    </div>
                  </div>
 
@@ -445,7 +465,8 @@ const NewAssessment = () => {
             <div className="space-y-4 animate-slide-up mt-4">
               <CreateEditPlanForm 
                 pacienteId={pacienteId} 
-                valoracionId={valoracionIdGuardada || undefined} 
+                valoracionId={valoracionIdGuardada || undefined}
+                initialProximaSesion={proximaSesion || undefined}
                 onSaved={(planId) => {
                    setPlanIdGuardado(planId);
                    setStep(4);
@@ -493,12 +514,21 @@ const NewAssessment = () => {
               </div>
 
               {step < 2 ? (
-                <button 
-                   onClick={() => setStep(step + 1)}
-                   className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors flex items-center justify-center shadow-sm w-full sm:w-auto uppercase tracking-wide"
-                >
-                   Continuar a Equivalencias →
-                </button>
+                <div className="flex flex-col-reverse sm:flex-row items-center gap-3 w-full sm:w-auto">
+                  <button
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-transparent border border-[#333] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 w-full sm:w-auto text-center uppercase tracking-wide"
+                  >
+                    {saving ? 'Guardando...' : 'Guardar'}
+                  </button>
+                  <button
+                    onClick={() => setStep(step + 1)}
+                    className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors flex items-center justify-center shadow-sm w-full sm:w-auto uppercase tracking-wide"
+                  >
+                    Continuar a Equivalencias →
+                  </button>
+                </div>
               ) : (
                 <div className="flex flex-col-reverse sm:flex-row items-center gap-3 w-full sm:w-auto">
                   <button

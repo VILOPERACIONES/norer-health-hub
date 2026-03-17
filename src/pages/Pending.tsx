@@ -155,11 +155,23 @@ const Pending = () => {
                   const { paciente: p, valoracion: val } = item;
                   const statusInfo = getBadgeForValuation(val);
                   
+                  // Navegación inteligente según el estado del plan
+                  const planId = (val as any).planId || (val as any).plan?.id;
+                  const handleClick = () => {
+                    if (planId) {
+                      // Plan asignado → ir directo a la vista del plan para enviarlo
+                      navigate(`/pacientes/${p.id}/planes/${planId}`);
+                    } else {
+                      // Sin plan → ir al detalle de la valoración para crear uno
+                      navigate(`/pacientes/${p.id}/valoraciones/${val.id}`);
+                    }
+                  };
+
                   return (
                     <tr 
                       key={`${p.id}-${val.id}-${index}`} 
                       className="group hover:bg-bg-elevated transition-colors cursor-pointer"
-                      onClick={() => navigate(`/pacientes/${p.id}/valoraciones/${val.id}`)}
+                      onClick={handleClick}
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-4">

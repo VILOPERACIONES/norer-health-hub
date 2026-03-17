@@ -157,14 +157,17 @@ const Layout = () => {
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* MOBILE HEADER */}
         <header className="h-[60px] lg:hidden bg-bg-base border-b border-border-subtle flex items-center justify-between px-6 sticky top-0 z-30 shadow-none">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center">
             <button 
               onClick={() => setMobileOpen(true)} 
-              className="p-2 hover:bg-bg-elevated rounded-[8px] transition-colors text-text-secondary"
+              className="p-2 hover:bg-bg-elevated rounded-[8px] transition-colors text-text-secondary -ml-2"
             >
               <Menu className="h-5 w-5" />
             </button>
-            <p className="text-[14px] font-semibold text-text-primary">Norder Hub</p>
+          </div>
+          
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <img src="/logo-nrdr.svg" alt="NORDER" className="h-[18px] w-auto object-contain mt-0.5" />
           </div>
         </header>
 
