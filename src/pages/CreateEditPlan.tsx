@@ -7,6 +7,7 @@ import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan } from '@/types';
 import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -29,13 +30,15 @@ export const CreateEditPlanForm = ({
   planId: propPlanId, 
   valoracionId: propValoracionId, 
   onSaved, 
-  onCancel 
+  onCancel,
+  initialProximaSesion,
 }: { 
   pacienteId?: string, 
   planId?: string, 
   valoracionId?: string, 
   onSaved?: (planId: string) => void, 
-  onCancel?: () => void 
+  onCancel?: () => void,
+  initialProximaSesion?: string,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -57,8 +60,12 @@ export const CreateEditPlanForm = ({
   const [proteinas, setProteinas] = useState('30');
   const [carbohidratos, setCarbohidratos] = useState('40');
   const [grasas, setGrasas] = useState('30');
-  const [proximaSesion, setProximaSesion] = useState('');
-  const [proximaSesionHora, setProximaSesionHora] = useState('');
+  const [proximaSesion, setProximaSesion] = useState(initialProximaSesion
+    ? initialProximaSesion.split('T')[0]        // date part
+    : '');
+  const [proximaSesionHora, setProximaSesionHora] = useState(initialProximaSesion && initialProximaSesion.includes('T')
+    ? initialProximaSesion.split('T')[1]?.slice(0, 5)  // HH:MM
+    : '');
   const [notas, setNotas] = useState('');
   const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
   const [valData, setValData] = useState<any>(null);
@@ -406,8 +413,17 @@ export const CreateEditPlanForm = ({
     }
   };
 
+  const { confirm, ConfirmDialogComponent } = useConfirm();
+
   const handleDelete = async () => {
-    if (!window.confirm('¿ELIMINAR ESTA PLANTILLA PERMANENTEMENTE?')) return;
+    const ok = await confirm({
+      title: '¿Eliminar Plantilla?',
+      description: 'Esta acción eliminará permanentemente la plantilla de plan. No se puede deshacer.',
+      confirmLabel: 'Sí, Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/planes/${planId}`);
       toast({ title: 'PLANTILLA ELIMINADA' });
@@ -418,6 +434,7 @@ export const CreateEditPlanForm = ({
   };
 
   return (
+    <>
     <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
         <div className="space-y-2">
@@ -922,6 +939,8 @@ export const CreateEditPlanForm = ({
         </div>
       </div>
     </div>
+    {ConfirmDialogComponent}
+    </>
   );
 };
 

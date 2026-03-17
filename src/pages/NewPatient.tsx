@@ -117,6 +117,7 @@ const NewPatient = () => {
     signosSintomas: '',
     talla: '',
     peso: '',
+    complexion: '',
   });
 
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
@@ -152,6 +153,8 @@ const NewPatient = () => {
         return String(raw < 10 ? Math.round(raw * 100) : raw);
       })(),
       peso: parseFloat(form.peso) || null,
+      // Complexión: Ectomorfo=1, Mesomorfo=2, Endomorfo=3
+      complexion: form.complexion === 'Ectomorfo' ? 1 : form.complexion === 'Mesomorfo' ? 2 : form.complexion === 'Endomorfo' ? 3 : null,
       fechaActual: new Date().toISOString(),
       
       ejercicio: {
@@ -230,10 +233,11 @@ const NewPatient = () => {
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
           <Input label="Estatura (cm)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="175" />
           <Input label="Peso Inicial (kg)" value={form.peso} onChange={(v: string) => update('peso', v)} placeholder="70.5" type="number" />
-          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
+          <Select label="Complexión / Somatotipo" value={form.complexion} onChange={(v: string) => update('complexion', v)} options={['', 'Ectomorfo', 'Mesomorfo', 'Endomorfo']} />
         </FormSection>
 
         <FormSection title="Dinámica Deportiva" icon={Activity} defaultOpen={false}>
+          <Input label="Objetivo de Entrenamiento" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Ej: Aumento de masa muscular, pérdida de grasa" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
           <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
           <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />

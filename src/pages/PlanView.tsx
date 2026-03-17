@@ -7,10 +7,12 @@ import type { Plan } from '@/types';
 import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogComponent } = useConfirm();
   
   const pacienteId = propPacienteId;
   const planId = propPlanId;
@@ -93,7 +95,14 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
   const [sending, setSending] = useState(false);
 
   const handleEnviar = async () => {
-    if (!window.confirm('¿Enviar este plan al paciente por correo y WhatsApp?')) return;
+    const ok = await confirm({
+      title: '¿Enviar Plan al Paciente?',
+      description: 'Se enviará el plan nutricional por correo electrónico y WhatsApp al paciente.',
+      confirmLabel: 'Sí, Enviar',
+      cancelLabel: 'Cancelar',
+      variant: 'info',
+    });
+    if (!ok) return;
     setSending(true);
     try {
       const { data } = await api.post(`/api/planes/${planId}/enviar`);
@@ -146,6 +155,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
   );
 
   return (
+    <>
     <div className="space-y-10 animate-fade-in max-w-none pb-24">
       <div className="flex flex-col gap-6 pt-6">
         {(!onFinish || onFinish) && (
@@ -309,6 +319,8 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
         loading={savingMeta}
       />
     </div>
+    {ConfirmDialogComponent}
+    </>
   );
 };
 

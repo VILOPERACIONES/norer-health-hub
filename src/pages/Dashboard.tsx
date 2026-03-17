@@ -108,7 +108,6 @@ const Dashboard = () => {
   // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
   const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de plan').length;
   const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Plan en Proceso').length;
-  const planesSinEnviar  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Listo para enviar').length;
   const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
@@ -168,7 +167,7 @@ const Dashboard = () => {
         text: `${pctPendientes}%`,
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
       },
-      sub: `${planesSinAsignar} sin equiv. · ${planesEnProceso} sin menú · ${planesSinEnviar} por enviar`,
+      sub: `${planesSinAsignar} sin equiv. · ${planesEnProceso} en proceso`,
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
     },
     {
@@ -289,7 +288,7 @@ const Dashboard = () => {
                   return (
                     <li
                       key={cliente.id || idx}
-                      onClick={() => cliente.id && navigate(`/pacientes/${cliente.id}`)}
+                      onClick={() => cliente.id && navigate(`/pacientes/${cliente.id}#historial`)}
                       className="flex items-center gap-3 px-5 py-[13px] border-b border-[#2a2a2a] last:border-0 hover:bg-[#1a1a1a] transition-colors cursor-pointer group"
                     >
                       {/* Rank */}
@@ -353,7 +352,7 @@ const Dashboard = () => {
                       <tr
                         key={`${item.pacienteId}-${item.val.id || i}`}
                         className="hover:bg-[#1a1a1a] transition-colors cursor-pointer group whitespace-nowrap"
-                        onClick={() => navigate(`/pacientes/${item.pacienteId}`)}
+                        onClick={() => navigate(`/pacientes/${item.pacienteId}#historial`)}
                       >
                         <td className="pl-5 pr-3 py-[14px] text-center w-12">
                           <Square className="w-4 h-4 text-[#444] inline-block opacity-50 group-hover:opacity-100 transition-opacity" />

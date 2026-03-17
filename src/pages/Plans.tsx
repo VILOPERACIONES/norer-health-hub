@@ -4,6 +4,7 @@ import { Plus, Search, Trash2, Edit3 } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { Plan } from '@/types';
 
 const Plans = () => {
@@ -13,6 +14,7 @@ const Plans = () => {
   
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogComponent } = useConfirm();
 
   const fetchData = async () => {
     setLoading(true);
@@ -32,7 +34,14 @@ const Plans = () => {
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm('¿ELIMINAR ESTA PLANTILLA PERMANENTEMENTE?')) return;
+    const ok = await confirm({
+      title: '¿Eliminar Plantilla?',
+      description: 'Esta acción eliminará permanentemente la plantilla. No se puede deshacer.',
+      confirmLabel: 'Sí, Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/planes/${id}`);
       toast({ title: 'PLANTILLA ELIMINADA' });
@@ -54,6 +63,7 @@ const Plans = () => {
   );
 
   return (
+    <>
     <div className="min-h-screen text-text-primary animate-fade-in pb-12">
       <div className="w-full space-y-8">
         
@@ -151,6 +161,8 @@ const Plans = () => {
         </section>
       </div>
     </div>
+    {ConfirmDialogComponent}
+    </>
   );
 };
 

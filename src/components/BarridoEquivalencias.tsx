@@ -1,5 +1,6 @@
 import { useState, useMemo, useRef, useCallback } from 'react';
 import { Plus, X, Check, AlertCircle, RotateCcw, Trash2, GripHorizontal } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface BarridoData {
@@ -94,6 +95,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   const [energiaInputStr, setEnergiaInputStr] = useState('');
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const { confirm, ConfirmDialogComponent } = useConfirm();
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDraggedColIdx(idx);
@@ -242,9 +244,15 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     setNewTiempoName('');
   };
 
-  const clearTable = () => {
-    // Si el usuario quiere limpiar por completo (pregunta de confirmación)
-    if (!window.confirm('¿Seguro que deseas limpiar todos los datos de la tabla?')) return;
+  const clearTable = async () => {
+    const ok = await confirm({
+      title: '¿Limpiar Tabla?',
+      description: 'Se eliminarán todos los datos de porciones y distribución de la tabla.',
+      confirmLabel: 'Sí, Limpiar',
+      cancelLabel: 'Cancelar',
+      variant: 'warning',
+    });
+    if (!ok) return;
     commit({
       ...state,
       porciones: {},
@@ -313,6 +321,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   // ─── Render ──────────────────────────────────────────────────────────────────
   return (
+    <>
     <div className="space-y-3">
       {/* ── Barra superior ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -760,6 +769,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
         <span>Doble clic en cabecera para renombrar tiempo</span>
       </div>
     </div>
+    {ConfirmDialogComponent}
+    </>
   );
 };
 

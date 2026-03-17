@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal, getBadgeForValuation } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
@@ -242,17 +243,32 @@ const PatientProfile = () => {
 
   useEffect(() => {
     if (location.hash === '#historial' && !loading) {
-      const el = document.getElementById('historial');
-      if (el) {
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: 'smooth' });
-        }, 500);
-      }
+      // Intentar scroll con reintentos por si el DOM aún no está listo
+      let attempts = 0;
+      const tryScroll = () => {
+        const el = document.getElementById('historial');
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (attempts < 10) {
+          attempts++;
+          setTimeout(tryScroll, 100);
+        }
+      };
+      setTimeout(tryScroll, 300);
     }
   }, [location.hash, loading]);
 
+  const { confirm, ConfirmDialogComponent } = useConfirm();
+
   const handleDelete = async () => {
-    if (!window.confirm('¿ESTÁ SEGURO DE PURGAR ESTE PACIENTE? ESTA ACCIÓN ELIMINARÁ TODO EL HISTORIAL CLÍNICO Y VALORACIONES.')) return;
+    const ok = await confirm({
+      title: '¿Eliminar Expediente?',
+      description: 'Esta acción eliminará PERMANENTEMENTE todo el historial clínico, valoraciones y planes del paciente. No se puede deshacer.',
+      confirmLabel: 'Sí, Eliminar',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await api.delete(`/api/pacientes/${id}`);
       toast({ title: 'EXPEDIENTE ELIMINADO', description: 'El paciente y toda su data han sido borrados del sistema.' });
@@ -280,6 +296,7 @@ const PatientProfile = () => {
   const historyData = [...valoraciones].reverse();
 
   return (
+    <>
     <div className="min-h-screen bg-bg-base text-text-primary font-sans pb-24 animate-fade-in selection:bg-brand-primary selection:text-bg-base">
       {/* HEADER */}
       <header className="w-full border-b border-border-subtle pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
@@ -553,6 +570,8 @@ const PatientProfile = () => {
         </section>
       </div>
     </div>
+    {ConfirmDialogComponent}
+  </>
   );
 };
 
