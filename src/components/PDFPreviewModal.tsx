@@ -19,8 +19,6 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
     showPageMenus: true,
     showPageIntercambio: true,
     showPageExtras: true,
-    notaAmarilla: '',
-    precioEspecial: '',
     ...planCustomMeta
   });
   
@@ -70,10 +68,6 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
     setMeta({ ...meta, [key]: !meta[key] });
   };
 
-  const handleTextChange = (key: string, value: string) => {
-    setMeta({ ...meta, [key]: value });
-  };
-
   const handleSave = async () => {
     await onSaveMeta(meta);
   };
@@ -117,30 +111,6 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                   </div>
                 </div>
 
-                <div className="h-px w-full bg-gradient-to-r from-transparent via-[#333] to-transparent opacity-30" />
-
-                {/* NOTAS */}
-                <div className="space-y-4">
-                  <h3 className="text-[11px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Notas Destacadas</h3>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-medium text-[#c0c0c0]">Advertencia (Amarilla)</label>
-                      <input 
-                        type="text" value={meta.notaAmarilla || ''} onChange={(e) => handleTextChange('notaAmarilla', e.target.value)}
-                        className="w-full bg-[#0a0a0a] border border-[#333] rounded-[10px] px-3 py-2.5 text-[13px] text-white focus:border-[#90c2ff] outline-none"
-                        placeholder="Ej. Evitar impacto..."
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[12px] font-medium text-[#c0c0c0]">Mensaje Final / Precio</label>
-                      <input 
-                        type="text" value={meta.precioEspecial || ''} onChange={(e) => handleTextChange('precioEspecial', e.target.value)}
-                        className="w-full bg-[#0a0a0a] border border-[#333] rounded-[10px] px-3 py-2.5 text-[13px] text-white focus:border-white outline-none"
-                        placeholder="Ej. Promoción 2x1..."
-                      />
-                    </div>
-                  </div>
-                </div>
               </div>
 
               <div className="p-5 sm:p-6 bg-[#161616] border-t border-[#2a2a2a]">

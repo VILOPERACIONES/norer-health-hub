@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react';
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Plus, X, Check, AlertCircle, RotateCcw, Trash2, GripHorizontal } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 
@@ -91,7 +91,7 @@ const cellCls =
 const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) => {
   const [state, setState] = useState<BarridoData>(() => buildInitial(value));
   const [newTiempoName, setNewTiempoName] = useState('');
-  const [energiaInputStr, setEnergiaInputStr] = useState('');
+  const [energiaInputStr, setEnergiaInputStr] = useState(value?.kcalTotal ? String(value.kcalTotal) : '');
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const { confirm, ConfirmDialogComponent } = useConfirm();
@@ -142,6 +142,13 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     commit({ ...state, tiempos: newTiempos });
     setDraggedColIdx(null);
   };
+
+  // Sincronizar el input de texto manual si el valor cambia desde el padre (ej. carga asíncrona)
+  useEffect(() => {
+    if (value?.kcalTotal && !energiaInputStr) {
+      setEnergiaInputStr(String(value.kcalTotal));
+    }
+  }, [value?.kcalTotal]);
 
   // ─── Navegar celdas con teclado (Tabla Excel) ────────────────────────────────
   const focusCell = useCallback((row: number, col: number) => {
@@ -215,6 +222,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   const commit = (next: BarridoData) => {
     // kcalManuales por tiempo fue eliminado de la UI → siempre limpiar para evitar datos residuales
     const cleanManuales = {};
+    // En el modo captura manual total solicitado por el usuario, el sistema NO recalcula nada.
+    // Retiene el valor cargado de kcalTotal a menos que se ingrese uno nuevo en el input manual.
     const autoTotal = next.tiempos.reduce((s, t) => {
       const auto = GRUPOS.reduce(
         (gs, { key }) => gs + (next.distribucion[t]?.[key] ?? 0) * KCAL_POR_EQ[key],
@@ -222,10 +231,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       );
       return s + auto;
     }, 0);
+
     const totalFinal =
       next.energiaTotalManual != null && next.energiaTotalManual > 0
         ? next.energiaTotalManual
-        : Math.round(autoTotal);
+        : (next.kcalTotal || Math.round(autoTotal));
     
     // Validar si la distribución suma exactamente la porción para TODOS los grupos
     const isValid = GRUPOS.every(({ key }) => {

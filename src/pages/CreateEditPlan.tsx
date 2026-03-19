@@ -2,12 +2,12 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
-import BarridoEquivalenciasComp from '@/components/BarridoEquivalencias';
 import api from '@/lib/api';
-import { Menu, TiempoComida, Ingrediente, Plan } from '@/types';
+import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
 import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { Input } from '@/components/ui/input';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -72,6 +72,10 @@ export const CreateEditPlanForm = ({
   const [availableTemplates, setAvailableTemplates] = useState<Plan[]>([]);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showBarridoRef, setShowBarridoRef] = useState(!propPacienteId === false); // abierto por default en planes de paciente
+  
+  const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
+  const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
+  const [platilloSearch, setPlatilloSearch] = useState('');
 
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
@@ -219,7 +223,21 @@ export const CreateEditPlanForm = ({
                setPesoUltimo(v.peso || 0);
                setValData({ ...v, barridoEquivalencias: barrido });
                if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
-            }
+
+               // INICIALIZAR TIEMPOS DEL PLAN DESDE EL BARRIDO
+               // Si el barrido tiene tiempos personalizados, los usamos para Menú 1 y Menú 2
+               if (barrido?.tiempos?.length > 0 && !isEdit) {
+                 const assessmentTiempos = barrido.tiempos.map((t: string) => ({
+                   nombre: t.toUpperCase(),
+                   ingredientes: [],
+                   nota: ''
+                 }));
+                 setMenus([
+                   { nombre: 'Menú 1', tiempos: assessmentTiempos },
+                   { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
+                 ]);
+               }
+             }
           }
           // Cargar plantillas disponibles
           const { data: tData } = await api.get('/api/planes?tipo=base');
@@ -230,6 +248,11 @@ export const CreateEditPlanForm = ({
       };
       fetchPatientData();
     }
+    
+    // Cargar biblioteca de platillos
+    api.get('/api/platillos').then(res => {
+      setPlatilloLibrary(res.data?.data || []);
+    }).catch(e => console.error("Error loading platillos library", e));
   }, [planId, isEdit, pacienteId, valoracionId, isBasePlan]);
 
   const loadTemplate = (template: Plan) => {
@@ -256,46 +279,24 @@ export const CreateEditPlanForm = ({
   // Energía del barrido — replica exactamente la lógica de BarridoEquivalencias.kcalTotalAuto:
   // por cada tiempo usa kcalManuales[tiempo] si existe, sino suma porciones × kcal/eq de la distribución
   const kcalBarrido = useMemo(() => {
-    let bd = valData?.barridoEquivalencias;
-    if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch {} }
-    if (bd?.barrido) bd = bd.barrido;
-    if (typeof bd === 'string') { try { bd = JSON.parse(bd); } catch {} }
-    if (!bd) return null;
-
-    const KCAL_BARRIDO: Record<string, number> = {
-      verduras: 0, frutas: 60, cerealSinGr: 70, cerealConGr: 115, leguminosas: 120,
-      aoaMuyBajo: 40, aoaBajo: 55, aoaModerado: 75, aoaAlto: 100,
-      lecheDesc: 95, lecheSemi: 110, lecheEntera: 150, lecheAz: 200,
-      grasaSinProt: 45, grasaConProt: 70, azSinGr: 40, azConGr: 85,
-    };
-
-    const tiempos: string[] = bd.tiempos || [];
-    const distribucion: Record<string, Record<string, number>> = bd.distribucion || {};
-    const kcalManuales: Record<string, number> = bd.kcalManuales || {};
-
-    let total = 0;
-    tiempos.forEach((tiempo: string) => {
-      const manual = kcalManuales[tiempo];
-      if (manual != null && Number(manual) > 0) {
-        // Kcal manual para este tiempo tiene prioridad (igual que el componente)
-        total += Number(manual);
-      } else {
-        // Auto: suma porciones × kcal/eq del tiempo
-        Object.entries(distribucion[tiempo] || {}).forEach(([grupo, cant]) => {
-          total += Number(cant) * (KCAL_BARRIDO[grupo] ?? 0);
-        });
-      }
-    });
-
-    return total > 0 ? Math.round(total) : null;
+    // Si la valoración ya fue guardada, el barrido vendrá poblado
+    const b = valData?.barrido || valData?.barridoEquivalencias;
+    if (!b) return 0;
+    return b.kcalTotal || 0;
   }, [valData]);
 
-  // Cuando carga el barrido y el usuario está CREANDO (no editando), pre-llenar la energía
   useEffect(() => {
     if (!isEdit && kcalBarrido && kcalBarrido > 0) {
       setCalorias(String(kcalBarrido));
     }
   }, [kcalBarrido, isEdit]);
+
+  // Si ya existe una valoración y no es edición, forzamos que use el barrido
+  useEffect(() => {
+    if (valData?.barrido?.kcalTotal) {
+      setCalorias(String(valData.barrido.kcalTotal));
+    }
+  }, [valData]);
 
   // Kcal por equivalente SMAE — acepta tanto el label de UI como la clave interna del backend
   const KCAL_EQ: Record<string, number> = {
@@ -325,30 +326,58 @@ export const CreateEditPlanForm = ({
     return found !== undefined ? KCAL_EQ[found] : 0;
   };
 
-  const menuKcalAverages = useMemo(() => {
-    if (menus.length === 0) return { avg: 0, byMenu: [] };
-    const byMenu = menus.map(m => {
-      let tMenu = 0;
-      m.tiempos.forEach(t => {
-        t.ingredientes.forEach(ing => {
-          const eq = Number(ing.eqCantidad) || 0;
-          const grupoLabel = ing.eqGrupo || '';
-          const kcalPorEq = lookupKcalEq(grupoLabel);
-          tMenu += eq * kcalPorEq;
-        });
-      });
-      return Math.round(tMenu);
-    });
-    const avg = Math.round(byMenu.reduce((a, b) => a + b, 0) / byMenu.length);
-    return { avg, byMenu };
-  }, [menus]);
+  // ─── LÓGICA DE MACROS DEL BARRIDO ───────────────────────────────────────────
+  // Gramos aproximados por cada equivalente SMAE (P, C, G)
+  const MACROS_SMAE: Record<string, { p: number; c: number; g: number }> = {
+    verduras:     { p: 2, c: 4,  g: 0 },
+    frutas:       { p: 0, c: 15, g: 0 },
+    cerealSinGr: { p: 2, c: 15, g: 0 },
+    cerealConGr: { p: 2, c: 15, g: 5 },
+    leguminosas:  { p: 8, c: 20, g: 1 },
+    aoaMuyBajo:   { p: 7, c: 0,  g: 1 },
+    aoaBajo:      { p: 7, c: 0,  g: 3 },
+    aoaModerado:  { p: 7, c: 0,  g: 5 },
+    aoaAlto:      { p: 7, c: 0,  g: 8 },
+    lecheDesc:    { p: 9, c: 12, g: 2 },
+    lecheSemi:    { p: 9, c: 12, g: 4 },
+    lecheEntera:  { p: 9, c: 12, g: 8 },
+    lecheAz:      { p: 9, c: 30, g: 5 },
+    grasaSinProt: { p: 0, c: 0,  g: 5 },
+    grasaConProt: { p: 3, c: 3,  g: 5 },
+    azSinGr:      { p: 0, c: 10, g: 0 },
+    azConGr:      { p: 0, c: 10, g: 5 },
+    // Aliases para nombres con espacios/mayúsculas del picker
+    'Cereal s/grasa': { p: 2, c: 15, g: 0 }, 'Cereal c/grasa': { p: 2, c: 15, g: 5 },
+    'AOA Muy Bajo':   { p: 7, c: 0,  g: 1 }, 'AOA Bajo':      { p: 7, c: 0,  g: 3 },
+    'AOA Moderado':   { p: 7, c: 0,  g: 5 }, 'AOA Alto':      { p: 7, c: 0,  g: 8 },
+    'Leche Descrem.': { p: 9, c: 12, g: 2 }, 'Leche Semi':    { p: 9, c: 12, g: 4 },
+    'Leche Entera':   { p: 9, c: 12, g: 8 }, 'Leche Azucarada':{ p: 9, c: 30, g: 5 },
+    'Grasa s/prot':   { p: 0, c: 0,  g: 5 }, 'Grasa c/prot':   { p: 3, c: 3,  g: 5 },
+    'Azúcar s/grasa': { p: 0, c: 10, g: 0 }, 'Azúcar c/grasa': { p: 0, c: 10, g: 5 },
+  };
 
-  // Actualiza automáticamente las calorías cuando el menú tiene ingredientes con equivalencias
-  useEffect(() => {
-    if (menuKcalAverages.avg > 0) {
-      setCalorias(String(menuKcalAverages.avg));
-    }
-  }, [menuKcalAverages.avg]);
+  const macrosBarridoResult = useMemo(() => {
+    const b = valData?.barridoEquivalencias;
+    if (!b?.porciones) return null;
+    let p = 0; let c = 0; let g = 0;
+    Object.entries(b.porciones).forEach(([grupo, cant]) => {
+      const gNum = Number(cant) || 0;
+      const m = MACROS_SMAE[grupo] || { p: 0, c: 0, g: 0 };
+      p += gNum * m.p;
+      c += gNum * m.c;
+      g += gNum * m.g;
+    });
+    const totalKcal = (p * 4) + (c * 4) + (g * 9);
+    if (totalKcal === 0) return null;
+    return {
+      pPct: Math.round((p * 4 / totalKcal) * 100),
+      cPct: Math.round((c * 4 / totalKcal) * 100),
+      gPct: Math.round((g * 9 / totalKcal) * 100),
+    };
+  }, [valData?.barridoEquivalencias?.porciones]);
+
+
+  const menuKcalAverages = useMemo(() => ({ avg: 0, byMenu: [] }), []);
 
   const macroCalc = useMemo(() => ({
     pGr: (cal * pPct / 100) / 4, pGrKg: pesoUltimo > 0 ? ((cal * pPct / 100) / 4) / pesoUltimo : 0,
@@ -511,23 +540,23 @@ export const CreateEditPlanForm = ({
           </div>
         </div>
 
-        {!isBasePlan && (
-          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            {/* Botón Guardar Cambios / Generar Menú arriba */}
-            <button
-              onClick={handleSave}
-              disabled={saving || macroSum !== 100}
-              className="w-full sm:w-auto px-[18px] py-[10px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? (
-                <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Save className="h-[18px] w-[18px]" />
-              )}
-              {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
-            </button>
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          {/* Botón Guardar Cambios / Generar Menú arriba - Ahora siempre visible */}
+          <button
+            onClick={handleSave}
+            disabled={saving || macroSum !== 100}
+            className="w-full sm:w-auto px-[18px] py-[10px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? (
+              <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="h-[18px] w-[18px]" />
+            )}
+            {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
+          </button>
 
-            {/* Usar menú base */}
+          {!isBasePlan && (
+            /* Usar menú base */
             <div className="relative w-full sm:w-auto">
               <button
                 onClick={() => setShowTemplates(!showTemplates)}
@@ -554,8 +583,8 @@ export const CreateEditPlanForm = ({
                 </div>
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
         {isBasePlan && isEdit && (
           <button
@@ -567,86 +596,151 @@ export const CreateEditPlanForm = ({
         )}
       </div>
 
-      <div className="grid lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-8 space-y-6">
-        
-          {/* Configuración Metabólica */}
-          <div className="bg-[#111111] p-6 rounded-[12px] animate-slide-up border border-[#2a2a2a]">
-            <h3 className="text-[16px] font-semibold text-white mb-6 flex items-center gap-2 m-0">
-               Requerimientos Esenciales
-            </h3>
-
-            {/* Identificador y Enfoque solo para plantillas base */}
-            {isBasePlan && (
-              <div className="grid sm:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-[#c0c0c0]">Identificador / Objetivo</label>
-                  <input
-                    value={nombrePlan}
-                    onChange={(e) => setNombrePlan(e.target.value)}
-                    placeholder="Ej: Balanceado 1800 kcal"
-                    className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[14px] font-normal text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-[#c0c0c0]">Enfoque Nutricional</label>
-                  <select
-                    value={tipo}
-                    onChange={(e) => setTipo(e.target.value)}
-                    className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[14px] font-normal text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors appearance-none"
-                    style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
-                  >
-                    <option value="Balanceada">Balanceada</option>
-                    <option value="Keto / Low Carb">Keto / Low Carb</option>
-                    <option value="Vegetariana / Vegana">Vegetariana / Vegana</option>
-                    <option value="Hipercalórica / Volumen">Hipercalórica / Volumen</option>
-                    <option value="Hipocalórica / Déficit">Hipocalórica / Déficit</option>
-                    <option value="Personalizada">Personalizada</option>
-                  </select>
-                </div>
-              </div>
-            )}
-
-            {/* Energía Total — solo editable para plantillas base. Para paciente, se toma del barrido */}
-            {isBasePlan && (
-              <div className="grid sm:grid-cols-1 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[12px] font-medium text-[#c0c0c0]">Energía Total (Kcal)</label>
-                  <div className="flex flex-col gap-3">
-                    <div className="relative">
-                      <input type="number" value={calorias} onChange={(e) => setCalorias(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 text-[18px] font-semibold text-white outline-none border border-[#2a2a2a] focus:border-[#444] transition-colors" />
+      <div className="space-y-6">
+        {/* DASHBOARD DE REQUERIMIENTOS: Unificado en la parte superior */}
+        <div className="bg-[#111111] p-8 rounded-[12px] animate-slide-up border border-[#2a2a2a] shadow-xl">
+          <div className="flex flex-col gap-10">
+            {/* CABECERA DE REQUERIMIENTOS: Unificada y Simplificada */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border-b border-[#2a2a2a] pb-8">
+              {/* Parte 1: Perfil Energético */}
+              <div className="lg:col-span-5 border-r border-[#2a2a2a] pr-10">
+                {isBasePlan ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest ml-1">Nombre Menú</label>
+                      <input
+                        type="text"
+                        value={nombrePlan}
+                        onChange={(e) => setNombrePlan(e.target.value)}
+                        placeholder="Ej: Balanceado 1800"
+                        className="w-full bg-transparent text-[16px] font-bold text-white outline-none border-b border-transparent focus:border-brand-primary pb-1 transition-colors"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                       <div className="space-y-1">
+                         <span className="text-[9px] font-bold text-[#555] uppercase block">Kcal</span>
+                         <input 
+                           type="number" 
+                           value={calorias} 
+                           onChange={(e) => setCalorias(e.target.value)} 
+                           className="w-full bg-transparent text-[28px] font-black text-brand-primary outline-none" 
+                         />
+                       </div>
+                       <div className="space-y-1">
+                         <span className="text-[9px] font-bold text-[#555] uppercase block">Tipo</span>
+                         <select
+                           value={tipo}
+                           onChange={(e) => setTipo(e.target.value)}
+                           className="w-full bg-transparent text-[14px] font-bold text-white outline-none appearance-none cursor-pointer"
+                         >
+                           <option value="Balanceada">Balanceada</option>
+                           <option value="Keto / Low Carb">Keto / Low Carb</option>
+                           <option value="Vegetariana">Vegetariana</option>
+                           <option value="Hipercalórica">Hipercalórica</option>
+                           <option value="Hipocalórica">Hipocalórica</option>
+                           <option value="Personalizada">Personalizada</option>
+                         </select>
+                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex flex-col items-center lg:items-start group">
+                      <span className="text-[10px] font-black text-[#666] uppercase tracking-widest mb-1 group-hover:text-brand-primary transition-colors">Meta Calórica Diaria</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-[44px] font-black text-white leading-none tracking-tighter">
+                          {calorias || '—'}
+                        </span>
+                        <span className="text-[18px] font-bold text-brand-primary">kcal</span>
+                      </div>
+                      <div className="mt-3 flex items-center gap-2 bg-[#181818] px-3 py-1.5 rounded-full border border-[#333]">
+                        <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(144,194,255,0.5)]" />
+                        <span className="text-[10px] text-[#8a8a8a] font-bold uppercase tracking-tight">
+                          {valData ? `Objetivo Estratégico Barrido #${valData.numeroValoracion}` : 'Asignación Manual'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8 pt-6 border-t border-[#2a2a2a]">
-              <div className="space-y-2">
-                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Proteína %</label>
-                <input type="number" value={proteinas} onChange={(e) => setProteinas(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
               </div>
-              <div className="space-y-2">
-                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Carbohidratos %</label>
-                <input type="number" value={carbohidratos} onChange={(e) => setCarbohidratos(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[12px] font-medium text-[#c0c0c0] text-center w-full block">Grasas %</label>
-                <input type="number" value={grasas} onChange={(e) => setGrasas(e.target.value)} className="w-full bg-[#181818] rounded-[8px] px-4 py-3 font-semibold text-center text-[16px] text-white outline-none border border-[#2a2a2a] focus:border-[#444]" />
+
+              {/* Parte 2: Requerimientos Esenciales (Macros y Objetivo) */}
+              <div className="lg:col-span-7">
+                <div className="grid grid-cols-3 gap-6">
+                  {[
+                    { label: 'Prot %', key: 'pPct', val: proteinas, set: setProteinas, color: '#ef8c8c', bg: 'rgba(239, 140, 140, 0.1)' },
+                    { label: 'Carb %', key: 'cPct', val: carbohidratos, set: setCarbohidratos, color: '#90c2ff', bg: 'rgba(144, 194, 255, 0.1)' },
+                    { label: 'Gras %', key: 'gPct', val: grasas, set: setGrasas, color: '#f5c842', bg: 'rgba(245, 200, 66, 0.1)' },
+                  ].map((m) => (
+                    <div key={m.label} className="group flex flex-col items-center">
+                      <label 
+                        className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 transition-colors"
+                        style={{ color: m.color }}
+                      >
+                        {m.label}
+                      </label>
+                      <div className="relative w-full aspect-square max-w-[80px]">
+                        {/* Círculo decorativo de fondo */}
+                        <div className="absolute inset-0 rounded-full border-2 border-white/5 bg-[#111111] overflow-hidden">
+                           <div className="absolute inset-0 opacity-20 blur-xl" style={{ backgroundColor: m.color }} />
+                        </div>
+                        
+                        <input
+                          type="number"
+                          value={m.val}
+                          onChange={(e) => m.set(e.target.value)}
+                          className="absolute inset-0 w-full h-full bg-transparent text-[20px] font-black text-center text-white outline-none z-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        
+                        {/* Indicador de progreso circular (visual) */}
+                        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
+                           <circle
+                             cx="50" cy="50" r="46"
+                             fill="none"
+                             stroke="currentColor"
+                             strokeWidth="4"
+                             className="text-white/5"
+                           />
+                           <circle
+                             cx="50" cy="50" r="46"
+                             fill="none"
+                             stroke={m.color}
+                             strokeWidth="4"
+                             strokeDasharray={289}
+                             strokeDashoffset={289 - (289 * (Number(m.val) || 0)) / 100}
+                             strokeLinecap="round"
+                             className="transition-all duration-1000 ease-out"
+                           />
+                        </svg>
+                      </div>
+
+                      {/* Objetivo del Barrido (Solo porcentaje) */}
+                      {macrosBarridoResult && (
+                        <div className="mt-3 flex flex-col items-center gap-0.5">
+                           <span className="text-[8px] font-bold text-[#444] uppercase tracking-widest">Barrido</span>
+                           <span className="text-[14px] font-black text-white/80 leading-none">
+                             {macrosBarridoResult[m.key as keyof typeof macrosBarridoResult]}%
+                           </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {macroSum !== 100 && (
+                  <div className="mt-6 flex items-center justify-center gap-2 text-rose-500 bg-rose-500/5 py-2 rounded-lg border border-rose-500/10">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Suma {macroSum}% (Ajuste a 100%)</span>
+                  </div>
+                )}
               </div>
             </div>
-
-            {macroSum !== 100 && (
-              <div className="mt-6 p-4 bg-[#2e1a1a] border border-accent-red/20 text-accent-red rounded-[8px]">
-                <p className="text-[14px] font-medium text-center m-0">
-                   La distribución suma {macroSum}% (Requiere 100%)
-                </p>
-              </div>
-            )}
           </div>
+        </div>
 
-          {/* Menús Personalizados */}
-          <div className="grid lg:grid-cols-2 gap-6 items-start">
+        {/* SECCIÓN DE MENÚS: Ahora a dos columnas completas */}
+        <div className="grid md:grid-cols-2 gap-8 items-start">
             {menus.map((menu, mi) => (
               <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] overflow-hidden flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
                 <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 flex items-center justify-between">
@@ -658,11 +752,6 @@ export const CreateEditPlanForm = ({
                   />
                   
                   <div className="flex items-center gap-2">
-                    {menuKcalAverages.byMenu[mi] > 0 && (
-                      <span className="text-[12px] font-semibold bg-[#2a2a2a] text-[#c0c0c0] px-2 py-1 rounded-[6px] whitespace-nowrap">
-                        ~{menuKcalAverages.byMenu[mi]} kcal
-                      </span>
-                    )}
                     <button
                        onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
                        className="p-2 text-[#8a8a8a] hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
@@ -780,6 +869,54 @@ export const CreateEditPlanForm = ({
                         >
                           + Crear Nuevo Platillo
                         </button>
+
+                        <div className="relative">
+                          <button
+                            onClick={() => setShowPlatilloSelector(showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti ? null : { mIdx: mi, tIdx: ti })}
+                            className="w-full py-2 bg-[#1a1a1a] border border-[#333] text-[#90c2ff] hover:text-white text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider mt-2 flex items-center justify-center gap-2"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" /> Importar de Biblioteca
+                          </button>
+                          
+                          {showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti && (
+                            <div className="absolute z-50 left-0 right-0 mt-2 bg-[#111] border border-[#333] rounded-[12px] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                               <Input 
+                                 placeholder="Buscar platillo..." 
+                                 className="h-8 text-xs mb-3 bg-bg-base"
+                                 autoFocus
+                                 value={platilloSearch}
+                                 onChange={(e) => setPlatilloSearch(e.target.value)}
+                               />
+                               <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
+                                  {platilloLibrary
+                                    .filter(p => p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) || p.categoria.toLowerCase().includes(platilloSearch.toLowerCase()))
+                                    .map(p => (
+                                       <button
+                                         key={p.id}
+                                         onClick={() => {
+                                            const ings = p.ingredientes.map((i, idx) => ({ 
+                                              ...i, 
+                                              platillo: p.nombre,
+                                              orden: (tiempo.ingredientes.length || 0) + idx + 1 
+                                            }));
+                                            updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
+                                            setShowPlatilloSelector(null);
+                                            setPlatilloSearch('');
+                                         }}
+                                         className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
+                                       >
+                                          <div>
+                                            <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
+                                            <p className="text-[10px] text-[#555]">{p.categoria}</p>
+                                          </div>
+                                          <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
+                                       </button>
+                                  ))}
+                                  {platilloLibrary.length === 0 && <p className="text-center py-4 text-[11px] text-[#555]">No hay platillos en la biblioteca</p>}
+                               </div>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -797,265 +934,15 @@ export const CreateEditPlanForm = ({
               </div>
             ))}
             
-            <button
-               onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
-               className="h-[100%] min-h-[400px] border-2 border-dashed border-[#333] rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-[#8a8a8a] hover:text-white hover:bg-[#181818] hover:border-text-muted transition-all group"
-            >
-              <Plus className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-              <span className="text-[14px] font-medium">Agregar Menú Alternativo</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Sidebar Summary & Persistence */}
-        <div className="lg:col-span-4 lg:relative">
-          <div className="space-y-6 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-border-default hover:[&::-webkit-scrollbar-thumb]:bg-[#444] [&::-webkit-scrollbar-thumb]:rounded-full pr-1" style={{ animationDelay: '0.1s' }}>
-            {isBasePlan ? (
-              <div className="bg-[#111111] border border-[#2a2a2a] p-6 rounded-[12px] relative overflow-hidden shadow-sm">
-                 <h3 className="text-[14px] font-semibold text-white mb-6 m-0 relative z-10">Balance Energético (Menú Base)</h3>
-                 
-                 <div className="space-y-6 relative z-10">
-                    <div className="bg-[#181818] border border-[#2a2a2a] rounded-[8px] p-5 flex flex-col items-center justify-center">
-                       <span className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-wider mb-1">Carga Total Definida</span>
-                       <p className="text-[36px] font-black text-white m-0 leading-none">{cal}<span className="text-[14px] ml-1 font-medium text-[#8a8a8a]">Kcal</span></p>
-                    </div>
-
-                    <div className="space-y-4">
-                      <p className="text-[11px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 pb-1 border-b border-[#2a2a2a]">Distribución de Macros</p>
-                      {[
-                        { label: 'Proteína', gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c' },
-                        { label: 'Hidratos', gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff' },
-                        { label: 'Lípidos', gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842' },
-                      ].map((m) => (
-                        <div key={m.label} className="flex items-center justify-between">
-                          <span className="text-[13px] font-semibold text-white">{m.label}</span>
-                          <div className="text-right flex items-end gap-2">
-                            <span className="text-[11px] font-medium text-[#8a8a8a]">{formatDecimal(m.grKg)} g/kg</span>
-                            <span className="text-[14px] font-bold" style={{ color: m.color }}>{formatDecimal(m.gr)} g</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                 </div>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                
-                {/* ── Balance Energético rediseñado para plan de paciente ── */}
-                <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] p-5 shadow-sm">
-                  <h3 className="text-[14px] font-semibold text-white m-0 mb-4">Balance Energético</h3>
-
-                  {/* Objetivo = Ref. Barrido (fija) */}
-                  {kcalBarrido && kcalBarrido > 0 ? (
-                    <div className="flex flex-col items-center justify-center py-5 bg-[#0a1628] rounded-[8px] border border-[#1e3a5f] mb-4">
-                      <span className="text-[10px] font-bold text-[#5a8abf] uppercase tracking-widest mb-1">Objetivo caloríco (Barrido)</span>
-                      <p className="text-[38px] font-black text-[#90c2ff] leading-none m-0">
-                        {kcalBarrido}<span className="text-[14px] ml-1 font-medium text-[#5a8abf]">kcal</span>
-                      </p>
-                      <span className="text-[10px] text-[#4a6a8f] mt-1">Val-{valData?.numeroValoracion}</span>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-5 bg-[#181818] rounded-[8px] border border-[#2a2a2a] mb-4">
-                      <span className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-1">Energía Total</span>
-                      <p className="text-[38px] font-black text-white leading-none m-0">
-                        {cal}<span className="text-[14px] ml-1 font-medium text-[#8a8a8a]">kcal</span>
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Contador de kcal en tiempo real por menú */}
-                  <div className="space-y-2">
-                    {menus.map((menu, mi) => {
-                      const menuKcal = menuKcalAverages.byMenu[mi] ?? 0;
-                      const ref = kcalBarrido ?? cal;
-                      const diff = menuKcal - ref;
-                      const pct = ref > 0 ? Math.round((menuKcal / ref) * 100) : 0;
-                      const isOk = ref > 0 && Math.abs(diff) <= ref * 0.05; // ±5% de margen
-                      const statusColor = menuKcal === 0
-                        ? 'border-[#2a2a2a] bg-[#181818]'
-                        : isOk
-                          ? 'border-green-500/30 bg-green-500/5'
-                          : Math.abs(diff) <= ref * 0.10
-                            ? 'border-yellow-500/30 bg-yellow-500/5'
-                            : 'border-rose-500/30 bg-rose-500/5';
-                      return (
-                        <div key={mi} className={`rounded-[8px] border p-3 transition-all duration-300 ${statusColor}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-[12px] font-semibold text-[#c0c0c0]">{menu.nombre || `Menú ${mi + 1}`}</span>
-                            <div className="flex items-center gap-2">
-                              {menuKcal > 0 && ref > 0 && (
-                                <span className={`text-[10px] font-bold ${
-                                  isOk ? 'text-green-400' : diff > 0 ? 'text-orange-400' : 'text-rose-400'
-                                }`}>
-                                  {diff > 0 ? '+' : ''}{diff}
-                                </span>
-                              )}
-                              <span className={`text-[18px] font-black ${
-                                menuKcal === 0 ? 'text-[#555]' : isOk ? 'text-green-400' : 'text-white'
-                              }`}>
-                                {menuKcal > 0 ? menuKcal : '--'}
-                              </span>
-                              <span className="text-[11px] text-[#8a8a8a]">kcal</span>
-                            </div>
-                          </div>
-                          {menuKcal > 0 && ref > 0 && (
-                            <div className="mt-2">
-                              <div className="w-full h-1.5 bg-[#2a2a2a] rounded-full overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full transition-all duration-500 ${
-                                    isOk ? 'bg-green-500' : diff > 0 ? 'bg-orange-500' : 'bg-rose-500'
-                                  }`}
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                />
-                              </div>
-                              <span className="text-[10px] text-[#8a8a8a] mt-0.5 block">{pct}% del objetivo</span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* ── Distribución Macronutrimental ── */}
-                <div className="bg-[#111111] border border-[#2a2a2a] p-5 rounded-[12px] shadow-sm">
-                  <h3 className="text-[14px] font-semibold text-white mb-5 m-0">Distribución de Macros</h3>
-                  <div className="space-y-4">
-                    {[
-                      { label: 'Proteína', pct: pPct, gr: macroCalc.pGr, grKg: macroCalc.pGrKg, color: '#ef8c8c', bar: 'bg-[#ef8c8c]', note: pPct >= 35 ? 'Hiperproteico' : pPct <= 15 ? 'Hipoproteico' : null },
-                      { label: 'Carbohidratos', pct: cPct, gr: macroCalc.cGr, grKg: macroCalc.cGrKg, color: '#90c2ff', bar: 'bg-[#90c2ff]', note: cPct <= 10 ? 'Cetogénico' : cPct <= 25 ? 'Low-Carb' : null },
-                      { label: 'Grasas', pct: gPct, gr: macroCalc.gGr, grKg: macroCalc.gGrKg, color: '#f5c842', bar: 'bg-[#f5c842]', note: null },
-                    ].map(m => (
-                      <div key={m.label}>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className="text-[13px] font-bold" style={{ color: m.color }}>{m.label}</span>
-                            {m.note && <span className="text-[9px] px-1.5 py-0.5 rounded-[4px] bg-[#181818] border border-[#2a2a2a] text-[#c0c0c0] font-semibold uppercase tracking-wider">{m.note}</span>}
-                          </div>
-                          <span className="text-[13px] font-bold text-white bg-[#181818] px-1.5 py-0.5 rounded-[4px]">{m.pct}%</span>
-                        </div>
-                        <div className="w-full h-2 bg-[#181818] border border-[#2a2a2a] rounded-full overflow-hidden">
-                          <div className={`h-full ${m.bar} rounded-full transition-all duration-500`} style={{ width: `${Math.min(m.pct, 100)}%` }} />
-                        </div>
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[11px] text-[#8a8a8a] font-mono bg-[#181818] px-1.5 rounded-[4px]">{formatDecimal(m.gr)} g/día</span>
-                          {pesoUltimo > 0 && <span className="text-[11px] text-[#8a8a8a] font-mono bg-[#181818] px-1.5 rounded-[4px]">{formatDecimal(m.grKg)} g/kg</span>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {macroSum !== 100 && (
-                    <div className="mt-4 p-2 bg-accent-red/10 border border-accent-red/20 rounded-[6px] text-center">
-                      <p className="text-[11px] font-bold text-accent-red m-0">Revisión requerida: Suma {macroSum}% ≠ 100%</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* ── Barrido estratégico ── siempre abierto para plan de paciente */}
-                <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] overflow-hidden shadow-sm">
-                  {/* Header: colapsable solo en plantillas base */}
-                  {isBasePlan ? (
-                    <button
-                      onClick={() => setShowBarridoRef(!showBarridoRef)}
-                      className="w-full flex flex-col items-start p-4 hover:bg-[#181818] transition-colors text-left"
-                    >
-                      <div className="w-full flex items-center justify-between mb-1.5">
-                        <h3 className="text-[14px] font-semibold text-white m-0 flex items-center gap-2">
-                          <ClipboardList className="w-[18px] h-[18px] text-[#c0c0c0]" />
-                          Barrido Estratégico
-                        </h3>
-                        {showBarridoRef ? <ChevronUp className="w-[18px] h-[18px] text-[#8a8a8a]" /> : <ChevronDown className="w-[18px] h-[18px] text-[#8a8a8a]" />}
-                      </div>
-                      <p className="text-[12px] text-[#8a8a8a] m-0">
-                        {valData?.numeroValoracion ? 'Revisar desglose de la consulta base' : 'Herramienta de apoyo (Scratchpad)'}
-                      </p>
-                    </button>
-                  ) : (
-                    <div className="flex flex-col items-start p-4">
-                      <h3 className="text-[14px] font-semibold text-white m-0 flex items-center gap-2 mb-1.5">
-                        <ClipboardList className="w-[18px] h-[18px] text-[#c0c0c0]" />
-                        Barrido Estratégico
-                      </h3>
-                      <p className="text-[12px] text-[#8a8a8a] m-0">Revisar desglose de la consulta base</p>
-                    </div>
-                  )}
-
-                  {/* Contenido: siempre visible para paciente, condicional para base */}
-                  {(!isBasePlan || showBarridoRef) && (
-                    <div className="p-4 border-t border-[#2a2a2a] bg-[#181818]">
-                      {(() => {
-                         let bd = valData?.barridoEquivalencias;
-                         if (typeof bd === 'string') {
-                           try { bd = JSON.parse(bd); } catch (e) {}
-                         }
-                         if (!bd || !bd.tiempos || bd.tiempos.length === 0) return <p className="text-[12px] text-[#8a8a8a] m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">Sin datos de barrido previos registrados.</p>;
-                         const gruposMap: any = { verduras: 'Verduras', frutas: 'Frutas', cerealSinGr: 'C y T s/grasa', cerealConGr: 'C y T c/grasa', leguminosas: 'Leguminosas', aoaMuyBajo: 'AOA muy bajo', aoaBajo: 'AOA bajo', aoaModerado: 'AOA moderado', aoaAlto: 'AOA alto', lecheDesc: 'Leche desc.', lecheSemi: 'Leche semi.', lecheEntera: 'Leche entera', lecheAz: 'Leche azuc.', grasaSinProt: 'A y G s/prot', grasaConProt: 'A y G c/prot', azSinGr: 'Az s/grasa', azConGr: 'Az c/grasa' };
-                         const renderedTiempos = bd.tiempos.map((t: string) => {
-                            const tiempoDist = (bd.distribucion || {})[t] || {};
-                            const distributionItems = Object.entries(tiempoDist).filter(([, cant]) => Number(cant) > 0);
-                            if (distributionItems.length === 0) return null;
-                            const kcalTiempo = distributionItems.reduce((s, [g, cant]) => s + Number(cant) * (KCAL_EQ[g] ?? 0), 0);
-                            return (
-                              <div key={t} className="bg-[#111111] p-3.5 rounded-[8px] border border-[#2a2a2a] mb-3 last:mb-0 shadow-sm">
-                                <div className="flex items-center justify-between mb-3 border-b border-[#333] pb-2">
-                                  <h4 className="text-[12px] font-bold text-white uppercase tracking-wider m-0">{t}</h4>
-                                  <span className="text-[11px] font-mono text-[#c0c0c0] bg-[#181818] px-2 py-0.5 rounded-[4px]">{Math.round(kcalTiempo)} kcal</span>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  {distributionItems.map(([g, cant]) => (
-                                    <span key={g} className="px-2 py-1 bg-[#181818] border border-[#2a2a2a] rounded-[6px] text-[11px] font-medium text-[#c0c0c0]">
-                                      {gruposMap[g] || g}: <span className="font-bold text-white">{parseFloat(Number(cant).toFixed(1))} eq</span>
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            );
-                         }).filter(Boolean);
-                         if (renderedTiempos.length === 0) return <p className="text-[12px] text-[#8a8a8a] m-0 p-4 text-center border border-dashed border-[#333] rounded-[8px]">El barrido estratégico parece no tener porciones asignadas.</p>;
-                         return <div className="pt-1 pb-1">{renderedTiempos}</div>;
-                      })()}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="bg-[#111111] p-5 rounded-[12px] space-y-6 border border-[#2a2a2a] shadow-sm">
-              <h3 className="text-[14px] font-semibold text-white m-0 flex items-center gap-2">
-                 <Settings className="w-[18px] h-[18px] text-[#c0c0c0]" /> Ajustes Finales
-              </h3>
-              <div className="space-y-5">
-                <div className="space-y-2">
-                  <label className="text-[11px] font-bold text-[#c0c0c0] uppercase tracking-widest pl-1">Anotaciones Generales</label>
-                  <textarea
-                    value={notas}
-                    onChange={(e) => setNotas(e.target.value)}
-                    className="w-full bg-[#181818] rounded-[8px] p-3 text-[13px] font-normal text-white border border-[#2a2a2a] focus:border-[#333] transition-colors outline-none resize-y min-h-[100px] placeholder:text-[#8a8a8a]"
-                    placeholder="Instrucciones, notas para el paciente, recomendaciones extras..."
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2">
-                <button
-                  onClick={handleSave}
-                  disabled={saving || macroSum !== 100}
-                  className="w-full py-3 bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {saving ? (
-                    <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Save className="h-[18px] w-[18px]" />
-                      {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          <button
+            onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
+            className="h-[100%] min-h-[400px] border-2 border-dashed border-[#333] rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-[#8a8a8a] hover:text-white hover:bg-[#181818] hover:border-text-muted transition-all group"
+          >
+            <Plus className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
+            <span className="text-[14px] font-medium">Agregar Menú Alternativo</span>
+          </button>
       </div>
+    </div>
     </div>
     {ConfirmDialogComponent}
     </>
@@ -1063,11 +950,12 @@ export const CreateEditPlanForm = ({
 };
 
 export default function CreateEditPlan() {
-  const { id: pacienteId, planId } = useParams();
+  const { id, planId } = useParams<{ id: string, planId: string }>();
+  const pacienteId = id;
   const location = useLocation();
   const searchParams = new URLSearchParams(location.search);
   const valoracionId = searchParams.get('valoracionId') || undefined;
-  
+
   return (
     <CreateEditPlanForm 
       pacienteId={pacienteId} 
