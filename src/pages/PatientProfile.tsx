@@ -127,7 +127,7 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
               const bg = getBadgeForValuation(val);
               
               if (!planId) {
-                if (bg.text === 'Pendiente de plan') {
+                if (bg.text === 'Pendiente de menú') {
                   return (
                     <button  
                       onClick={() => onVerDetalles(val.id + '#barrido')}
@@ -475,38 +475,6 @@ const PatientProfile = () => {
             </ResponsiveContainer>
           </ChartBox>
 
-          <ChartBox title="Grasa Corporal (%)">
-             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                <XAxis 
-                  dataKey="fecha" 
-                  tickFormatter={(val) => formatDateShort(val)}
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis 
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="grasaEvolucion" 
-                  name="Grasa"
-                  stroke="#8a8a8a" 
-                  strokeWidth={2} 
-                  fill="rgba(138, 138, 138, 0.05)"
-                  dot={{ r: 3, fill: '#8a8a8a' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartBox>
-
           <ChartBox title="Masa Magra (KG)">
                <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
@@ -530,10 +498,42 @@ const PatientProfile = () => {
                   type="monotone" 
                   dataKey="masaMagraEvolucion" 
                   name="Masa Magra"
-                  stroke="#22c55e" 
+                  stroke="#f0f0f0" 
                   strokeWidth={2} 
-                  fill="rgba(34, 197, 94, 0.05)"
-                  dot={{ r: 4, fill: '#111', stroke: '#22c55e', strokeWidth: 2 }}
+                  fill="rgba(240, 240, 240, 0.05)"
+                  dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </ChartBox>
+
+          <ChartBox title="Grasa Corporal (%)">
+             <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                <XAxis 
+                  dataKey="fecha" 
+                  tickFormatter={(val) => formatDateShort(val)}
+                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                  axisLine={false}
+                  tickLine={false}
+                  dy={10}
+                />
+                <YAxis 
+                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                  axisLine={false}
+                  tickLine={false}
+                  domain={['auto', 'auto']}
+                />
+                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                <Area 
+                  type="monotone" 
+                  dataKey="grasaEvolucion" 
+                  name="Grasa"
+                  stroke="#f0f0f0" 
+                  strokeWidth={2} 
+                  fill="rgba(240, 240, 240, 0.05)"
+                  dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
                 />
               </AreaChart>
             </ResponsiveContainer>

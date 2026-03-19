@@ -243,3 +243,4 @@ export interface Alerta {
   tipoRiesgo?: string;
   fechaPlan?: string;
 }
+}

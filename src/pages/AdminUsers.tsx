@@ -141,7 +141,7 @@ export default function AdminUsers() {
         </div>
         <button 
           onClick={abrirNuevo}
-          className="bg-white text-black px-5 py-2.5 rounded-[10px] text-[13px] font-bold flex items-center gap-2 hover:bg-white/90 transition-all shadow-lg shadow-white/10 active:scale-95 whitespace-nowrap uppercase italic"
+          className="bg-white text-black px-5 py-2.5 rounded-[10px] text-[13px] font-bold flex items-center gap-2 hover:bg-white/90 transition-all shadow-lg shadow-white/10 active:scale-95 whitespace-nowrap "
         >
           <Plus className="h-4 w-4" /> AGREGAR USUARIO
         </button>

@@ -103,7 +103,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
     await handleSaveMeta();
     setSending(true);
     try {
-      await api.post(`/api/planes/${planId}/send`);
+      await api.post(`/api/planes/${planId}/enviar`);
       toast({ title: '¡Plan Enviado!', description: 'El PDF fue enviado por WhatsApp correctamente.' });
       onFinish();
     } catch (err: any) {
@@ -115,7 +115,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   if (loadingInitial) return <div className="p-8 text-center text-[#8a8a8a]">Cargando configuración...</div>;
 
   return (
-    <div className="flex flex-col lg:flex-row w-full h-[700px] gap-6 animate-slide-up">
+    <div className="flex flex-col lg:flex-row w-full lg:h-[700px] gap-6 animate-slide-up pb-8 lg:pb-0">
       {/* Columna Izquierda: Controles */}
       <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6">
         <div>

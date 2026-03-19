@@ -269,12 +269,7 @@ const Requirements = () => {
                      </table>
                    </div>
                 </div>
-                {equivTotals.kcal > 0 && (
-                  <div className={`p-4 rounded-[8px] border flex items-center justify-between transition-colors ${Math.abs(equivTotals.kcal - energeticData.get) <= 100 ? 'bg-[#1a2e1a] border-accent-green/20 text-accent-green' : 'bg-[#332517] border-[#d97706]/20 text-[#fbbf24]'}`}>
-                    <span className="text-[13px] font-medium">Diferencia Energética</span>
-                    <span className="text-[16px] font-bold">{Math.round(equivTotals.kcal - energeticData.get)} kcal</span>
-                  </div>
-                )}
+
              </section>
           </div>
         </div>

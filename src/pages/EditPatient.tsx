@@ -112,6 +112,7 @@ const EditPatient = () => {
     signosSintomas: '',
     talla: '',
     peso: '',
+    complexion: '',
   });
 
   useEffect(() => {
@@ -177,6 +178,13 @@ const EditPatient = () => {
             tabaco: ant.tabaco || 'No',
             agua: ant.agua || '',
             signosSintomas: ant.signosYSintomas || ant.signosSintomas || '',
+            complexion: (() => {
+              const c = p.complexion;
+              if (c == 1) return 'Ectomorfo';
+              if (c == 2) return 'Mesomorfo';
+              if (c == 3) return 'Endomorfo';
+              return '';
+            })(),
           });
         }
       } catch (err) {
@@ -217,6 +225,9 @@ const EditPatient = () => {
       edad,
       estatura: form.talla,
       peso: parseFloat(form.peso) || null,
+      complexion: form.complexion === 'Ectomorfo' ? 1 
+                  : (form.complexion === 'Mesomorfo' || form.complexion === 'Mesomorfico') ? 2 
+                  : form.complexion === 'Endomorfo' ? 3 : null,
       
       ejercicio: {
         objetivo: form.objetivo,
@@ -299,10 +310,11 @@ const EditPatient = () => {
           <Select label="Sexo Biológico" value={form.sexo} onChange={(v: string) => update('sexo', v)} options={['F', 'M']} />
           <Input label="Estatura (cm)" value={form.talla} onChange={(v: string) => update('talla', v)} placeholder="175" />
           <Input label="Peso Actual (kg)" value={form.peso} onChange={(v: string) => update('peso', v)} placeholder="70.5" type="number" />
-          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
+          <Select label="Somatotipo" value={form.complexion} onChange={(v: string) => update('complexion', v)} options={['', 'Ectomorfo', 'Mesomorfo', 'Endomorfo']} />
         </FormSection>
 
         <FormSection title="Dinámica Deportiva" icon={Activity}>
+          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
           <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
           <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />

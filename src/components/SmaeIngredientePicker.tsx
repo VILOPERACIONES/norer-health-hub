@@ -85,6 +85,10 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
   const [showManual, setShowManual] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
+  // Valores originales del montaje (para calcular ratios proporcionales en ingredientes precargados)
+  const origCantidad = useRef<number>(parseFloat(ing.cantidad?.toString() || '0') || 0);
+  const origEqCantidad = useRef<number>(parseFloat(ing.eqCantidad?.toString() || '0') || 0);
+
   // Cargar catálogo SMAE una sola vez
   useEffect(() => {
     loadSmae().then(setAllAlimentos);
@@ -101,8 +105,10 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Filtrar resultados mientras escribe
+  // Filtrar resultados mientras escribe — solo si el usuario interactuó activamente
+  const hasUserTyped = useRef(false);
   useEffect(() => {
+    if (!hasUserTyped.current) return; // no abrir si es carga automática del catálogo
     if (!query || query.length < 2) {
       setResults([]);
       return;
@@ -164,18 +170,32 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     });
   };
 
-  // Cambio de cantidad manual → recalcular eq si hay alimento seleccionado
+  // Cambio de cantidad → recalcular eq proporcional para ingredientes precargados
   const handleCantidadChange = (val: string) => {
-    setCantidad(val);
     const num = parseFloat(val);
-    onUpdate({ cantidad: num || 0, unidad });
+    setCantidad(val);
+
     if (selectedAlimento && num) {
-      // Si unidad es GR, calcular directo; si es porción casera, normalizar
+      // Alimento del catálogo — calcular desde pesoGramos
       const grPorUnidad = selectedAlimento.cantidadPorcion
         ? selectedAlimento.pesoGramos / (selectedAlimento.cantidadPorcion || 1)
         : 1;
       const totalGr = unidad === 'GR' ? num : num * grPorUnidad;
       calcEquivalencias(selectedAlimento, totalGr);
+    } else if (!selectedAlimento && num > 0) {
+      // Ingrediente precargado — si ya tiene eqCantidad y cantidad base, escalar proporcionalmente
+      const currentEq = parseFloat(eqCantidad);
+      const currentCant = parseFloat(cantidad); // estado LOCAL antes de este render
+      if (currentEq > 0 && currentCant > 0) {
+        const ratio = num / currentCant;
+        const newEq = parseFloat((currentEq * ratio).toFixed(2));
+        setEqCantidad(String(newEq));
+        onUpdate({ cantidad: num, unidad, eqCantidad: newEq });
+      } else {
+        onUpdate({ cantidad: num || 0, unidad });
+      }
+    } else {
+      onUpdate({ cantidad: num || 0, unidad });
     }
   };
 
@@ -209,10 +229,11 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
               type="text"
               value={query}
               onChange={(e) => {
+                hasUserTyped.current = true;
                 setQuery(e.target.value);
                 handleDescripcionManual(e.target.value);
               }}
-              onFocus={() => results.length > 0 && setShowDropdown(true)}
+              onFocus={() => hasUserTyped.current && results.length > 0 && setShowDropdown(true)}
               placeholder="Buscar alimento SMAE o escribir libre..."
               className="w-full pl-8 pr-28 py-2 bg-bg-base rounded-[6px] text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
             />
