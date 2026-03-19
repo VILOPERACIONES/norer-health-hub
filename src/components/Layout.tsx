@@ -57,7 +57,7 @@ const Layout = () => {
         <Logo size="sm" collapsed={collapsed} />
       </div>
 
-      <nav className={`flex-1 px-4 space-y-1 mt-6 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+      <nav className={`flex-1 px-4 space-y-1 mt-6 overflow-y-auto custom-scrollbar ${collapsed ? 'flex flex-col items-center' : ''}`}>
         {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4 pt-4">Navegación</p>}
         {filteredNavItems.map((item) => (
           <NavLink
@@ -101,7 +101,7 @@ const Layout = () => {
         )}
       </nav>
 
-      <div className={`px-4 pb-6 mt-auto space-y-2 ${collapsed ? 'flex flex-col items-center' : ''}`}>
+      <div className={`px-4 pb-6 mt-auto shrink-0 space-y-2 pt-4 border-t border-border-subtle/50 ${collapsed ? 'flex flex-col items-center' : ''}`}>
         <NavLink 
           to="/configuracion"
           className={({ isActive }) => `block w-full rounded-[12px] transition-all group/profile ${isActive ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-bg-elevated border-border-subtle'} border ${collapsed ? 'p-2' : 'px-4 py-3'}`}
@@ -156,7 +156,7 @@ const Layout = () => {
 
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* MOBILE HEADER */}
-        <header className="h-[60px] lg:hidden bg-bg-base border-b border-border-subtle flex items-center justify-between px-6 sticky top-0 z-30 shadow-none">
+        <header className="h-[60px] lg:hidden bg-bg-base border-b border-border-subtle flex items-center justify-between px-4 sticky top-0 z-30 shadow-none">
           <div className="flex items-center">
             <button 
               onClick={() => setMobileOpen(true)} 
@@ -171,8 +171,8 @@ const Layout = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-6 md:px-8 pt-6 pb-12 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
-          <div className="w-full h-full max-w-none mx-auto">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pt-6 pb-12 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
+          <div className="w-full min-h-full max-w-none mx-auto">
             <Outlet />
           </div>
         </main>

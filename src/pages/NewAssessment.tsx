@@ -47,6 +47,7 @@ const NewAssessment = () => {
   const [peso, setPeso] = useState('');
   const [estatura, setEstatura] = useState('');
   const [pctGrasa, setPctGrasa] = useState('');
+  const [kgGrasa, setKgGrasa] = useState(''); // Kg Grasa manually? Or just auto? I'll add for capture.
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
@@ -116,9 +117,8 @@ const NewAssessment = () => {
        lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
     }
 
-    // Peso
-    let pVal = lastVal?.pesoActual || lastVal?.peso || p?.peso || '';
-    if (pVal) setPeso(String(pVal));
+    // Peso (siempre limpio)
+    setPeso('');
 
     // Estatura
     let eVal = lastVal?.estatura || lastVal?.talla || p?.estatura || p?.talla || '';
@@ -127,9 +127,8 @@ const NewAssessment = () => {
       setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
     }
 
-    // Grasa
-    let gVal = lastVal?.pctGrasa2comp || lastVal?.pctGrasa || '';
-    if (gVal) setPctGrasa(String(gVal));
+    // Grasa (siempre limpio)
+    setPctGrasa('');
   };
 
   // Save drafts
@@ -155,9 +154,8 @@ const NewAssessment = () => {
              lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
           }
 
-          // Peso
-          let pVal = lastVal?.pesoActual || lastVal?.peso || p?.peso || '';
-          if (pVal) setPeso(String(pVal));
+          // Peso (siempre limpio en nueva valoración)
+          setPeso('');
 
           // Estatura
           let eVal = lastVal?.estatura || lastVal?.talla || p?.estatura || p?.talla || '';
@@ -166,9 +164,8 @@ const NewAssessment = () => {
             setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
           }
 
-          // Grasa
-          let gVal = lastVal?.pctGrasa2comp || lastVal?.pctGrasa || '';
-          if (gVal) setPctGrasa(String(gVal));
+          // Grasa (siempre limpio en nueva valoración)
+          setPctGrasa('');
         }
         
         const vals = p?.valoraciones || [];
@@ -193,6 +190,12 @@ const NewAssessment = () => {
     const pg = parseFloat(pctGrasa);
     if (!pesoNum || !pg) return null;
     return pesoNum - (pesoNum * pg / 100);
+  }, [pesoNum, pctGrasa]);
+
+  const kgGrasaCalc = useMemo(() => {
+    const pg = parseFloat(pctGrasa);
+    if (!pesoNum || !pg) return null;
+    return (pesoNum * pg / 100);
   }, [pesoNum, pctGrasa]);
 
   const addTema = () => setTemario([...temario, { id: Date.now().toString(), tema: '', detalle: '' }]);
@@ -223,8 +226,9 @@ const NewAssessment = () => {
     };
 
     if (pctGrasa) {
-      body.pctGrasa = parseFloat(pctGrasa);
+      body.pctGrasaCorp = parseFloat(pctGrasa);
       if (masaMagra !== null) body.masaMagra = parseFloat(masaMagra.toFixed(2));
+      if (kgGrasaCalc !== null) body.masaGrasaReal = parseFloat(kgGrasaCalc.toFixed(2));
     }
 
     try {
@@ -253,7 +257,7 @@ const NewAssessment = () => {
   };
 
   return (
-    <div className="animate-fade-in w-full h-[calc(100vh-60px)] font-sans flex flex-col pb-2 relative" style={{ backgroundColor: '#0a0a0a' }}>
+    <div className="animate-fade-in w-full min-h-full font-sans flex flex-col pb-6 relative" style={{ backgroundColor: '#0a0a0a' }}>
       
       {/* DRAFT PROMPT MODAL */}
       {showDraftPrompt && (
@@ -282,7 +286,7 @@ const NewAssessment = () => {
         </div>
       )}
 
-      <div className="max-w-none w-full mx-auto flex flex-col flex-1 overflow-hidden min-h-0">
+      <div className="max-w-none w-full mx-auto flex flex-col flex-1 min-h-0">
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 pb-2 text-[#f0f0f0]">
           {paciente && (
@@ -360,6 +364,7 @@ const NewAssessment = () => {
                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
                      
                      <Field label="% Grasa Corp." value={pctGrasa} onChange={(v) => { setPctGrasa(v); setIsGrasaModified(true); }} placeholder="Ej. 24.3" />
+                     <Field label="Kg Grasa" value={kgGrasaCalc !== null ? kgGrasaCalc.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
 
                      {/* Próxima consulta — full width */}
@@ -516,17 +521,17 @@ const NewAssessment = () => {
               {step < 2 ? (
                 <div className="flex flex-col-reverse sm:flex-row items-center gap-3 w-full sm:w-auto">
                   <button
-                    onClick={() => handleSave(false)}
-                    disabled={saving}
+                    onClick={() => setStep(step + 1)}
                     className="px-5 py-2.5 bg-transparent border border-[#333] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 w-full sm:w-auto text-center uppercase tracking-wide"
                   >
-                    {saving ? 'Guardando...' : 'Guardar'}
+                    Equivalencias
                   </button>
                   <button
-                    onClick={() => setStep(step + 1)}
-                    className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors flex items-center justify-center shadow-sm w-full sm:w-auto uppercase tracking-wide"
+                    onClick={() => handleSave(false)}
+                    disabled={saving}
+                    className="px-5 py-2.5 bg-[#f0f0f0] border border-[#333] text-black rounded-[8px] text-[12px] font-bold hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 w-full sm:w-auto text-center uppercase tracking-wide"
                   >
-                    Continuar a Equivalencias →
+                    {saving ? 'Guardando...' : 'Guardar  →'}
                   </button>
                 </div>
               ) : (

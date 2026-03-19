@@ -1,36 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, Clock, UserIcon, MoreHorizontal, ChevronRight, Activity, Hash, Calendar, ShieldCheck } from 'lucide-react';
-import api from '@/lib/api';
+import { Search, Plus, ChevronRight } from 'lucide-react';
+import { usePatients } from '@/hooks/usePatients';
 import type { Paciente } from '@/types';
 import { formatDate } from '@/lib/format';
 
 const Patients = () => {
-  const [pacientes, setPacientes] = useState<Paciente[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [search, setSearch]           = useState('');
+  const [debouncedSearch, setDebounced] = useState('');
   const navigate = useNavigate();
 
+  // Debounce 300ms — no se llama a la API por cada tecla
   useEffect(() => {
-    const fetchPacientes = async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/api/pacientes${search ? `?buscar=${search}` : ''}`);
-        const p = data?.data || data;
-        if (Array.isArray(p)) setPacientes(p);
-      } catch (err) {
-        console.error('Error cargando pacientes:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const timer = setTimeout(() => {
-      fetchPacientes();
-    }, 500);
-
-    return () => clearTimeout(timer);
+    const t = setTimeout(() => setDebounced(search), 300);
+    return () => clearTimeout(t);
   }, [search]);
+
+  const { data: pacientes = [], isLoading: loading } = usePatients(debouncedSearch);
 
   const diasSinVisita = (fecha?: string) => {
     if (!fecha) return null;

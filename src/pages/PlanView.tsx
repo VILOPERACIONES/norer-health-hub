@@ -149,7 +149,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
   
   if (!plan) return (
      <div className="h-[80vh] flex flex-col items-center justify-center gap-6">
-      <p className="text-[16px] font-medium text-[#8a8a8a]">Plan alimenticio no localizado</p>
+      <p className="text-[16px] font-medium text-[#8a8a8a]">Menú no localizado</p>
       <button onClick={() => onFinish ? onFinish() : navigate(`/pacientes/${pacienteId}`)} className="text-[14px] font-medium text-white hover:text-[#c0c0c0] transition-colors underline underline-offset-4">Volver al expediente</button>
     </div>
   );
@@ -173,33 +173,33 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                 </h1>
               )}
               <p className="text-[#8a8a8a] font-medium text-[13px] m-0 uppercase tracking-widest">
-                Plan alimenticio &mdash; {plan.tipoPlan || plan.tipo}
+                Menú &mdash; {plan.tipoPlan || plan.tipo}
               </p>
            </div>
            
-           <div className="flex flex-wrap gap-3">
+           <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
               <button
                 onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#181818] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222]"
+                className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#181818] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222] w-full sm:w-auto"
               >
                 <Edit2 className="h-[18px] w-[18px]" /> Editar
               </button>
               <button
                 onClick={() => setShowConfig(true)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818]"
+                className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818] w-full sm:w-auto"
               >
                 <Settings2 className="h-[18px] w-[18px]" /> Configurar PDF
               </button>
               <button
                 onClick={handlePdf}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818]"
+                className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818] w-full sm:w-auto"
               >
                 <FileText className="h-[18px] w-[18px]" /> Descargar
               </button>
               <button
                 onClick={handleEnviar}
                 disabled={sending}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a2e1a] text-accent-green border border-accent-green/20 rounded-[8px] text-[14px] font-medium transition-colors hover:bg-accent-green hover:text-[#000] disabled:opacity-50"
+                className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818] disabled:opacity-50 w-full sm:w-auto"
               >
                 {sending ? (
                   <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />

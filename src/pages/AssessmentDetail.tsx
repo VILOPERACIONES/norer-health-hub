@@ -45,7 +45,7 @@ const PlanSection = ({
       const newPlan = data?.data || data;
       setPlan(newPlan);
       setShowModal(false);
-      toast({ title: 'Plantilla asignada correctamente' });
+      toast({ title: 'Menú asignado correctamente' });
     } catch (err: any) {
       toast({ title: 'Error', description: err.response?.data?.message || 'No se pudo asignar.', variant: 'destructive' });
     } finally {
@@ -59,7 +59,7 @@ const PlanSection = ({
         <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-bg-elevated rounded-[10px] border border-border-default">
           <div>
             <p className="text-[12px] font-medium text-text-muted m-0">Plan asignado</p>
-            <p className="text-[15px] font-semibold text-text-primary m-0">{plan.nombre || plan.tipoPlan || 'Plan alimenticio'}</p>
+            <p className="text-[15px] font-semibold text-text-primary m-0">{plan.nombre || plan.tipoPlan || 'Menú'}</p>
           </div>
           <div className="flex gap-2">
             <button
@@ -87,7 +87,7 @@ const PlanSection = ({
               Se requieren equivalencias para agregar el plan
             </p>
             <p className="text-[13px] font-normal text-text-secondary m-0 leading-relaxed">
-              Completa primero el <span className="font-semibold text-text-primary">Barrido de Equivalencias</span> de esta consulta y guárdalo. Una vez asignadas las equivalencias, podrás crear o asignar un plan alimenticio.
+              Completa primero el <span className="font-semibold text-text-primary">Barrido de Equivalencias</span> de esta consulta y guárdalo. Una vez asignadas las equivalencias, podrás crear o asignar un menú.
             </p>
           </div>
         </div>
@@ -99,12 +99,6 @@ const PlanSection = ({
           >
             <Plus className="w-4 h-4" /> Crear nuevo plan
           </button>
-          <button
-            onClick={() => { setShowModal(true); fetchPlantillas(); }}
-            className="flex items-center gap-2 px-5 py-2.5 bg-bg-elevated border border-border-subtle text-text-primary rounded-[8px] text-[13px] font-medium hover:bg-[#222] transition-colors"
-          >
-            <Layers className="w-4 h-4" /> Asignar plantilla
-          </button>
         </div>
       )}
 
@@ -113,7 +107,7 @@ const PlanSection = ({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="bg-bg-surface border border-border-subtle rounded-[16px] w-full max-w-lg shadow-2xl animate-fade-in">
             <div className="flex items-center justify-between p-6 border-b border-border-subtle">
-              <h3 className="text-[16px] font-bold text-text-primary m-0">Seleccionar plantilla</h3>
+              <h3 className="text-[16px] font-bold text-text-primary m-0">Seleccionar menú base</h3>
               <button onClick={() => setShowModal(false)} className="p-2 text-text-muted hover:text-text-primary transition-colors">
                 <X className="w-5 h-5" />
               </button>
@@ -124,7 +118,7 @@ const PlanSection = ({
                   <div className="w-6 h-6 border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin" />
                 </div>
               ) : plantillas.length === 0 ? (
-                <p className="text-[14px] text-text-secondary text-center py-8">No hay plantillas disponibles</p>
+                <p className="text-[14px] text-text-secondary text-center py-8">No hay menús base disponibles</p>
               ) : (
                 plantillas.map((p) => (
                   <button
@@ -305,24 +299,32 @@ const AssessmentDetail = () => {
           </div>
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">IMC</p>
-            <p className={`text-[20px] font-bold m-0 ${imcNum >= 30 ? 'text-accent-red' : imcNum >= 25 ? 'text-yellow-400' : 'text-text-primary'}`}>
+            <p className="text-[20px] font-bold m-0 text-text-primary">
               {imcDisplay}
             </p>
           </div>
         </div>
 
-        {(val.pctGrasa || val.masaMagra) && (
-          <div className="grid grid-cols-2 p-6 md:p-8 gap-6 border-b border-border-subtle">
+        {(val.pctGrasa || val.masaMagra || val.masaGrasaReal) && (
+          <div className="grid grid-cols-2 md:grid-cols-3 p-6 md:p-8 gap-6 border-b border-border-subtle">
             {val.pctGrasa && (
               <div className="space-y-1">
                 <p className="text-[12px] font-medium text-text-secondary m-0">% Grasa</p>
                 <p className="text-[18px] font-bold text-text-primary m-0">{val.pctGrasa}%</p>
               </div>
             )}
+            {val.masaGrasaReal && (
+              <div className="space-y-1">
+                <p className="text-[12px] font-medium text-text-secondary m-0">Masa Grasa</p>
+                <p className="text-[18px] font-bold text-text-primary m-0">
+                  {val.masaGrasaReal}<span className="text-[13px] font-medium text-text-muted ml-1">kg</span>
+                </p>
+              </div>
+            )}
             {val.masaMagra && (
               <div className="space-y-1">
-                <p className="text-[12px] font-medium text-text-secondary m-0">Masa Magra</p>
-                <p className="text-[18px] font-bold text-accent-green m-0">
+                <p className="text-[12px] font-medium text-text-secondary m-0">Masa Muscular</p>
+                <p className="text-[18px] font-bold text-text-primary m-0">
                   {val.masaMagra}<span className="text-[13px] font-medium text-text-muted ml-1">kg</span>
                 </p>
               </div>
@@ -371,7 +373,19 @@ const AssessmentDetail = () => {
               <h3 className="text-[15px] font-semibold text-text-primary m-0">Barrido de Equivalencias</h3>
               <p className="text-[12px] text-text-muted m-0">
                 {barridoData
-                  ? `${Math.round(barridoData.kcalTotal || 0).toLocaleString()} kcal registradas`
+                  ? (() => {
+                      const KCAL_BD: Record<string, number> = {
+                        verduras: 0, frutas: 60, cerealSinGr: 70, cerealConGr: 115, leguminosas: 120,
+                        aoaMuyBajo: 40, aoaBajo: 55, aoaModerado: 75, aoaAlto: 100,
+                        lecheDesc: 95, lecheSemi: 110, lecheEntera: 150, lecheAz: 200,
+                        grasaSinProt: 45, grasaConProt: 70, azSinGr: 40, azConGr: 85,
+                      };
+                      // Siempre suma desde distribución — ignora energiaTotalManual que puede estar desactualizado
+                      const real = Object.values(barridoData.distribucion || {}).reduce((s, grupos) =>
+                        s + Object.entries(grupos as Record<string, number>).reduce((gs, [g, c]) =>
+                          gs + Number(c) * (KCAL_BD[g] ?? 0), 0), 0);
+                      return `${Math.round(real).toLocaleString()} kcal registradas`;
+                    })()
                   : 'Sin datos — haz clic para ingresar'}
               </p>
             </div>
@@ -415,7 +429,7 @@ const AssessmentDetail = () => {
           <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
             <FileText className="w-4 h-4" />
           </div>
-          <h3 className="text-[15px] font-semibold text-text-primary m-0">Plan alimenticio de esta consulta</h3>
+          <h3 className="text-[15px] font-semibold text-text-primary m-0">Menú de esta consulta</h3>
         </div>
 
         <PlanSection

@@ -35,8 +35,8 @@ const Plans = () => {
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
     const ok = await confirm({
-      title: '¿Eliminar Plantilla?',
-      description: 'Esta acción eliminará permanentemente la plantilla. No se puede deshacer.',
+      title: '¿Eliminar Menú?',
+      description: 'Esta acción eliminará permanentemente el menú. No se puede deshacer.',
       confirmLabel: 'Sí, Eliminar',
       cancelLabel: 'Cancelar',
       variant: 'danger',
@@ -44,7 +44,7 @@ const Plans = () => {
     if (!ok) return;
     try {
       await api.delete(`/api/planes/${id}`);
-      toast({ title: 'PLANTILLA ELIMINADA' });
+      toast({ title: 'MENÚ ELIMINADO' });
       fetchData();
     } catch (err) {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
@@ -58,7 +58,7 @@ const Plans = () => {
   if (loading) return (
     <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
       <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-      <p className="text-[14px] text-[#8a8a8a]">Cargando plantillas...</p>
+      <p className="text-[14px] text-[#8a8a8a]">Cargando menús...</p>
     </div>
   );
 
@@ -98,9 +98,9 @@ const Plans = () => {
             </div>
           </div>
 
-          {/* Tabla de Plantillas Full Width */}
-          <div className="overflow-x-auto rounded-[8px] border border-border-subtle bg-bg-surface">
-            <table className="w-full border-collapse">
+          {/* Tabla de Menús Full Width */}
+          <div className="overflow-x-auto rounded-[8px] border border-border-subtle bg-bg-surface custom-scrollbar">
+            <table className="w-full border-collapse min-w-[700px]">
               <thead>
                 <tr className="border-b border-border-subtle text-left bg-bg-surface">
                   <th className="px-6 py-4 text-[12px] font-medium text-text-muted uppercase">Nombre del Menú</th>
@@ -121,7 +121,7 @@ const Plans = () => {
                   filteredPlanes.map(p => (
                     <tr key={p.id} className="hover:bg-bg-elevated transition-colors group">
                       <td className="px-6 py-4">
-                        <p className="text-[14px] font-medium text-text-primary m-0">{p.nombre || 'Plan sin nombre'}</p>
+                        <p className="text-[14px] font-medium text-text-primary m-0">{p.nombre || 'Menú sin nombre'}</p>
                       </td>
                       <td className="px-6 py-4">
                          <p className="text-[14px] font-normal text-text-primary m-0">{p.calorias} <span className="text-text-secondary">KCAL</span></p>
@@ -139,7 +139,7 @@ const Plans = () => {
                           <button 
                             onClick={() => navigate(`/planes/${p.id}/editar`)}
                             className="p-2 text-text-secondary hover:text-text-primary hover:bg-bg-muted rounded-[8px] transition-colors"
-                            title="Editar Plan"
+                            title="Editar Menú"
                           >
                             <Edit3 className="w-[18px] h-[18px]" />
                           </button>

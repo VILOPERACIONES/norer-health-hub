@@ -106,8 +106,8 @@ const Dashboard = () => {
   const userName = user?.nombre?.split(' ')[0] || 'Especialista';
 
   // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
-  const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de plan').length;
-  const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Plan en Proceso').length;
+  const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de menú').length;
+  const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú en Proceso').length;
   const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
@@ -149,15 +149,15 @@ const Dashboard = () => {
       subColor: r?.pacientesNuevosHoy > 0 ? 'text-emerald-400' : 'text-[#555]',
     },
     {
-      label: 'Nuevos hoy',
-      value: r?.pacientesNuevosHoy ?? 0,
+      label: 'Nuevos últimos 30 días',
+      value: r?.pacientesNuevosMes ?? 0,
       icon: UserPlus,
       badge: {
-        text: `${pctNuevosHoy}% del mes`,
-        color: parseFloat(pctNuevosHoy) > 0 ? 'text-emerald-400' : 'text-[#555]',
+        text: `${pctNuevosMes}% del total`,
+        color: parseFloat(pctNuevosMes) > 0 ? 'text-emerald-400' : 'text-[#555]',
       },
-      sub: r?.pacientesNuevosMes != null ? `${r.pacientesNuevosMes} este mes` : '—',
-      subColor: 'text-[#8a8a8a]',
+      sub: r?.pacientesNuevosHoy > 0 ? `+${r.pacientesNuevosHoy} hoy` : '0 nuevos hoy',
+      subColor: r?.pacientesNuevosHoy > 0 ? 'text-emerald-400' : 'text-[#8a8a8a]',
     },
     {
       label: 'Menús pendientes',
@@ -167,7 +167,7 @@ const Dashboard = () => {
         text: `${pctPendientes}%`,
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
       },
-      sub: `${planesSinAsignar} sin equiv. · ${planesEnProceso} en proceso`,
+      sub: `${planesSinAsignar} Pendiente de menú · ${planesEnProceso} Menú en proceso`,
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
     },
     {
@@ -195,7 +195,7 @@ const Dashboard = () => {
 
   return (
     <div 
-      className="flex flex-col gap-6 animate-fade-in max-w-none overflow-hidden h-full" 
+      className="flex flex-col gap-6 animate-fade-in max-w-none min-h-full" 
       style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a' }}
     >
       {/* HEADER SECTION */}

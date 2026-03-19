@@ -76,7 +76,7 @@ const buildInitial = (value: BarridoData | null): BarridoData => ({
   porciones: value?.porciones ?? {},
   distribucion: value?.distribucion ?? {},
   kcalTotal: value?.kcalTotal ?? 0,
-  kcalManuales: value?.kcalManuales ?? {},
+  kcalManuales: {}, // Siempre limpiar — el feature fue eliminado de la UI
   energiaTotalManual: value?.energiaTotalManual ?? null,
 });
 
@@ -90,12 +90,37 @@ const cellCls =
 // ─── Componente ───────────────────────────────────────────────────────────────
 const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) => {
   const [state, setState] = useState<BarridoData>(() => buildInitial(value));
-  const [editingTiempo, setEditingTiempo] = useState<number | null>(null);
   const [newTiempoName, setNewTiempoName] = useState('');
   const [energiaInputStr, setEnergiaInputStr] = useState('');
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const { confirm, ConfirmDialogComponent } = useConfirm();
+
+  const handlePastePorciones = (e: React.ClipboardEvent<HTMLInputElement>, startRowIdx: number) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text');
+
+    // Dividir por filas (saltos de línea de Excel)
+    // Para cada fila tomamos solo la primera columna (si pegaron varias columnas del Excel)
+    // IMPORTANTE: NO filtrar vacíos — las celdas en blanco deben respetar su posición = 0
+    const rows = pastedText.split(/\r?\n/);
+
+    // Quitar filas vacías al final (trailing) pero mantener las del medio
+    let lastNonEmpty = rows.length - 1;
+    while (lastNonEmpty > 0 && rows[lastNonEmpty].trim() === '') lastNonEmpty--;
+    const values = rows.slice(0, lastNonEmpty + 1).map(row => row.split('\t')[0].trim());
+
+    if (values.length === 0) return;
+
+    const newPorciones = { ...state.porciones };
+    for (let i = 0; i < values.length; i++) {
+      const targetRowIdx = startRowIdx + i;
+      if (targetRowIdx >= GRUPOS.length) break;
+      // Celda vacía = 0 (respeta el espacio en blanco de Excel)
+      newPorciones[GRUPOS[targetRowIdx].key] = parseNum(values[i]);
+    }
+    commit({ ...state, porciones: newPorciones });
+  };
 
   const handleDragStart = (e: React.DragEvent, idx: number) => {
     setDraggedColIdx(idx);
@@ -167,10 +192,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     return manual != null && manual > 0 ? manual : colKcalAuto(tiempo);
   };
 
+  // kcalTotalAuto: suma pura de porciones × kcal_base por tiempo (sin overrides manuales)
   const kcalTotalAuto = useMemo(
-    () => tiempos.reduce((s, t) => s + colKcalEfectiva(t), 0),
+    () => tiempos.reduce((s, t) => s + colKcalAuto(t), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tiempos, distribucion, kcalManuales]
+    [tiempos, distribucion]
   );
 
   // Energía total: manual tiene prioridad sobre auto
@@ -187,13 +213,14 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   // ─── Commit ──────────────────────────────────────────────────────────────────
   const commit = (next: BarridoData) => {
+    // kcalManuales por tiempo fue eliminado de la UI → siempre limpiar para evitar datos residuales
+    const cleanManuales = {};
     const autoTotal = next.tiempos.reduce((s, t) => {
-      const manual = next.kcalManuales?.[t];
       const auto = GRUPOS.reduce(
         (gs, { key }) => gs + (next.distribucion[t]?.[key] ?? 0) * KCAL_POR_EQ[key],
         0
       );
-      return s + (manual != null && manual > 0 ? manual : auto);
+      return s + auto;
     }, 0);
     const totalFinal =
       next.energiaTotalManual != null && next.energiaTotalManual > 0
@@ -204,10 +231,10 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     const isValid = GRUPOS.every(({ key }) => {
       const porcion = next.porciones[key] || 0;
       const total = next.tiempos.reduce((s, t) => s + (next.distribucion[t]?.[key] || 0), 0);
-      return Math.abs(porcion - total) < 0.01; // Usar tolerancia en vez de ===
+      return Math.abs(porcion - total) < 0.01;
     });
 
-    const updated = { ...next, kcalTotal: totalFinal, isValid };
+    const updated = { ...next, kcalManuales: cleanManuales, kcalTotal: totalFinal, isValid };
     setState(updated);
     setTimeout(() => onChange(updated), 0);
   };
@@ -279,20 +306,25 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   const renameTiempo = (idx: number, name: string) => {
     const oldName = tiempos[idx];
+    if (oldName === name) return;
+
+    let newName = name;
+    if (tiempos.includes(newName) && tiempos.indexOf(newName) !== idx) {
+      newName = newName + '*';
+    }
+
     const newTiempos = [...tiempos];
-    newTiempos[idx] = name;
+    newTiempos[idx] = newName;
     const nextDist = { ...distribucion };
     const nextManuales = { ...kcalManuales };
-    if (oldName !== name) {
-      nextDist[name] = nextDist[oldName] || {};
-      delete nextDist[oldName];
-      if (nextManuales[oldName] != null) {
-        nextManuales[name] = nextManuales[oldName];
-        delete nextManuales[oldName];
-      }
+
+    nextDist[newName] = nextDist[oldName] || {};
+    delete nextDist[oldName];
+    if (nextManuales[oldName] != null) {
+      nextManuales[newName] = nextManuales[oldName];
+      delete nextManuales[oldName];
     }
     commit({ ...state, tiempos: newTiempos, distribucion: nextDist, kcalManuales: nextManuales });
-    setEditingTiempo(null);
   };
 
   // Evitar scroll que cambie valores
@@ -409,7 +441,6 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
           <thead>
             <tr style={{ backgroundColor: '#1a1a1a', borderBottom: '2px solid #333' }}>
               <th
-                className="sticky left-0 z-20"
                 style={{
                   padding: '10px 14px',
                   fontSize: '11px',
@@ -419,9 +450,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                   letterSpacing: '0.05em',
                   backgroundColor: '#1a1a1a',
                   borderRight: '2px solid #333',
-                  width: '170px',
-                  minWidth: '170px',
                 }}
+                className="w-[120px] sm:w-[170px] min-w-[120px] sm:min-w-[170px] uppercase font-bold text-[11px] tracking-wider sticky left-0 z-20"
               >
                 Grupo Alimenticio
               </th>
@@ -442,7 +472,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
               </th>
               {tiempos.map((t, idx) => (
                 <th
-                  key={t}
+                  key={idx}
                   draggable
                   onDragStart={(e) => handleDragStart(e, idx)}
                   onDragOver={(e) => handleDragOver(e, idx)}
@@ -458,42 +488,31 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                     borderRight: idx < tiempos.length - 1 ? '1px solid #2a2a2a' : '2px solid #333',
                     backgroundColor: draggedColIdx === idx ? '#2a3a50' : '#1a2030',
                     width: '90px',
-                    cursor: 'grab',
+                    cursor: 'default',
                   }}
                 >
                   <div className="absolute top-1 left-1/2 -translate-x-1/2 opacity-0 group-hover/th:opacity-100 transition-opacity cursor-grab hover:cursor-grabbing active:cursor-grabbing">
                     <GripHorizontal className="w-[14px] h-[14px] text-[#666] hover:text-[#999]" />
                   </div>
-                  {editingTiempo === idx ? (
+                  <div className="flex items-center justify-center gap-1 group/thead px-1 relative mt-[14px]">
                     <input
-                      autoFocus
-                      defaultValue={t}
-                      className="text-[11px] bg-transparent border-b border-[#90c2ff] outline-none w-full text-center text-[#90c2ff]"
-                      onBlur={(e) => renameTiempo(idx, e.target.value)}
-                      onKeyDown={(e) =>
-                        e.key === 'Enter' && renameTiempo(idx, (e.target as HTMLInputElement).value)
-                      }
+                      type="text"
+                      value={t}
+                      onChange={(e) => renameTiempo(idx, e.target.value)}
+                      className="text-[11px] font-bold bg-transparent border-0 border-b border-transparent hover:border-[#444] focus:border-[#90c2ff] outline-none w-full text-center text-[#c0c0c0] focus:text-[#90c2ff] uppercase transition-colors tracking-wider placeholder:text-[#444] m-0 p-0"
+                      title="Editable"
                     />
-                  ) : (
-                    <div className="flex items-center justify-center gap-1 group/thead">
-                      <span
-                        className="cursor-pointer hover:text-white transition-colors"
-                        onDoubleClick={() => setEditingTiempo(idx)}
-                        title="Doble clic para renombrar"
+                    {tiempos.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeTiempo(idx)}
+                        className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 group-hover/thead:opacity-100 text-[#555] hover:text-[#ff6b6b] transition-all bg-[#1a2030] px-1"
+                        title="Eliminar tiempo"
                       >
-                        {t}
-                      </span>
-                      {tiempos.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeTiempo(idx)}
-                          className="opacity-0 group-hover/thead:opacity-100 text-[#555] hover:text-[#ff6b6b] transition-all"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  )}
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </th>
               ))}
               <th
@@ -530,11 +549,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 >
                   {/* Nombre del grupo */}
                   <td
-                    className="sticky left-0 z-10"
-                    style={{
-                      padding: '0 10px',
-                      height: '28px',
-                      fontSize: '11px',
+                    className="sticky left-0 z-10 w-[120px] sm:w-[170px] min-w-[120px] sm:min-w-[170px] text-[10px] sm:text-[11px] px-2 h-8"
+                  style={{
                       fontWeight: 600,
                       color: '#d0d0d0',
                       backgroundColor: hdrBg,
@@ -556,11 +572,12 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       backgroundColor: rowBg,
                     }}
                   >
-                    <input
+                      <input
                       type="text"
                       inputMode="decimal"
                       value={porcion || ''}
                       onChange={(e) => setPorcion(key, parseNum(e.target.value))}
+                      onPaste={(e) => handlePastePorciones(e, rowIdx)}
                       onWheel={noScroll}
                       onKeyDown={(e) => handleCellKey(e, rowIdx, 0, tiempos.length)}
                       data-row={rowIdx}
@@ -576,7 +593,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                     const v = getCell(t, key);
                     return (
                       <td
-                        key={t}
+                        key={idx}
                         style={{
                           padding: '2px',
                           borderRight: idx < tiempos.length - 1 ? '1px solid #222' : '2px solid #333',
@@ -662,18 +679,16 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 <p style={{ margin: 0, fontSize: '11px', fontWeight: 700, color: '#8a8a8a', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Kcal / tiempo
                 </p>
-                <p style={{ margin: 0, fontSize: '10px', color: '#555', marginTop: '2px' }}>
-                  Auto · editable
-                </p>
               </td>
               <td style={{ borderRight: '2px solid #333', textAlign: 'center', color: '#444', fontSize: '13px' }}>—</td>
 
               {tiempos.map((t, idx) => {
-                const auto = colKcalAuto(t);
-                const manual = kcalManuales[t];
-                const isManual = manual != null && manual > 0;
-                const efectiva = isManual ? manual! : auto;
-                const pct = kcalTotalAuto > 0 ? ((efectiva / kcalTotalAuto) * 100).toFixed(2) : '0.00';
+                // Fórmula: kcal_auto_tiempo / energía_total_estimada × 100
+                // El denominador es energiaTotalManual (lo que el nutriólogo ingresó),
+                // con fallback al total auto-calculado de todas las porciones del barrido
+                const kcalTiempo = colKcalAuto(t);
+                const denominador = energiaTotalManual && energiaTotalManual > 0 ? energiaTotalManual : kcalTotalAuto;
+                const pct = denominador > 0 ? (kcalTiempo / denominador) * 100 : 0;
 
                 return (
                   <td
@@ -682,75 +697,23 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       padding: '6px 4px',
                       textAlign: 'center',
                       borderRight: idx < tiempos.length - 1 ? '1px solid #222' : '2px solid #333',
-                      position: 'relative',
                     }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
-                      <div style={{ position: 'relative' }} className="group/kcal">
-                        <input
-                          type="text"
-                          inputMode="numeric"
-                          value={isManual ? String(manual) : ''}
-                          onChange={(e) => {
-                            const raw = e.target.value.replace(/[^0-9]/g, '');
-                            const n = parseInt(raw, 10);
-                            setKcalManual(t, raw === '' ? null : isNaN(n) ? null : n);
-                          }}
-                          onWheel={noScroll}
-                          placeholder={String(Math.round(auto))}
-                          style={{
-                            width: '62px',
-                            textAlign: 'center',
-                            padding: '4px 2px',
-                            fontSize: '13px',
-                            fontWeight: 700,
-                            fontFamily: 'monospace',
-                            outline: 'none',
-                            border: `1px solid ${isManual ? '#3b5bdb' : '#2a2a2a'}`,
-                            borderRadius: '3px',
-                            backgroundColor: isManual ? '#111828' : 'transparent',
-                            color: isManual ? '#90c2ff' : '#8a8a8a',
-                            appearance: 'textfield',
-                          }}
-                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                        {isManual && (
-                          <button
-                            type="button"
-                            onClick={() => setKcalManual(t, null)}
-                            title="Restablecer automático"
-                            className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-[#1a0a0a] border border-[#7f1d1d] rounded-full flex items-center justify-center opacity-0 group-hover/kcal:opacity-100 transition-opacity hover:bg-[#ff6b6b]"
-                          >
-                            <RotateCcw className="w-2 h-2 text-[#ff6b6b] hover:text-white" />
-                          </button>
-                        )}
-                      </div>
-                      <span style={{ fontSize: '10px', color: '#555', fontFamily: 'monospace' }}>
-                        {pct}%
-                        {isManual && (
-                          <span style={{ color: '#90c2ff', marginLeft: '2px', fontWeight: 700 }}>M</span>
-                        )}
-                      </span>
-                    </div>
+                    <span style={{
+                      fontSize: '13px',
+                      fontWeight: 700,
+                      fontFamily: 'monospace',
+                      color: pct > 0 ? '#e0e0e0' : '#444',
+                    }}>
+                      {pct.toFixed(2)}%
+                    </span>
                   </td>
                 );
               })}
 
-              {/* Total kcal */}
-              <td style={{ padding: '8px 6px', textAlign: 'center' }}>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: '15px',
-                    fontWeight: 700,
-                    fontFamily: 'monospace',
-                    color: energiaTotalManual != null && energiaTotalManual > 0 ? '#90c2ff' : '#f0f0f0',
-                  }}
-                >
-                  {Math.round(kcalTotal)}
-                </p>
-                <p style={{ margin: 0, fontSize: '10px', color: '#555' }}>kcal</p>
-              </td>
+
+              {/* Celda vacÃ­a en columna TOTAL */}
+              <td style={{ padding: '8px 6px', textAlign: 'center' }} />
             </tr>
           </tfoot>
         </table>
@@ -762,11 +725,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
           <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#1a2030', border: '1px solid #2a3a50', display: 'inline-block' }} />
           Celda con valor
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: '#111828', border: '1px solid #3b5bdb', display: 'inline-block' }} />
-          <span style={{ color: '#90c2ff' }}>M</span> Kcal manual
-        </span>
-        <span>Doble clic en cabecera para renombrar tiempo</span>
+        <span>Puedes pegar desde Excel seleccionando una celda de Porciones</span>
       </div>
     </div>
     {ConfirmDialogComponent}
