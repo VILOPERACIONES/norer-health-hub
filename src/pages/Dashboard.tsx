@@ -195,8 +195,8 @@ const Dashboard = () => {
 
   return (
     <div 
-      className="flex flex-col gap-6 animate-fade-in max-w-none min-h-full" 
-      style={{ fontFamily: 'Inter, system-ui, sans-serif', backgroundColor: '#0a0a0a' }}
+      className="flex flex-col gap-4 animate-fade-in h-full overflow-hidden" 
+      style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {/* HEADER SECTION */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
@@ -252,10 +252,10 @@ const Dashboard = () => {
       </div>
 
       {/* SECCIÓN PRINCIPAL: Tablas */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 min-h-0">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
         
         {/* TOP CLIENTES */}
-        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col h-full overflow-hidden">
+        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
           <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a]">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#f59e0b]" />
@@ -316,14 +316,14 @@ const Dashboard = () => {
         </div>
 
         {/* ULTIMOS PACIENTES (2/3 Width on Large Screens) */}
-        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col h-full overflow-hidden">
+        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
           <div className="px-5 py-4 border-b border-[#2a2a2a]">
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
               Últimos Pacientes
             </h2>
           </div>
 
-          <div className="flex-1 overflow-x-auto w-full">
+          <div className="flex-1 min-h-0 overflow-auto w-full">
             <table className="w-full text-left border-collapse min-w-[500px]">
               <thead>
                 <tr className="border-b border-[#2a2a2a] whitespace-nowrap">
