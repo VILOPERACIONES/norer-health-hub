@@ -1,14 +1,28 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft } from 'lucide-react';
+import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 import SmaeIngredientePicker from '@/components/SmaeIngredientePicker';
 import type { Platillo, Ingrediente } from '@/types';
 
-const CATEGORIAS = ['DESAYUNO', 'COLACIÓN', 'COMIDA', 'CENA', 'PRE-ENTRENO', 'POST-ENTRENO', 'OTROS'];
+const DEFAULT_CATEGORIAS = ['DESAYUNO', 'COLACIÓN', 'ALMUERZO', 'CENA', 'PRE-ENTRENO', 'POST-ENTRENO', 'OTROS'];
 
 const Platillos = () => {
   const [platillos, setPlatillos] = useState<Platillo[]>([]);
@@ -37,7 +51,7 @@ const Platillos = () => {
   const handleCreate = () => {
     setCurrentPlatillo({
       nombre: '',
-      categoria: 'DESAYUNO',
+      categoria: '',
       ingredientes: []
     });
     setIsEditing(true);
@@ -113,6 +127,15 @@ const Platillos = () => {
     p.categoria.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Obtener todas las categorías únicas para sugerencias
+  const suggestedCategories = Array.from(new Set([
+    ...DEFAULT_CATEGORIAS,
+    ...platillos.map(p => p.categoria.toUpperCase())
+  ])).sort().filter(c => c !== '');
+
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const [newCatInput, setNewCatInput] = useState('');
+
   return (
     <div className="space-y-6 w-full">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -128,45 +151,126 @@ const Platillos = () => {
       </div>
 
       {!isEditing ? (
-        <div className="space-y-6">
-          <div className="relative max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
-            <Input 
-              placeholder="Buscar por nombre o categoría..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-10 bg-bg-surface border-border-subtle"
-            />
+        <>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-text-muted" />
+              <Input 
+                placeholder="Buscar por nombre..." 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-10 bg-bg-surface border-border-subtle"
+              />
+            </div>
+            
+            <div className="flex flex-wrap gap-2 items-center">
+              <Button 
+                variant={search === '' ? 'default' : 'outline'} 
+                size="sm" 
+                onClick={() => setSearch('')}
+                className="text-[10px] h-8 font-black uppercase tracking-widest px-4"
+              >
+                Todos
+              </Button>
+              {suggestedCategories.map(cat => (
+                <Button 
+                  key={cat}
+                  variant={search.toUpperCase() === cat ? 'default' : 'outline'} 
+                  size="sm" 
+                  onClick={() => setSearch(cat)}
+                  className="text-[10px] h-8 font-black uppercase tracking-widest px-4 border-border-subtle"
+                >
+                  {cat}
+                </Button>
+              ))}
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filtered.map(p => (
-              <Card key={p.id} className="p-5 bg-bg-surface border-border-subtle hover:border-[#444] transition-all group relative overflow-hidden">
-                <div className="flex items-start justify-between relative z-10">
-                  <div className="flex-1 min-w-0 mr-4">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[#90c2ff] bg-[#90c2ff]/10 px-2.5 py-1 rounded-full border border-[#90c2ff]/20">
-                      {p.categoria}
-                    </span>
-                    <h3 className="text-lg font-bold text-text-primary mt-3 truncate">{p.nombre}</h3>
-                    <div className="flex items-center gap-2 mt-2">
-                       <Utensils className="w-3.5 h-3.5 text-text-muted" />
-                       <p className="text-xs font-medium text-text-muted">{p.ingredientes?.length || 0} ingredientes</p>
-                    </div>
-                  </div>
-                  <div className="flex flex-col gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" onClick={() => handleEdit(p)} className="h-8 w-8 bg-bg-base/50">
-                      <Edit2 className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)} className="h-8 w-8 text-accent-red hover:bg-accent-red/10 bg-bg-base/50">
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
+          {/* Grouped Tables */}
+          {suggestedCategories.map(cat => {
+            const catPlatillos = filtered.filter(p => p.categoria.toUpperCase() === cat);
+            if (catPlatillos.length === 0) return null;
+
+            return (
+              <div key={cat} className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <div className="h-4 w-1 bg-brand-primary rounded-full" />
+                  <h2 className="text-sm font-black text-text-primary uppercase tracking-[0.2em]">{cat}</h2>
+                  <span className="text-[10px] font-bold text-text-muted bg-bg-surface px-2 py-0.5 rounded-full border border-border-subtle">
+                    {catPlatillos.length}
+                  </span>
+                </div>
+
+                <div className="bg-bg-surface border border-border-subtle rounded-xl overflow-hidden shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-bg-base/50 border-b border-border-subtle">
+                          <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Nombre del Platillo</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Ingredientes</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest">Macros Est.</th>
+                          <th className="px-6 py-4 text-[10px] font-black text-text-muted uppercase tracking-widest text-right">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-subtle/50">
+                        {catPlatillos.map(p => (
+                          <tr key={p.id} className="hover:bg-bg-base/30 transition-colors group">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
+                                  <Utensils className="w-4 h-4 text-brand-primary" />
+                                </div>
+                                <span className="font-bold text-text-primary text-sm">{p.nombre}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-wrap gap-1 max-w-xs">
+                                {p.ingredientes?.slice(0, 3).map((ing, i) => (
+                                  <span key={i} className="text-[10px] bg-bg-base border border-border-subtle px-1.5 py-0.5 rounded text-text-muted truncate">
+                                    {ing.descripcion}
+                                  </span>
+                                ))}
+                                {(p.ingredientes?.length || 0) > 3 && (
+                                  <span className="text-[10px] text-text-muted font-bold">
+                                    +{ (p.ingredientes?.length || 0) - 3} más
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4">
+                               <span className="text-xs font-medium text-text-muted">
+                                 {p.ingredientes?.length || 0} items
+                               </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <div className="flex items-center justify-end gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleEdit(p)}
+                                  className="h-8 w-8 p-0"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleDelete(p.id)}
+                                  className="h-8 w-8 p-0 text-accent-red hover:bg-accent-red/10"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-                {/* Visual accent */}
-                <div className="absolute top-0 right-0 w-24 h-24 bg-brand-primary/5 rounded-full -mr-12 -mt-12 transition-transform group-hover:scale-110" />
-              </Card>
-            ))}
-          </div>
+              </div>
+            );
+          })}
           
           {filtered.length === 0 && !loading && (
             <div className="text-center py-24 border-2 border-dashed border-border-subtle rounded-2xl bg-bg-surface/30">
@@ -188,7 +292,7 @@ const Platillos = () => {
                 ))}
              </div>
           )}
-        </div>
+        </>
       ) : (
         <Card className="p-0 bg-bg-surface border-border-subtle max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 shadow-2xl overflow-hidden">
           <div className="p-6 md:p-8 flex items-center justify-between bg-bg-base/30 border-b border-border-subtle">
@@ -226,14 +330,69 @@ const Platillos = () => {
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] block">Categoría Sugerida</label>
-                <select
-                  value={currentPlatillo?.categoria}
-                  onChange={(e) => setCurrentPlatillo({ ...currentPlatillo, categoria: e.target.value })}
-                  className="w-full h-12 bg-bg-base border border-border-subtle rounded-md px-4 text-sm font-bold outline-none focus:border-brand-primary appearance-none transition-all cursor-pointer hover:border-[#444]"
-                >
-                  {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
+                <label className="text-[11px] font-black text-text-muted uppercase tracking-[0.2em] block">Categoría del Platillo</label>
+                <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={popoverOpen}
+                      className="w-full h-12 justify-between bg-bg-base border-border-subtle focus:border-brand-primary font-bold uppercase"
+                    >
+                      {currentPlatillo?.categoria
+                        ? suggestedCategories.find((c) => c === currentPlatillo.categoria) || currentPlatillo.categoria
+                        : "Seleccionar categoría..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 bg-[#0a0a0a] border-[#333]">
+                    <Command className="bg-transparent">
+                      <CommandInput 
+                        placeholder="Buscar o crear categoría..." 
+                        value={newCatInput}
+                        onValueChange={setNewCatInput}
+                      />
+                      <CommandList className="max-h-[300px]">
+                        <CommandEmpty className="p-2">
+                          <Button 
+                            variant="ghost" 
+                            className="w-full justify-start text-brand-primary hover:bg-brand-primary/10"
+                            onClick={() => {
+                              if (newCatInput) {
+                                setCurrentPlatillo({ ...currentPlatillo, categoria: newCatInput.toUpperCase() });
+                                setPopoverOpen(false);
+                                setNewCatInput('');
+                              }
+                            }}
+                          >
+                            <Plus className="mr-2 h-4 w-4" /> Crear "{newCatInput.toUpperCase()}"
+                          </Button>
+                        </CommandEmpty>
+                        <CommandGroup>
+                          {suggestedCategories.map((cat) => (
+                            <CommandItem
+                              key={cat}
+                              value={cat}
+                              onSelect={(currentValue) => {
+                                setCurrentPlatillo({ ...currentPlatillo, categoria: currentValue === currentPlatillo?.categoria ? "" : currentValue });
+                                setPopoverOpen(false);
+                              }}
+                              className="uppercase font-bold"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  currentPlatillo?.categoria === cat ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {cat}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
             </div>
 

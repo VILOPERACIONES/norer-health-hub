@@ -8,6 +8,7 @@ import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
+import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -69,13 +70,12 @@ export const CreateEditPlanForm = ({
   const [notas, setNotas] = useState('');
   const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
   const [valData, setValData] = useState<any>(null);
-  const [availableTemplates, setAvailableTemplates] = useState<Plan[]>([]);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [showBarridoRef, setShowBarridoRef] = useState(!propPacienteId === false); // abierto por default en planes de paciente
+  const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
   
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
   const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
   const [platilloSearch, setPlatilloSearch] = useState('');
+  const [platilloCatFilter, setPlatilloCatFilter] = useState(null); // filtro activo por categoría
 
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
@@ -136,58 +136,7 @@ export const CreateEditPlanForm = ({
             }
             
             setNotas(p.notasGenerales || p.notas || '');
-            
-            // USAR MAPEO ROBUSTO
             setMenus(mapMenusFromBackend(p.menus));
-
-            // Intentar cargar la valoración ligada o la más reciente para mostrar el barrido
-            if (!isBasePlan && pacienteId) {
-              try {
-                // Obtener lista para hallar la ligada o simplemente tomar la última
-                const { data: vDataList } = await api.get(`/api/pacientes/${pacienteId}/valoraciones`);
-                const valList = vDataList?.data || vDataList;
-                if (valList && valList.length > 0) {
-                   const matched = p.valoracionId ? valList.find((v: any) => v.id === p.valoracionId) : null;
-                   const vToUse = matched || valList[0];
-                   
-                   // Cargar detalle completo de esa valoración
-                   const { data: vDataFull } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${vToUse.id}`);
-                   const v = vDataFull?.data || vDataFull;
-                   if (v) {
-                     // Fetch barrido separadamente
-                     const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${vToUse.id}/barrido`).catch(() => null);
-                     let barrido = bRes?.data;
-                     // Descender por los .data hasta el objeto de verdad
-                     while (barrido?.data) {
-                       barrido = barrido.data;
-                     }
-                     if (typeof barrido === 'string') {
-                       try { barrido = JSON.parse(barrido); } catch (e) {}
-                     }
-                     if (barrido?.barrido) {
-                       barrido = barrido.barrido; 
-                     }
-                     if (typeof barrido === 'string') {
-                       try { barrido = JSON.parse(barrido); } catch (e) {}
-                     }
-                     
-                     setValData({ ...v, barridoEquivalencias: barrido });
-                     if (!pesoUltimo) setPesoUltimo(v.pesoCurrent || v.pesoActual || v.peso || 0);
-                   }
-                }
-              } catch (e) {
-                console.error('Error cargando valoración ligada al plan:', e);
-              }
-            }
-          }
-          // Load templates as well if we are dealing with a patient
-          if (!isBasePlan) {
-            try {
-              const { data: tData } = await api.get('/api/planes?tipo=base');
-              setAvailableTemplates(tData?.data || tData || []);
-            } catch (e) {
-              console.error('Error loading templates', e);
-            }
           }
         } catch (err) {
           console.error('Error cargando plan:', err);
@@ -195,55 +144,42 @@ export const CreateEditPlanForm = ({
       };
       fetchPlan();
     } 
-    // Si estamos creando uno nuevo para un paciente, intentar cargar última valoración y plantillas
-    else if (pacienteId) {
+    // Si estamos creando uno nuevo para un paciente, intentar cargar valoración
+    else if (pacienteId && valoracionId) {
       const fetchPatientData = async () => {
         try {
-          // Cargar valoración si existe ID
-          if (valoracionId) {
-            const { data: vData } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-            const v = vData?.data || vData;
-            if (v) {
-               // Fetch barrido
-               const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null);
-               let barrido = bRes?.data;
-               while (barrido?.data) {
-                 barrido = barrido.data;
-               }
-               if (typeof barrido === 'string') {
-                 try { barrido = JSON.parse(barrido); } catch (e) {}
-               }
-               if (barrido?.barrido) {
-                 barrido = barrido.barrido; 
-               }
-               if (typeof barrido === 'string') {
-                 try { barrido = JSON.parse(barrido); } catch (e) {}
-               }
-               
-               setPesoUltimo(v.peso || 0);
-               setValData({ ...v, barridoEquivalencias: barrido });
-               if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
-
-               // INICIALIZAR TIEMPOS DEL PLAN DESDE EL BARRIDO
-               // Si el barrido tiene tiempos personalizados, los usamos para Menú 1 y Menú 2
-               if (barrido?.tiempos?.length > 0 && !isEdit) {
-                 const assessmentTiempos = barrido.tiempos.map((t: string) => ({
-                   nombre: t.toUpperCase(),
-                   ingredientes: [],
-                   nota: ''
-                 }));
-                 setMenus([
-                   { nombre: 'Menú 1', tiempos: assessmentTiempos },
-                   { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
-                 ]);
-               }
+          const { data: vData } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
+          const v = vData?.data || vData;
+          if (v) {
+             const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null);
+             let barrido = bRes?.data;
+             while (barrido?.data) barrido = barrido.data;
+             if (typeof barrido === 'string') {
+               try { barrido = JSON.parse(barrido); } catch (e) {}
              }
-          }
-          // Cargar plantillas disponibles
-          const { data: tData } = await api.get('/api/planes?tipo=base');
-          setAvailableTemplates(tData?.data || tData || []);
+             if (barrido?.barrido) barrido = barrido.barrido; 
+             if (typeof barrido === 'string') {
+               try { barrido = JSON.parse(barrido); } catch (e) {}
+             }
+             
+             setPesoUltimo(v.peso || 0);
+             setValData({ ...v, barridoEquivalencias: barrido });
+             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
+
+             if (barrido?.tiempos?.length > 0 && !isEdit) {
+               const assessmentTiempos = barrido.tiempos.map((t: string) => ({
+                 nombre: t.toUpperCase(),
+                 ingredientes: [],
+                 nota: ''
+               }));
+               setMenus([
+                 { nombre: 'Menú 1', tiempos: assessmentTiempos },
+                 { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
+               ]);
+             }
+           }
         } catch (err) {
-          console.error('Error cargando datos del paciente/plantillas:', err);
+          console.error('Error cargando datos del paciente:', err);
         }
       };
       fetchPatientData();
@@ -255,20 +191,6 @@ export const CreateEditPlanForm = ({
     }).catch(e => console.error("Error loading platillos library", e));
   }, [planId, isEdit, pacienteId, valoracionId, isBasePlan]);
 
-  const loadTemplate = (template: Plan) => {
-    setNombrePlan(template.nombre || '');
-    setTipo(template.tipoPlan || template.tipo || 'Balanceada');
-    setCalorias((template.calorias || 1800).toString());
-    setProteinas((template.proteinasPct || (template as any).macros?.proteinas || 30).toString());
-    setCarbohidratos((template.carbohidratosPct || (template as any).macros?.carbohidratos || 40).toString());
-    setGrasas((template.grasasPct || (template as any).macros?.grasas || 30).toString());
-    
-    // IMPORTANTE: Mapear los menús de la plantilla antes de setearlos
-    setMenus(mapMenusFromBackend(template.menus));
-    
-    setShowTemplates(false);
-    toast({ title: 'MENÚ BASE CARGADO', description: 'Ahora puedes personalizarlo para este paciente.' });
-  };
 
   const cal = parseFloat(calorias) || 0;
   const pPct = parseFloat(proteinas) || 0;
@@ -384,6 +306,35 @@ export const CreateEditPlanForm = ({
     cGr: (cal * cPct / 100) / 4, cGrKg: pesoUltimo > 0 ? ((cal * cPct / 100) / 4) / pesoUltimo : 0,
     gGr: (cal * gPct / 100) / 9, gGrKg: pesoUltimo > 0 ? ((cal * gPct / 100) / 9) / pesoUltimo : 0,
   }), [cal, pPct, cPct, gPct, pesoUltimo]);
+
+  const autoScaleIngredients = (nextBarridoData: BarridoData) => {
+    if (!nextBarridoData?.distribucion) return;
+    
+    setMenus(prevMenus => prevMenus.map(menu => ({
+      ...menu,
+      tiempos: menu.tiempos.map(tiempo => {
+        const tiempoNameLower = (tiempo.nombre || '').toLowerCase().trim();
+        const barridoTiempoKey = nextBarridoData.tiempos.find(t => t.toLowerCase().trim() === tiempoNameLower);
+        
+        if (!barridoTiempoKey) return tiempo;
+
+        return {
+          ...tiempo,
+          ingredientes: tiempo.ingredientes.map(ing => {
+            if (ing.platillo && ing.eqGrupo) {
+              const assignedEq = nextBarridoData.distribucion[barridoTiempoKey]?.[ing.eqGrupo] || 0;
+              if (assignedEq >= 0) {
+                const baseEq = Number(ing.eqCantidad) || 1;
+                const newCant = (Number(ing.cantidad) / baseEq) * Number(assignedEq);
+                return { ...ing, cantidad: newCant, eqCantidad: assignedEq };
+              }
+            }
+            return ing;
+          })
+        };
+      })
+    })));
+  };
 
 
   const updateMenu = (menuIdx: number, fn: (m: Menu) => Menu) => {
@@ -555,35 +506,6 @@ export const CreateEditPlanForm = ({
             {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
           </button>
 
-          {!isBasePlan && (
-            /* Usar menú base */
-            <div className="relative w-full sm:w-auto">
-              <button
-                onClick={() => setShowTemplates(!showTemplates)}
-                className="w-full sm:w-auto px-[18px] py-[10px] bg-[#111111] border border-[#333] text-white text-[14px] font-medium rounded-[8px] hover:bg-[#181818] transition-colors flex items-center justify-center gap-2"
-              >
-                <ClipboardList className="h-[18px] w-[18px]" /> Usar menú base
-              </button>
-              {showTemplates && (
-                <div className="absolute top-full right-0 mt-2 w-[350px] bg-[#111111] border border-[#333] rounded-[12px] shadow-2xl z-50 p-4 space-y-4 animate-slide-up">
-                  <p className="text-[14px] font-medium text-[#8a8a8a] m-0">Seleccionar menú</p>
-                  <div className="max-h-60 overflow-y-auto space-y-2 custom-scrollbar pr-2">
-                    {availableTemplates.map(t => (
-                      <button
-                        key={t.id}
-                        onClick={() => loadTemplate(t)}
-                        className="w-full text-left p-3 rounded-[8px] hover:bg-[#181818] border border-transparent hover:border-[#333] transition-all group"
-                      >
-                        <p className="text-[14px] font-medium text-white group-hover:text-brand-primary m-0">{t.nombre || 'Menú Sin Nombre'}</p>
-                        <p className="text-[12px] font-normal text-[#8a8a8a] mt-1 m-0">{t.calorias} Kcal · {t.tipo}</p>
-                      </button>
-                    ))}
-                    {availableTemplates.length === 0 && <p className="p-4 text-center text-[14px] font-normal text-[#8a8a8a]">Sin menús disponibles</p>}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         {isBasePlan && isEdit && (
@@ -739,6 +661,41 @@ export const CreateEditPlanForm = ({
           </div>
         </div>
 
+        {/* TABLA DE EQUIVALENCIAS (BARRIDO) */}
+        {!isBasePlan && valData?.barridoEquivalencias && (
+          <div className="bg-[#111] rounded-[12px] border border-[#2a2a2a] overflow-hidden">
+             <div 
+               className="bg-[#181818] px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-[#1d1d1d] transition-all"
+               onClick={() => setShowBarridoRef(!showBarridoRef)}
+             >
+                <div className="flex items-center gap-3">
+                   <div className="p-2 bg-brand-primary/10 rounded-lg">
+                      <Activity className="h-4 w-4 text-brand-primary" />
+                   </div>
+                   <div>
+                      <h3 className="text-[14px] font-bold text-white uppercase tracking-wider">Carga Estratégica de Equivalencias (Barrido)</h3>
+                      <p className="text-[11px] text-[#8a8a8a]">Sincronización automática con porciones asignadas</p>
+                   </div>
+                </div>
+                <div className="flex items-center gap-2">
+                   <ChevronDown className={`h-5 w-5 text-[#555] transition-transform duration-300 ${showBarridoRef ? 'rotate-180' : ''}`} />
+                </div>
+             </div>
+             
+             {showBarridoRef && (
+               <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300">
+                  <BarridoEquivalenciasComp 
+                    value={valData.barridoEquivalencias} 
+                    onChange={(data) => {
+                      setValData({ ...valData, barridoEquivalencias: data });
+                      autoScaleIngredients(data);
+                    }} 
+                  />
+               </div>
+             )}
+          </div>
+        )}
+
         {/* SECCIÓN DE MENÚS: Ahora a dos columnas completas */}
         <div className="grid md:grid-cols-2 gap-8 items-start">
             {menus.map((menu, mi) => (
@@ -880,40 +837,133 @@ export const CreateEditPlanForm = ({
                           
                           {showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti && (
                             <div className="absolute z-50 left-0 right-0 mt-2 bg-[#111] border border-[#333] rounded-[12px] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                               {/* Buscador general */}
                                <Input 
-                                 placeholder="Buscar platillo..." 
+                                 placeholder="Buscar por nombre de platillo..." 
                                  className="h-8 text-xs mb-3 bg-bg-base"
                                  autoFocus
                                  value={platilloSearch}
-                                 onChange={(e) => setPlatilloSearch(e.target.value)}
+                                 onChange={(e) => { setPlatilloSearch(e.target.value); if (e.target.value) setPlatilloCatFilter(null); }}
                                />
-                               <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
-                                  {platilloLibrary
-                                    .filter(p => p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) || p.categoria.toLowerCase().includes(platilloSearch.toLowerCase()))
-                                    .map(p => (
+                               
+                               {/* Sin búsqueda: mostrar categorías primero */}
+                               {!platilloSearch && !platilloCatFilter && (
+                                 <div>
+                                   <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-2">Selecciona categoría</p>
+                                   <div className="flex flex-wrap gap-1.5">
+                                     {Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort().map(cat => (
+                                       <button
+                                         key={cat}
+                                         onClick={() => setPlatilloCatFilter(cat)}
+                                         className="px-3 py-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#90c2ff] hover:text-[#90c2ff] rounded-[6px] text-[10px] font-bold text-[#8a8a8a] transition-colors uppercase"
+                                       >
+                                         {cat}
+                                       </button>
+                                     ))}
+                                   </div>
+                                 </div>
+                               )}
+
+                               {/* Categoría seleccionada: header + lista de platillos */}
+                               {(platilloSearch || platilloCatFilter) && (
+                               <>
+                                 {platilloCatFilter && !platilloSearch && (
+                                   <div className="flex items-center gap-2 mb-2">
+                                     <button
+                                       onClick={() => setPlatilloCatFilter(null)}
+                                       className="text-[9px] text-[#555] hover:text-white transition-colors uppercase font-bold"
+                                     >
+                                       ← Categorías
+                                     </button>
+                                     <span className="text-[10px] font-black text-[#90c2ff] uppercase">{platilloCatFilter}</span>
+                                   </div>
+                                 )}
+                                 <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
+                                   {(() => {
+                                     // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
+                                     const LABEL_TO_KEY: Record<string, string> = {
+                                       'Verduras': 'verduras', 'Verdura': 'verduras',
+                                       'Frutas': 'frutas', 'Fruta': 'frutas',
+                                       'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
+                                       'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
+                                       'Leguminosas': 'leguminosas',
+                                       'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
+                                       'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
+                                       'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
+                                       'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
+                                       'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
+                                       'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
+                                       'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
+                                       'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
+                                       'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
+                                       'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
+                                       'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
+                                       'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
+                                     };
+                                     
+                                     const results = platilloLibrary.filter(p => {
+                                       if (platilloSearch) {
+                                         return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
+                                                p.categoria.toLowerCase().includes(platilloSearch.toLowerCase());
+                                       }
+                                       return p.categoria === platilloCatFilter;
+                                     });
+
+                                     if (results.length === 0) return <p className="text-center py-4 text-[10px] text-[#555]">Sin resultados.</p>;
+
+                                     return results.map(p => (
                                        <button
                                          key={p.id}
                                          onClick={() => {
-                                            const ings = p.ingredientes.map((i, idx) => ({ 
-                                              ...i, 
-                                              platillo: p.nombre,
-                                              orden: (tiempo.ingredientes.length || 0) + idx + 1 
-                                            }));
-                                            updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
-                                            setShowPlatilloSelector(null);
-                                            setPlatilloSearch('');
+                                           const d = valData?.barridoEquivalencias?.distribucion;
+                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
+                                           const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
+                                             (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
+                                           );
+                                           const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
+
+                                           const ings = p.ingredientes.map((i: any, idx: number) => {
+                                             let scaledCant = Number(i.cantidad);
+                                             let scaledEq = Number(i.eqCantidad);
+
+                                             if (i.eqGrupo && distTiempo) {
+                                               // Traduce el label del platillo al key del barrido
+                                               const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
+                                               const assigned = distTiempo[barridoKey];
+                                               if (assigned != null && assigned > 0) {
+                                                 const baseEq = Number(i.eqCantidad) || 1;
+                                                 scaledCant = parseFloat(((Number(i.cantidad) / baseEq) * assigned).toFixed(2));
+                                                 scaledEq = assigned;
+                                               }
+                                             }
+
+                                             return {
+                                               ...i,
+                                               cantidad: scaledCant,
+                                               eqCantidad: scaledEq,
+                                               platillo: p.nombre,
+                                               orden: (tiempo.ingredientes.length || 0) + idx + 1
+                                             };
+                                           });
+
+                                           updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
+                                           setShowPlatilloSelector(null);
+                                           setPlatilloSearch('');
+                                           setPlatilloCatFilter(null);
                                          }}
                                          className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
                                        >
-                                          <div>
-                                            <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
-                                            <p className="text-[10px] text-[#555]">{p.categoria}</p>
-                                          </div>
-                                          <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
+                                         <div>
+                                           <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
+                                           <p className="text-[10px] text-[#555]">{p.categoria}</p>
+                                         </div>
+                                         <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
                                        </button>
-                                  ))}
-                                  {platilloLibrary.length === 0 && <p className="text-center py-4 text-[11px] text-[#555]">No hay platillos en la biblioteca</p>}
-                               </div>
+                                     ));
+                                   })()}
+                                 </div>
+                               </>
+                               )}
                             </div>
                           )}
                         </div>

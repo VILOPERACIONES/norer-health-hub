@@ -34,11 +34,14 @@ const KpiCardCompact = ({ label, value, active, icon: Icon }: { label: string, v
   </div>
 );
 
-const ChartBox = ({ title, children }: { title: string, children: React.ReactNode }) => (
+const ChartBox = ({ title, children, extra }: { title: string, children: React.ReactNode, extra?: React.ReactNode }) => (
   <div className="border border-border-subtle p-6 bg-bg-surface flex flex-col rounded-[12px] min-h-[300px]">
-    <h2 className="text-[12px] font-medium uppercase tracking-widest mb-6 text-text-secondary leading-none">
-      {title}
-    </h2>
+    <div className="flex items-center justify-between mb-6">
+      <h2 className="text-[12px] font-medium uppercase tracking-widest text-text-secondary leading-none">
+        {title}
+      </h2>
+      {extra}
+    </div>
     <div className="w-full flex-1 min-h-0">
       {children}
     </div>
@@ -206,6 +209,7 @@ const PatientProfile = () => {
   const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
   const [loading, setLoading] = useState(true);
   const [showFullExpediente, setShowFullExpediente] = useState(false);
+  const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -227,7 +231,8 @@ const PatientProfile = () => {
               ...v,
               pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
               grasaEvolucion: parseFloat((v.pctGrasa || v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
-              masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.'))
+              masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.')),
+              kgGrasaEvolucion: parseFloat((v.masaGrasaReal || v.kgGrasa2comp || 0).toString().replace(',', '.'))
             }))
             .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
           setValoraciones(processed);
@@ -417,17 +422,18 @@ const PatientProfile = () => {
         )}
 
         <div className="flex justify-between items-center pt-4 border-t border-border-subtle/50">
-           <div>
-             <h2 className="text-[18px] font-semibold text-text-primary m-0 mb-1 tracking-tight">Indicadores Críticos</h2>
-             <p className="text-[14px] text-text-secondary m-0">Métricas principales de progreso físico</p>
-           </div>
+            <div>
+              <h2 className="text-[18px] font-semibold text-text-primary m-0 mb-1 tracking-tight">Indicadores Críticos</h2>
+              <p className="text-[14px] text-text-secondary m-0">Métricas principales de progreso físico</p>
+            </div>
         </div>
 
         {/* KPIs */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
           <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
-          <KpiCardCompact label="Porcentaje Grasa" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Heart} />
+          <KpiCardCompact label="Kilos Grasa (KG)" value={`${(currentVal as any)?.masaGrasaReal || (currentVal as any)?.kgGrasa2comp || '--'} KG`} icon={Heart} />
+          <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Activity} />
         </section>
 
         {/* PROGRESS CHARTS HIGH-CONTRAST */}
@@ -507,7 +513,25 @@ const PatientProfile = () => {
             </ResponsiveContainer>
           </ChartBox>
 
-          <ChartBox title="Grasa Corporal (%)">
+          <ChartBox 
+            title="Grasa Corporal" 
+            extra={
+              <div className="flex bg-bg-elevated p-0.5 rounded-[6px] border border-border-subtle">
+                <button 
+                  onClick={() => setFatChartMode('pct')}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'pct' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  %
+                </button>
+                <button 
+                  onClick={() => setFatChartMode('kg')}
+                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'kg' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  KG
+                </button>
+              </div>
+            }
+          >
              <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
@@ -527,10 +551,11 @@ const PatientProfile = () => {
                 />
                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
                 <Area 
+                  key={fatChartMode}
                   type="monotone" 
-                  dataKey="grasaEvolucion" 
-                  name="Grasa"
-                  stroke="#f0f0f0" 
+                  dataKey={fatChartMode === 'pct' ? "grasaEvolucion" : "kgGrasaEvolucion"} 
+                  name={fatChartMode === 'pct' ? "Porcenteja de Grasa (%)" : "Kilos Grasa (KG)"}
+                  stroke={fatChartMode === 'pct' ? "#f0f0f0" : "#f0f0f0"} 
                   strokeWidth={2} 
                   fill="rgba(240, 240, 240, 0.05)"
                   dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}

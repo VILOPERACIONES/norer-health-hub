@@ -7,6 +7,7 @@ import BarridoEquivalenciasComp, { type BarridoData } from '@/components/Barrido
 import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
+import CalcomScheduling from '@/components/CalcomScheduling';
 
 const Field = ({
   label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '',
@@ -50,11 +51,13 @@ const NewAssessment = () => {
   const [kgGrasa, setKgGrasa] = useState(''); // Kg Grasa manually? Or just auto? I'll add for capture.
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
+  const [evitar, setEvitar] = useState<{ id: string; valor: string }[]>([]);
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
   const [proximaSesion, setProximaSesion] = useState('');
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
+  const [calcomData, setCalcomData] = useState<{ fecha: string; modalidad: string; eventTypeId: number; name: string; email: string; phone: string } | null>(null);
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
   const [pendingDraft, setPendingDraft] = useState<any>(null);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
@@ -221,6 +224,14 @@ const NewAssessment = () => {
     setTemario(nt);
   };
 
+  const addEvitar = () => setEvitar([...evitar, { id: Date.now().toString(), valor: '' }]);
+  const removeEvitar = (idx: number) => setEvitar(evitar.filter((_, i) => i !== idx));
+  const updateEvitar = (idx: number, val: string) => {
+    const ne = [...evitar];
+    ne[idx].valor = val;
+    setEvitar(ne);
+  };
+
   const clearDraft = () => localStorage.removeItem(`draft_assessment_${pacienteId}`);
 
   const handleSave = async (redirectAPlan: boolean | 'equivalencias' = false) => {
@@ -236,6 +247,7 @@ const NewAssessment = () => {
       imc: parseFloat(imc.toFixed(2)),
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
+      evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
@@ -256,6 +268,42 @@ const NewAssessment = () => {
       }
 
       toast({ title: 'Valoración guardada correctamente' });
+      
+      // AGENDAR CITA EN SEGUNDO PLANO SI HAY DATOS
+      if (calcomData) {
+        // Si los datos de contacto cambiaron, actualizamos al paciente primario
+        const hasChanges = calcomData.name !== paciente.nombre || 
+                          calcomData.email !== paciente.email || 
+                          (calcomData.phone && calcomData.phone !== paciente.telefono);
+        
+        if (hasChanges) {
+          try {
+            await api.patch(`/api/pacientes/${pacienteId}`, {
+              nombre: calcomData.name,
+              email: calcomData.email,
+              telefono: calcomData.phone
+            });
+          } catch (updateErr) {
+            console.error('Error actualizando paciente:', updateErr);
+          }
+        }
+
+        try {
+          await api.post('/api/citas/agendar', {
+            pacienteId,
+            ...calcomData
+          });
+          toast({ title: 'Cita agendada', description: 'Se ha enviado la confirmación por correo.' });
+        } catch (bookingErr) {
+          console.error('Error al agendar cita:', bookingErr);
+          toast({ 
+            title: 'Valoración guardada, pero la cita falló', 
+            description: 'Intenta agendar manualmente o revisa la configuración de Cal.com.', 
+            variant: 'destructive' 
+          });
+        }
+      }
+
       clearDraft();
 
       if (redirectAPlan && valoracionId) {
@@ -381,26 +429,10 @@ const NewAssessment = () => {
                       <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
                       <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
-
-                     {/* Próxima consulta — full width */}
-                     <div className="sm:col-span-2">
-                       <Field
-                         label="Próxima Consulta"
-                         value={proximaSesion}
-                         onChange={setProximaSesion}
-                         type="datetime-local"
-                       />
-                       {proximaSesion && (
-                         <p className="mt-1 text-[10px] text-[#5a5a5a]">
-                           {'Registrada para: '}
-                           {new Date(proximaSesion).toLocaleString('es-MX', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                         </p>
-                       )}
-                     </div>
                    </div>
                  </div>
 
-                 {/* COLUMNA 2: TEMARIO */}
+                 {/* COLUMNA 2: TEMARIO Y NOTAS */}
                  <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
                     <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas y Temario</h4>
                     <div className="shrink-0">
@@ -411,6 +443,32 @@ const NewAssessment = () => {
                          className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
                          placeholder="Observaciones relevantes de la consulta..."
                        />
+                    </div>
+
+                    <div className="shrink-0 mt-4">
+                        <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
+                           <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
+                           <button onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
+                             <Plus className="h-2.5 w-2.5" /> Agregar
+                           </button>
+                        </div>
+                        <div className="space-y-2">
+                          {evitar.map((e, idx) => (
+                            <div key={e.id} className="flex gap-2 items-center">
+                              <input
+                                type="text"
+                                value={e.valor}
+                                onChange={(el) => updateEvitar(idx, el.target.value)}
+                                className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                                placeholder="Ej. Lácteos, Azúcares..."
+                              />
+                              <button onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          ))}
+                          {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
+                        </div>
                     </div>
 
                     <div className="flex-1 flex flex-col min-h-0 mt-4">
@@ -453,6 +511,13 @@ const NewAssessment = () => {
                        </div>
                     </div>
                  </div>
+              </div>
+
+              <div className="mt-4">
+                 <CalcomScheduling 
+                   pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
+                   onSelection={setCalcomData}
+                 />
               </div>
             </div>
           )}
