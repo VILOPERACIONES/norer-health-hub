@@ -372,21 +372,7 @@ const AssessmentDetail = () => {
             <div className="text-left">
               <h3 className="text-[15px] font-semibold text-text-primary m-0">Barrido de Equivalencias</h3>
               <p className="text-[12px] text-text-muted m-0">
-                {barridoData
-                  ? (() => {
-                      const KCAL_BD: Record<string, number> = {
-                        verduras: 0, frutas: 60, cerealSinGr: 70, cerealConGr: 115, leguminosas: 120,
-                        aoaMuyBajo: 40, aoaBajo: 55, aoaModerado: 75, aoaAlto: 100,
-                        lecheDesc: 95, lecheSemi: 110, lecheEntera: 150, lecheAz: 200,
-                        grasaSinProt: 45, grasaConProt: 70, azSinGr: 40, azConGr: 85,
-                      };
-                      // Siempre suma desde distribución — ignora energiaTotalManual que puede estar desactualizado
-                      const real = Object.values(barridoData.distribucion || {}).reduce((s, grupos) =>
-                        s + Object.entries(grupos as Record<string, number>).reduce((gs, [g, c]) =>
-                          gs + Number(c) * (KCAL_BD[g] ?? 0), 0), 0);
-                      return `${Math.round(real).toLocaleString()} kcal registradas`;
-                    })()
-                  : 'Sin datos — haz clic para ingresar'}
+                {barridoData ? `${Math.round(barridoData.kcalTotal || 0).toLocaleString()} kcal totales` : "Sin datos - haz clic para ingresar"}
               </p>
             </div>
           </div>

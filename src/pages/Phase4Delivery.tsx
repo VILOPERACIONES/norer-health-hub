@@ -30,6 +30,10 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
 
   useEffect(() => {
     const loadMeta = async () => {
+      if (!planId || planId === 'undefined' || planId === '') {
+        setLoadingInitial(false);
+        return;
+      }
       try {
         const res = await api.get(`/api/planes/${planId}`);
         if (res.data?.pdfCustomMeta) {
@@ -135,17 +139,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="text-[12px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Notas Destacadas</h3>
-            <div className="group">
-              <label className="text-[13px] font-medium text-[#c0c0c0] mb-2 block group-focus-within:text-[#90c2ff] transition-colors">Nota de advertencia (Amarilla)</label>
-              <input type="text" value={meta.notaAmarilla || ''} onChange={(e) => handleTextChange('notaAmarilla', e.target.value)} className="w-full bg-[#111] border border-[#333] rounded-[10px] px-4 py-3 text-[14px] text-white focus:border-[#90c2ff] focus:ring-1 focus:ring-[#90c2ff]/30 focus:outline-none transition-all" placeholder="Ej. Precaución con rodilla..." />
-            </div>
-            <div className="group mt-4">
-              <label className="text-[13px] font-medium text-[#c0c0c0] mb-2 block group-focus-within:text-[white] transition-colors">Mensaje Final / Precio Promo</label>
-              <input type="text" value={meta.precioEspecial || ''} onChange={(e) => handleTextChange('precioEspecial', e.target.value)} className="w-full bg-[#111] border border-[#333] rounded-[10px] px-4 py-3 text-[14px] text-white focus:border-white focus:ring-1 focus:ring-white/30 focus:outline-none transition-all" placeholder="Ej. PRECIO PROMOCION = $600" />
-            </div>
-          </div>
+          {/* Sección de Notas Destacadas removida según solicitud del usuario */}
         </div>
 
         <div className="space-y-3 pt-4 border-t border-[#1a1a1a]">

@@ -41,7 +41,7 @@ const NewAssessment = () => {
 
   const now = new Date();
   const [step, setStep] = useState(1);
-  const [fecha, setFecha] = useState(now.toISOString().split('T')[0]);
+  const [fecha, setFecha] = useState(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`);
   const [hora, setHora] = useState(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
   const [numeroValoracion, setNumeroValoracion] = useState(1);
   const [peso, setPeso] = useState('');
@@ -164,8 +164,9 @@ const NewAssessment = () => {
             setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
           }
 
-          // Grasa (siempre limpio en nueva valoración)
+          // Grasa (siempre lo dejamos manual para capturar Kg o % por solicitud)
           setPctGrasa('');
+          setKgGrasa('');
         }
         
         const vals = p?.valoraciones || [];
@@ -192,11 +193,25 @@ const NewAssessment = () => {
     return pesoNum - (pesoNum * pg / 100);
   }, [pesoNum, pctGrasa]);
 
-  const kgGrasaCalc = useMemo(() => {
-    const pg = parseFloat(pctGrasa);
-    if (!pesoNum || !pg) return null;
-    return (pesoNum * pg / 100);
-  }, [pesoNum, pctGrasa]);
+  const handlePctGrasaChange = (v: string) => {
+    setPctGrasa(v);
+    const vNum = parseFloat(v);
+    if (pesoNum > 0 && !isNaN(vNum)) {
+      setKgGrasa(((pesoNum * vNum) / 100).toFixed(2));
+    } else {
+      setKgGrasa('');
+    }
+  };
+
+  const handleKgGrasaChange = (v: string) => {
+    setKgGrasa(v);
+    const vNum = parseFloat(v);
+    if (pesoNum > 0 && !isNaN(vNum) && vNum > 0) {
+      setPctGrasa(((vNum / pesoNum) * 100).toFixed(2));
+    } else {
+      setPctGrasa('');
+    }
+  };
 
   const addTema = () => setTemario([...temario, { id: Date.now().toString(), tema: '', detalle: '' }]);
   const removeTema = (idx: number) => setTemario(temario.filter((_, i) => i !== idx));
@@ -228,7 +243,7 @@ const NewAssessment = () => {
     if (pctGrasa) {
       body.pctGrasaCorp = parseFloat(pctGrasa);
       if (masaMagra !== null) body.masaMagra = parseFloat(masaMagra.toFixed(2));
-      if (kgGrasaCalc !== null) body.masaGrasaReal = parseFloat(kgGrasaCalc.toFixed(2));
+      if (kgGrasa) body.masaGrasaReal = parseFloat(kgGrasa);
     }
 
     try {
@@ -363,8 +378,8 @@ const NewAssessment = () => {
                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
                      
-                     <Field label="% Grasa Corp." value={pctGrasa} onChange={(v) => { setPctGrasa(v); setIsGrasaModified(true); }} placeholder="Ej. 24.3" />
-                     <Field label="Kg Grasa" value={kgGrasaCalc !== null ? kgGrasaCalc.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
+                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
 
                      {/* Próxima consulta — full width */}

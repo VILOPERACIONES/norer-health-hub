@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { BarChart3, Users, Settings, LogOut, Menu, User as UserIcon, ClipboardList, ChevronLeft, ChevronRight, Calendar, MessageSquare, Clock, ShieldCheck, Sun, Moon, BookOpen, ListTodo } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Logo from './Logo';
 import { useAuthStore } from '@/store/auth';
 import { useThemeStore } from '@/store/theme';
@@ -8,7 +8,7 @@ import { useThemeStore } from '@/store/theme';
 const navItems = [
   { to: '/dashboard', icon: BarChart3, label: 'RESUMEN' },
   { to: '/pacientes', icon: Users, label: 'PACIENTES' },
-  { to: '/planes', icon: ClipboardList, label: 'MENÚS' },
+  { to: '/platillos', icon: BookOpen, label: 'PLATILLOS' },
   { to: '/pendientes', icon: ListTodo, label: 'PENDIENTES' },
   { to: '/equivalencias', icon: BookOpen, label: 'EQUIVALENCIAS' },
   { to: '/configuracion', icon: Settings, label: 'AJUSTES' },
@@ -21,6 +21,11 @@ const Layout = () => {
   const { theme, setTheme } = useThemeStore();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Auto-colapsar sidebar al navegar
+  useEffect(() => {
+    setCollapsed(true);
+  }, [location.pathname]);
 
   const handleLogout = () => {
     logout();
@@ -45,6 +50,7 @@ const Layout = () => {
     if (path === 'dashboard') return user.permisos?.dashboard?.read !== false;
     if (path === 'pacientes') return user.permisos?.pacientes?.read !== false;
     if (path === 'planes') return user.permisos?.planes?.read !== false;
+    if (path === 'platillos') return user.permisos?.planes?.read !== false;
     if (path === 'pendientes') return user.permisos?.planes?.read !== false;
     if (path === 'equivalencias') return user.permisos?.smae?.read !== false;
     if (path === 'configuracion') return true; // Ajustes siempre visible para perfil

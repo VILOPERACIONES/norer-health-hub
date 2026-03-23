@@ -22,6 +22,7 @@ import Plans from "@/pages/Plans";
 import Pending from "@/pages/Pending";
 import Settings from "@/pages/Settings";
 import EquivalenciasSMAE from "@/pages/EquivalenciasSMAE";
+import Platillos from "@/pages/Platillos";
 import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -65,7 +66,7 @@ const App = () => {
     const isAdmin = user.rol === 'admin' || (user as any).role === 'admin';
     if (isAdmin || user.permisos?.dashboard?.read !== false) return "/dashboard";
     if (user.permisos?.pacientes?.read !== false) return "/pacientes";
-    if (user.permisos?.planes?.read !== false) return "/planes";
+    if (user.permisos?.pacientes?.read !== false) return "/pacientes";
     if (user.permisos?.smae?.read !== false) return "/equivalencias";
     return "/configuracion";
   };
@@ -102,14 +103,11 @@ const App = () => {
               <Route path="pacientes/:id/planes/:planId" element={<PermissionGuard module="pacientes"><PlanView /></PermissionGuard>} />
               <Route path="pacientes/:id/planes/:planId/editar" element={<PermissionGuard module="pacientes"><CreateEditPlan /></PermissionGuard>} />
               
-              {/* Rutas de Planes */}
-              <Route path="planes" element={<PermissionGuard module="planes"><Plans /></PermissionGuard>} />
               <Route path="pendientes" element={<PermissionGuard module="planes"><Pending /></PermissionGuard>} />
-              <Route path="planes/nuevo" element={<PermissionGuard module="planes"><CreateEditPlan /></PermissionGuard>} />
-              <Route path="planes/:planId/editar" element={<PermissionGuard module="planes"><CreateEditPlan /></PermissionGuard>} />
               
               <Route path="configuracion" element={<Settings />} />
               <Route path="equivalencias" element={<PermissionGuard module="smae"><EquivalenciasSMAE /></PermissionGuard>} />
+              <Route path="platillos" element={<PermissionGuard module="planes"><Platillos /></PermissionGuard>} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>

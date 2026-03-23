@@ -207,6 +207,15 @@ export interface Ingrediente {
   platillo?: string;
 }
 
+export interface Platillo {
+  id: string;
+  nombre: string;
+  categoria: string;
+  ingredientes: Ingrediente[];
+  creadoEn: string;
+  actualizadoEn: string;
+}
+
 export interface DashboardMetricas {
   resumen: {
     pacientesTotales: number;
@@ -242,5 +251,4 @@ export interface Alerta {
   prioridad: 'Alta' | 'Baja';
   tipoRiesgo?: string;
   fechaPlan?: string;
-}
 }
