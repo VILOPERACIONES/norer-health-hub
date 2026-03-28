@@ -3,6 +3,7 @@ import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { ShieldCheck, Plus, Edit2, Trash2, X, Check, Save, Loader2, User, Mail, Shield, AlertTriangle } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import {
   Dialog,
   DialogContent,
@@ -124,9 +125,8 @@ export default function AdminUsers() {
   };
 
   if (loading) return (
-    <div className="h-[40vh] flex flex-col items-center justify-center gap-4">
-      <div className="w-6 h-6 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin" />
-      <p className="text-[13px] font-medium text-text-muted">Leyendo base de usuarios...</p>
+    <div className="h-[40vh] flex flex-col items-center justify-center">
+      <NutritionLoader text="Leyendo base de usuarios..." />
     </div>
   );
 

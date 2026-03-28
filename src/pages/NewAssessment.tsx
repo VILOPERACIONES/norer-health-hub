@@ -34,7 +34,8 @@ const Field = ({
 );
 
 const NewAssessment = () => {
-  const { id: pacienteId } = useParams<{ id: string }>();
+  const { id: pacienteId, valoracionId } = useParams<{ id: string; valoracionId?: string }>();
+  const isEdit = !!valoracionId;
   const navigate = useNavigate();
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
@@ -62,6 +63,9 @@ const NewAssessment = () => {
   const [pendingDraft, setPendingDraft] = useState<any>(null);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
 
+  const [tieneSuplementos, setTieneSuplementos] = useState(false);
+  const [suplementos, setSuplementos] = useState<{ id: string; nombre: string; indicaciones: string; fechaInicio: string; activo: boolean }[]>([]);
+
   const totalSteps = 4;
   const STEPS = [
     { id: 1, label: 'Valoración' },
@@ -70,8 +74,9 @@ const NewAssessment = () => {
     { id: 4, label: 'Opciones de Envío' }
   ];
 
-  // Detect drafts but don't apply automatically
+  // Detect drafts but don't apply automatically (only if not editing)
   useEffect(() => {
+    if (isEdit) return; // No drafts in edit mode
     const draftStr = localStorage.getItem(`draft_assessment_${pacienteId}`);
     if (draftStr) {
       try {
@@ -82,7 +87,7 @@ const NewAssessment = () => {
         console.error('Error parsing draft:', e);
       }
     }
-  }, [pacienteId]);
+  }, [pacienteId, isEdit]);
 
   const applyDraft = () => {
     if (!pendingDraft) return;
@@ -97,6 +102,8 @@ const NewAssessment = () => {
     if (d.fecha) setFecha(d.fecha);
     if (d.hora) setHora(d.hora);
     if (d.proximaSesion) setProximaSesion(d.proximaSesion);
+    if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
+    if (d.suplementos) setSuplementos(d.suplementos);
     setIsGrasaModified(true);
     setShowDraftPrompt(false);
     toast({ title: 'Progreso restaurado', description: 'Has vuelto a donde te quedaste.' });
@@ -134,23 +141,69 @@ const NewAssessment = () => {
     setPctGrasa('');
   };
 
-  // Save drafts
+  // Save drafts (only if not editing)
   useEffect(() => {
+    if (isEdit) return; // No drafts in edit mode
     if (step > 2) return; // Only save draft for steps 1 and 2
     if (!isGrasaModified) return; // Only start saving draft once fat % is touched
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion };
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, pacienteId, isGrasaModified]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, isEdit]);
 
   useEffect(() => {
-    const fetchPatient = async () => {
+    const fetchPatientAndData = async () => {
       try {
         const { data } = await api.get(`/api/pacientes/${pacienteId}`);
         const p = data?.data || data;
         setPaciente(p);
         
-        // Solo pre-llenar si no hay borrador activo o pendiente de decisión
-        if (!localStorage.getItem(`draft_assessment_${pacienteId}`)) {
+        if (isEdit) {
+           try {
+             const { data: valDataRes } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
+             const val = valDataRes?.data || valDataRes;
+             
+             if (val) {
+               setFecha(val.fecha ? val.fecha.split('T')[0] : '');
+               setHora(val.hora || '');
+               setNumeroValoracion(val.numeroValoracion || 1);
+               setPeso(val.pesoActual ? String(val.pesoActual) : String(val.peso || ''));
+               const eVal = val.estatura || val.talla || '';
+               if (eVal) {
+                 const eNum = parseFloat(String(eVal));
+                 setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
+               }
+               setPctGrasa(val.pctGrasa ? String(val.pctGrasa) : '');
+               setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : '');
+               setComentarios(val.comentarios || '');
+               
+               if (val.temarioConsulta && Array.isArray(val.temarioConsulta)) {
+                 setTemario(val.temarioConsulta.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
+               } else if (val.temario && Array.isArray(val.temario)) {
+                 setTemario(val.temario.map((t: any) => ({ ...t, id: Math.random().toString() })));
+               }
+
+               if (val.evitar) {
+                 const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
+                 setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
+               }
+               
+               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
+                 setTieneSuplementos(true);
+                 setSuplementos(val.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
+               }
+
+               // Load barrido if exists
+               try {
+                 const br = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`);
+                 const bd = br.data?.data || br.data;
+                 if (bd && (bd.tiempos || bd.kcalTotal)) setBarridoData(bd);
+               } catch {}
+             }
+           } catch {
+             toast({ title: 'Error', description: 'No se pudo cargar la valoración a editar.', variant: 'destructive' });
+           }
+        } else if (!localStorage.getItem(`draft_assessment_${pacienteId}`)) {
+          // Solo pre-llenar nueva valoración si no hay borrador activo
           const vals = p?.valoraciones || [];
           let lastVal = null;
           if (vals.length > 0) {
@@ -167,19 +220,31 @@ const NewAssessment = () => {
             setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
           }
 
+          // Suplementos activos anteriores
+          if (lastVal?.suplementosDetalle && Array.isArray(lastVal.suplementosDetalle)) {
+            const activeSups = lastVal.suplementosDetalle.filter((s: any) => s.activo);
+            if (activeSups.length > 0) {
+              setTieneSuplementos(true);
+              // Clonar para evitar mutar el estado anterior
+              setSuplementos(activeSups.map((s: any) => ({ ...s, id: Date.now().toString() + Math.random() })));
+            }
+          }
+
           // Grasa (siempre lo dejamos manual para capturar Kg o % por solicitud)
           setPctGrasa('');
           setKgGrasa('');
         }
         
-        const vals = p?.valoraciones || [];
-        setNumeroValoracion(vals.length + 1);
+        if (!isEdit) {
+           const vals = p?.valoraciones || [];
+           setNumeroValoracion(vals.length + 1);
+        }
       } catch (err) {
         console.error('Error cargando paciente:', err);
       }
     };
-    fetchPatient();
-  }, [pacienteId]);
+    fetchPatientAndData();
+  }, [pacienteId, valoracionId, isEdit]);
 
   const pesoNum = parseFloat(peso) || 0;
   const estaturaNum = parseFloat(estatura) || 0;
@@ -224,6 +289,14 @@ const NewAssessment = () => {
     setTemario(nt);
   };
 
+  const addSuplemento = () => setSuplementos([...suplementos, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }]);
+  const removeSuplemento = (idx: number) => setSuplementos(suplementos.filter((_, i) => i !== idx));
+  const updateSuplemento = (idx: number, field: 'nombre' | 'indicaciones' | 'activo', val: any) => {
+    const ns = [...suplementos];
+    ns[idx] = { ...ns[idx], [field]: val };
+    setSuplementos(ns);
+  };
+
   const addEvitar = () => setEvitar([...evitar, { id: Date.now().toString(), valor: '' }]);
   const removeEvitar = (idx: number) => setEvitar(evitar.filter((_, i) => i !== idx));
   const updateEvitar = (idx: number, val: string) => {
@@ -248,6 +321,7 @@ const NewAssessment = () => {
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
+      suplementosDetalle: tieneSuplementos ? suplementos : [],
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
@@ -259,15 +333,20 @@ const NewAssessment = () => {
     }
 
     try {
-      const response = await api.post(`/api/pacientes/${pacienteId}/valoraciones`, body);
-      const serverData = response.data?.data || response.data;
-      const valoracionId = serverData?.id;
-
-      if (valoracionId && barridoData && barridoData.kcalTotal > 0) {
-        try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`, barridoData); } catch {}
+      let valoracionResId = valoracionId;
+      if (isEdit) {
+        await api.put(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`, body);
+        toast({ title: 'Valoración actualizada correctamente' });
+      } else {
+        const response = await api.post(`/api/pacientes/${pacienteId}/valoraciones`, body);
+        const serverData = response.data?.data || response.data;
+        valoracionResId = serverData?.id;
+        toast({ title: 'Valoración guardada correctamente' });
       }
 
-      toast({ title: 'Valoración guardada correctamente' });
+      if (valoracionResId && barridoData && barridoData.kcalTotal > 0) {
+        try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch {}
+      }
       
       // AGENDAR CITA EN SEGUNDO PLANO SI HAY DATOS
       if (calcomData) {
@@ -278,7 +357,7 @@ const NewAssessment = () => {
         
         if (hasChanges) {
           try {
-            await api.patch(`/api/pacientes/${pacienteId}`, {
+            await api.put(`/api/pacientes/${pacienteId}`, {
               nombre: calcomData.name,
               email: calcomData.email,
               telefono: calcomData.phone
@@ -304,16 +383,16 @@ const NewAssessment = () => {
         }
       }
 
-      clearDraft();
+      if (!isEdit) clearDraft();
 
-      if (redirectAPlan && valoracionId) {
-        setValoracionIdGuardada(valoracionId);
+      if (redirectAPlan && valoracionResId) {
+        setValoracionIdGuardada(valoracionResId);
         setStep(redirectAPlan === 'equivalencias' ? 2 : 3);
       } else {
-        navigate(`/pacientes/${pacienteId}`);
+        navigate(isEdit ? `/pacientes/${pacienteId}/valoraciones/${valoracionId}` : `/pacientes/${pacienteId}`);
       }
     } catch (err: any) {
-      toast({ title: 'Error al guardar', description: err.response?.data?.message || 'No se pudo guardar la valoración.', variant: 'destructive' });
+      toast({ title: 'Error al guardar', description: err.response?.data?.message || `No se pudo ${isEdit ? 'actualizar' : 'guardar'} la valoración.`, variant: 'destructive' });
     } finally {
       setSaving(false);
     }
@@ -416,19 +495,81 @@ const NewAssessment = () => {
               </div>
               
               <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
-                 {/* COLUMNA 1: ANTROPOMETRÍA */}
-                 <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col shrink-0 h-fit">
-                   <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
-                   <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
-                     <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
-                     <Field label="Hora" value={hora} onChange={setHora} type="time" />
+                 {/* COLUMNA 1: ANTROPOMETRÍA Y SUPLEMENTACIÓN */}
+                 <div className="flex flex-col gap-4 shrink-0 h-fit">
+                   <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
+                     <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
+                     <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+                       <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
+                       <Field label="Hora" value={hora} onChange={setHora} type="time" />
+                       
+                       <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
+                       <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
+                       
+                        <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
+                        <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
+                       <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                     </div>
+                   </div>
+
+                   <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
+                     <div className="flex items-center justify-between mb-4">
+                       <h4 className="text-[13px] font-bold text-white tracking-widest uppercase m-0">Esquema de Suplementación</h4>
+                       <label className="flex items-center cursor-pointer">
+                         <div className="relative">
+                           <input type="checkbox" className="sr-only" checked={tieneSuplementos} onChange={(e) => setTieneSuplementos(e.target.checked)} />
+                           <div className={`block w-10 h-6 rounded-full transition-colors ${tieneSuplementos ? 'bg-brand-primary' : 'bg-[#333]'}`}></div>
+                           <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${tieneSuplementos ? 'transform translate-x-4' : ''}`}></div>
+                         </div>
+                       </label>
+                     </div>
                      
-                     <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
-                     <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
-                     
-                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
-                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
-                     <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                     {tieneSuplementos && (
+                       <div className="animate-slide-up mt-2 flex flex-col gap-3">
+                          <button onClick={addSuplemento} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center justify-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-2 border border-[#333] rounded-[6px] w-full">
+                            <Plus className="h-3 w-3" strokeWidth={3} /> Agregar Suplemento
+                          </button>
+                          
+                          <div className="space-y-3 mt-2">
+                            {suplementos.length === 0 ? (
+                               <p className="text-[11px] text-[#555] italic text-center py-2">Lista vacía. Presiona agregar para añadir suplementos.</p>
+                            ) : (
+                               suplementos.map((sup, idx) => (
+                                 <div key={sup.id} className="p-3 bg-[#181818] border border-[#333] rounded-[8px] flex flex-col gap-2 relative group">
+                                    <button onClick={() => removeSuplemento(idx)} className="absolute top-2 right-2 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
+                                      <Trash2 className="h-4 w-4" />
+                                    </button>
+                                    <div className="pr-8">
+                                      <input
+                                        type="text"
+                                        placeholder="Nombre del suplemento..."
+                                        value={sup.nombre}
+                                        onChange={(e) => updateSuplemento(idx, 'nombre', e.target.value)}
+                                        className="w-full bg-transparent text-[13px] font-bold text-white outline-none placeholder-[#555] border-none m-0 p-0"
+                                      />
+                                    </div>
+                                    <input
+                                      type="text"
+                                      placeholder="Dosis / Indicaciones (ej. 1 scoop post-entreno)"
+                                      value={sup.indicaciones}
+                                      onChange={(e) => updateSuplemento(idx, 'indicaciones', e.target.value)}
+                                      className="w-full bg-[#111] border border-[#333] focus:border-[#555] rounded-[6px] p-2 text-[12px] font-medium text-[#c0c0c0] outline-none placeholder-[#444] transition-colors"
+                                    />
+                                    <div className="flex items-center justify-between mt-1">
+                                      <span className="text-[10px] text-[#8a8a8a] font-medium tracking-wide">
+                                        Tiempo tomando: {Math.max(0, Math.floor((new Date().getTime() - new Date(sup.fechaInicio).getTime()) / (1000 * 3600 * 24)))} días
+                                      </span>
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${sup.activo ? 'text-brand-primary' : 'text-[#8a8a8a]'}`}>{sup.activo ? 'Activo' : 'Suspendido'}</span>
+                                        <input type="checkbox" checked={sup.activo} onChange={(e) => updateSuplemento(idx, 'activo', e.target.checked)} className="accent-brand-primary cursor-pointer" />
+                                      </label>
+                                    </div>
+                                 </div>
+                               ))
+                            )}
+                          </div>
+                       </div>
+                     )}
                    </div>
                  </div>
 
@@ -516,7 +657,14 @@ const NewAssessment = () => {
               <div className="mt-4">
                  <CalcomScheduling 
                    pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
-                   onSelection={setCalcomData}
+                   onSelection={(data) => {
+                     setCalcomData(data);
+                     if (data?.fecha) {
+                       setProximaSesion(data.fecha);
+                     } else {
+                       setProximaSesion('');
+                     }
+                   }}
                  />
               </div>
             </div>

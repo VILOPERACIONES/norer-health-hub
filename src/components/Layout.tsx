@@ -1,5 +1,5 @@
 import { NavLink, Outlet, useNavigate, useLocation } from 'react-router-dom';
-import { BarChart3, Users, Settings, LogOut, Menu, User as UserIcon, ClipboardList, ChevronLeft, ChevronRight, Calendar, MessageSquare, Clock, ShieldCheck, Sun, Moon, BookOpen, ListTodo } from 'lucide-react';
+import { BarChart3, Users, Settings, LogOut, Menu, User as UserIcon, ClipboardList, ChevronLeft, ChevronRight, Calendar, MessageSquare, Clock, ShieldCheck, Sun, Moon, BookOpen, ListTodo, Utensils, Scale } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import Logo from './Logo';
 import { useAuthStore } from '@/store/auth';
@@ -8,9 +8,9 @@ import { useThemeStore } from '@/store/theme';
 const navItems = [
   { to: '/dashboard', icon: BarChart3, label: 'RESUMEN' },
   { to: '/pacientes', icon: Users, label: 'PACIENTES' },
-  { to: '/platillos', icon: BookOpen, label: 'PLATILLOS' },
+  { to: '/platillos', icon: Utensils, label: 'PLATILLOS' },
   { to: '/pendientes', icon: ListTodo, label: 'PENDIENTES' },
-  { to: '/equivalencias', icon: BookOpen, label: 'EQUIVALENCIAS' },
+  { to: '/equivalencias', icon: Scale, label: 'EQUIVALENCIAS' },
   { to: '/configuracion', icon: Settings, label: 'AJUSTES' },
 ];
 
@@ -90,8 +90,7 @@ const Layout = () => {
             <div className="space-y-1">
               {[
                 { label: collapsed ? '' : 'Calendario', icon: Calendar, color: 'text-text-secondary', title: 'Google Calendar' },
-                { label: collapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' },
-                { label: collapsed ? '' : 'Cal.com', icon: Clock, color: 'text-text-secondary', title: 'Cal.com Sync' }
+                { label: collapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' }
               ].map((ext) => (
                 <button
                   key={ext.title}

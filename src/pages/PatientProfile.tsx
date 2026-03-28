@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
@@ -9,6 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 // --- Sub-componentes Estilo Moderno & Premium ---
 
@@ -183,28 +185,51 @@ const MetricItem = ({ label, value, alert }: { label: string, value: string, ale
   </div>
 );
 
-const ClinicalSection = ({ title, data, icon: Icon, className = "" }: { title: string, data: Record<string, any>, icon?: any, className?: string }) => (
-  <div className={`bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 group hover:bg-bg-elevated/40 transition-colors ${className}`}>
-    <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
-      {Icon && <Icon className="h-4 w-4 text-text-secondary" />}
-      <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">{title}</h4>
+const ClinicalSection = ({ title, data, icon: Icon, className = "" }: { title: string, data: Record<string, any>, icon?: any, className?: string }) => {
+  const renderValue = (value: any) => {
+    if (!value || value === 'N/A' || value === '—') return <p className="text-[14px] font-medium text-text-muted tracking-tight">—</p>;
+    const str = String(value).trim();
+    // Dividir en viñetas si contiene coma, punto y coma, o salto de línea
+    const parts = str.split(/[,;\n]+/).map(s => s.trim()).filter(Boolean);
+    if (parts.length <= 1) {
+      return <p className="text-[14px] font-medium text-text-primary tracking-tight">{str}</p>;
+    }
+    return (
+      <ul className="m-0 p-0 space-y-1">
+        {parts.map((item, i) => (
+          <li key={i} className="flex items-start gap-2">
+            <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-brand-primary flex-shrink-0" />
+            <span className="text-[13px] font-medium text-text-primary leading-snug">{item}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  };
+
+  return (
+    <div className={`bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 group hover:bg-bg-elevated/40 transition-colors ${className}`}>
+      <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
+        {Icon && <Icon className="h-4 w-4 text-text-secondary" />}
+        <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">{title}</h4>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        {Object.entries(data).map(([key, value]) => (
+          <div key={key} className="space-y-2 group">
+            <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+            {renderValue(value)}
+          </div>
+        ))}
+      </div>
     </div>
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-      {Object.entries(data).map(([key, value]) => (
-        <div key={key} className="space-y-1 group">
-          <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
-          <p className="text-[14px] font-medium text-text-primary tracking-tight">{value || '—'}</p>
-        </div>
-      ))}
-    </div>
-  </div>
-);
+  );
+};
 
 const PatientProfile = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [paciente, setPaciente] = useState<Paciente | null>(null);
   const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
   const [loading, setLoading] = useState(true);
@@ -277,6 +302,7 @@ const PatientProfile = () => {
     try {
       await api.delete(`/api/pacientes/${id}`);
       toast({ title: 'EXPEDIENTE ELIMINADO', description: 'El paciente y toda su data han sido borrados del sistema.' });
+      queryClient.invalidateQueries({ queryKey: ['pacientes'] });
       navigate('/pacientes');
     } catch (err) {
       toast({ title: 'Error de Purga', description: 'No se pudo eliminar el expediente. Verifique la conexión con el servidor.', variant: 'destructive' });
@@ -284,9 +310,8 @@ const PatientProfile = () => {
   };
 
   if (loading || !paciente) return (
-    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
-      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-      <p className="text-[14px] font-medium text-text-muted">Cargando expediente...</p>
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+      <NutritionLoader text="Cargando expediente..." />
     </div>
   );
 

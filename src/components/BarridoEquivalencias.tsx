@@ -617,21 +617,19 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                           inputMode="decimal"
                           value={v || ''}
                           onChange={(e) => setCell(t, key, parseNum(e.target.value))}
-                          disabled={porcion <= 0}
                           onWheel={noScroll}
                           onKeyDown={(e) => handleCellKey(e, rowIdx, idx + 1, tiempos.length)}
                           data-row={rowIdx}
                           data-col={idx + 1}
-                          placeholder={porcion > 0 ? '·' : ''}
+                          placeholder={'·'}
                           className={cellCls}
                           style={{
                             height: '24px',
                             backgroundColor: v > 0 ? '#1a2030' : 'transparent',
                             fontWeight: v > 0 ? 700 : 400,
                             fontSize: '11px',
-                            color: v > 0 ? '#c8e0ff' : '#333',
-                            opacity: porcion <= 0 ? 0.2 : 1,
-                            cursor: porcion <= 0 ? 'not-allowed' : 'text',
+                            color: v > 0 ? '#c8e0ff' : '#444',
+                            outline: 'none',
                           }}
                         />
                       </td>

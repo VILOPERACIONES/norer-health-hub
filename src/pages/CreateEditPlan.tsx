@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings } from 'lucide-react';
+import { ArrowLeft, Save, Plus, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -25,6 +26,16 @@ const emptyIngrediente = (): Ingrediente => ({
   eqGrupo: '', 
   nota: '' 
 });
+
+/** Redondeo inteligente para porciones prácticas:
+ *  - Parte decimal >= 0.5 → redondea arriba
+ *  - Parte decimal < 0.5  → redondea abajo
+ *  Nunca devuelve < 0. Si el valor es 0, devuelve 0.
+ */
+const smartRound = (val: number): number => {
+  if (val <= 0) return 0;
+  return Math.round(val); // Math.round ya hace >=0.5 up, <0.5 down
+};
 
 export const CreateEditPlanForm = ({ 
   pacienteId: propPacienteId, 
@@ -70,6 +81,7 @@ export const CreateEditPlanForm = ({
   const [notas, setNotas] = useState('');
   const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
   const [valData, setValData] = useState<any>(null);
+  const [suplementosDetalle, setSuplementosDetalle] = useState<any[]>([]); // 💊 State independiente para persistencia
   const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
   
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
@@ -77,19 +89,51 @@ export const CreateEditPlanForm = ({
   const [platilloSearch, setPlatilloSearch] = useState('');
   const [platilloCatFilter, setPlatilloCatFilter] = useState(null); // filtro activo por categoría
 
+  // ─── Save-as-Platillo modal ────────────────────────────────────────────────
+  const [savePlatilloModal, setSavePlatilloModal] = useState<{
+    mIdx: number; tIdx: number;
+    nombre: string; categoria: string;
+  } | null>(null);
+  const [savingPlatillo, setSavingPlatillo] = useState(false);
+
+  // ─── Presupuesto de equivalencias ─ siempre abierto por defecto ─────────────────
+  // Budget panels are ALWAYS visible for Eyder to track progress in real-time
+  const [showBudgetMap, setShowBudgetMap] = useState<Record<string, boolean>>({});
+
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
       nombre: m.nombre,
-      tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => ({
-        nombre: t.nombre,
-        nota: t.notaPie || t.nota || '',
-        ingredientes: (t.ingredientes || []).map((i: any) => ({
-          ...i,
-          cantidad: parseFloat(i.cantidad) || 0,
-          eqCantidad: i.eqCantidad != null ? parseFloat(String(i.eqCantidad)) : undefined,
-          platillo: i.platillo || ''
-        }))
-      }))
+      tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => {
+        // Parse metadata encoded in notaPie (fallback until backend adds columns)
+        const rawNote = t.notaPie || t.nota || '';
+        let nota = rawNote;
+        let metaBebida = '';
+        let metaSuplTiempo = '';
+        let metaSuplNotas = '';
+        const metaMatch = rawNote.match(/\n?<!--META:(.*?)-->/);
+        if (metaMatch) {
+          try {
+            const parsed = JSON.parse(metaMatch[1]);
+            metaBebida = parsed.bebida || '';
+            metaSuplTiempo = parsed.suplTiempo || '';
+            metaSuplNotas = parsed.suplNotas || '';
+          } catch { /* ignore parse errors */ }
+          nota = rawNote.replace(/\n?<!--META:.*?-->/, '');
+        }
+        return {
+          nombre: t.nombre,
+          nota,
+          bebida: t.bebida || metaBebida,
+          suplTiempo: t.suplTiempo || metaSuplTiempo,
+          suplNotas: t.suplNotas || metaSuplNotas,
+          ingredientes: (t.ingredientes || []).map((i: any) => ({
+            ...i,
+            cantidad: parseFloat(i.cantidad) || 0,
+            eqCantidad: i.eqCantidad != null ? parseFloat(String(i.eqCantidad)) : undefined,
+            platillo: i.platillo || ''
+          }))
+        };
+      })
     })) || [emptyMenu('Menú 1'), emptyMenu('Menú 2')];
   };
 
@@ -137,6 +181,7 @@ export const CreateEditPlanForm = ({
             
             setNotas(p.notasGenerales || p.notas || '');
             setMenus(mapMenusFromBackend(p.menus));
+            setSuplementosDetalle(p.suplementosDetalle || []);
           }
         } catch (err) {
           console.error('Error cargando plan:', err);
@@ -164,18 +209,24 @@ export const CreateEditPlanForm = ({
              
              setPesoUltimo(v.peso || 0);
              setValData({ ...v, barridoEquivalencias: barrido });
+             setSuplementosDetalle(v.suplementosDetalle || []);
              if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
              if (barrido?.tiempos?.length > 0 && !isEdit) {
+               // Mostrar TODOS los tiempos del barrido, tengan o no equivalencias asignadas.
+               // El nutriólogo puede llenar cualquier tiempo manualmente con productos procesados.
                const assessmentTiempos = barrido.tiempos.map((t: string) => ({
                  nombre: t.toUpperCase(),
                  ingredientes: [],
                  nota: ''
                }));
-               setMenus([
-                 { nombre: 'Menú 1', tiempos: assessmentTiempos },
-                 { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
-               ]);
+               
+               if (assessmentTiempos.length > 0) {
+                 setMenus([
+                   { nombre: 'Menú 1', tiempos: assessmentTiempos },
+                   { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
+                 ]);
+               }
              }
            }
         } catch (err) {
@@ -309,6 +360,10 @@ export const CreateEditPlanForm = ({
 
   const autoScaleIngredients = (nextBarridoData: BarridoData) => {
     if (!nextBarridoData?.distribucion) return;
+
+
+    const getBarridoKey = (grupo: string) => groupToBarridoKey(normalizeGroup(grupo));
+    
     
     setMenus(prevMenus => prevMenus.map(menu => ({
       ...menu,
@@ -322,10 +377,20 @@ export const CreateEditPlanForm = ({
           ...tiempo,
           ingredientes: tiempo.ingredientes.map(ing => {
             if (ing.platillo && ing.eqGrupo) {
-              const assignedEq = nextBarridoData.distribucion[barridoTiempoKey]?.[ing.eqGrupo] || 0;
+              const bKey = getBarridoKey(ing.eqGrupo);
+              const assignedEq = nextBarridoData.distribucion[barridoTiempoKey]?.[bKey] || 0;
+              
               if (assignedEq >= 0) {
+                // EXCEPCIÓN: Si es verdura y el barrido le asignó 0 (libre), no la desaparecemos a 0. 
+                // Mantenemos la porción base que traía el platillo.
+                if (assignedEq === 0 && bKey === 'verduras') {
+                  return ing; 
+                }
+
                 const baseEq = Number(ing.eqCantidad) || 1;
-                const newCant = (Number(ing.cantidad) / baseEq) * Number(assignedEq);
+                const rawCant = (Number(ing.cantidad) / baseEq) * Number(assignedEq);
+                // Redondeo inteligente: no puede decirle al paciente "come 1.33 plátanos"
+                const newCant = smartRound(rawCant);
                 return { ...ing, cantidad: newCant, eqCantidad: assignedEq };
               }
             }
@@ -386,6 +451,72 @@ export const CreateEditPlanForm = ({
     });
   };
 
+  // ─── Guardar tiempo como Platillo en la biblioteca ──────────────────────────
+  const handleSaveTiempoAsPlatillo = async () => {
+    if (!savePlatilloModal) return;
+    const { mIdx, tIdx, nombre, categoria } = savePlatilloModal;
+    const tiempo = menus[mIdx]?.tiempos[tIdx];
+    if (!tiempo || !nombre.trim()) return;
+
+    setSavingPlatillo(true);
+    try {
+      const ingredientes = tiempo.ingredientes.map(ing => ({
+        descripcion: ing.descripcion,
+        cantidad: ing.cantidad,
+        unidad: ing.unidad,
+        platillo: ing.platillo || '',
+        equivalencias: ing.equivalencias || (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: normalizeGroup(ing.eqGrupo) }] : []),
+        eqCantidad: ing.eqCantidad,
+        eqGrupo: ing.eqGrupo ? normalizeGroup(ing.eqGrupo) : '',
+        smaeGrPorEq: ing.smaeGrPorEq,
+      }));
+
+      const { data } = await api.post('/api/platillos', { nombre: nombre.trim(), categoria, ingredientes });
+      const saved = data?.data || data;
+      setPlatilloLibrary(prev => [...prev, saved]);
+      setSavePlatilloModal(null);
+      toast({ title: 'Platillo guardado ✅', description: `"${nombre}" está disponible en tu biblioteca.` });
+    } catch (err) {
+      toast({ title: 'Error', description: 'No se pudo guardar el platillo.', variant: 'destructive' });
+    } finally {
+      setSavingPlatillo(false);
+    }
+  };
+
+  // ─── Presupuesto de equivalencias por tiempo (del barrido) ──────────────────
+  const getBudgetForTiempo = (tiempo: TiempoComida): { label: string; used: number; budget: number }[] => {
+    const barridoData = valData?.barridoEquivalencias;
+    if (!barridoData?.tiempos || !barridoData?.distribucion) return [];
+
+    const barridoTiempoKey = barridoData.tiempos.find(
+      (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
+    );
+    if (!barridoTiempoKey) return [];
+    const dist = barridoData.distribucion[barridoTiempoKey] || {};
+
+    return Object.entries(dist)
+      .filter(([, val]) => Number(val) > 0)
+      .map(([barridoKey, val]) => {
+        const budget = Number(val);
+        // Sumar equivalencias usadas en ingredientes de este tiempo
+        let used = 0;
+        tiempo.ingredientes.forEach(ing => {
+          const eqs = ing.equivalencias && ing.equivalencias.length > 0
+            ? ing.equivalencias
+            : (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+          eqs.forEach((eq: any) => {
+            if (groupToBarridoKey(normalizeGroup(String(eq.grupo))) === barridoKey) {
+              used += Number(eq.cantidad) || 0;
+            }
+          });
+        });
+        // Encontrar etiqueta canónica para mostrar
+        const canonEntry = Object.entries(CANONICAL_TO_BARRIDO_KEY).find(([, v]) => v === barridoKey);
+        const label = canonEntry ? canonEntry[0] : barridoKey;
+        return { label, used: parseFloat(used.toFixed(2)), budget };
+      });
+  };
+
   const handleSave = async () => {
     if (macroSum !== 100) {
       toast({ title: 'ERROR ESTRATÉGICO', description: 'La distribución de macronutrientes debe sumar el 100% de la carga energética.', variant: 'destructive' });
@@ -405,15 +536,19 @@ export const CreateEditPlanForm = ({
         nombre: m.nombre,
         tiemposComida: m.tiempos.map(t => ({
           nombre: t.nombre,
-          notaPie: t.nota,
+          notaPie: t.nota || '',
+          bebida: t.bebida || '',
+          suplTiempo: t.suplTiempo || '',
+          suplNotas: t.suplNotas || '',
           ingredientes: t.ingredientes.map(i => ({
             ...i,
-            cantidad: i.cantidad.toString(), // El backend parece enviarlas como string en el JSON
+            cantidad: i.cantidad.toString(),
             eqCantidad: i.eqCantidad?.toString()
           }))
         }))
       })), 
       notasGenerales: notas,
+      suplementosDetalle,
     };
 
     if (!isBasePlan) {
@@ -436,7 +571,7 @@ export const CreateEditPlanForm = ({
         const { data } = await api.post(url, body);
         serverData = data?.data || data;
       } 
-      toast({ title: 'MENÚ PERSISTIDO' });
+      toast({ title: 'MENÚ GUARDADO' });
       
       if (onSaved) {
         onSaved(serverData?.id || planId);
@@ -696,10 +831,10 @@ export const CreateEditPlanForm = ({
           </div>
         )}
 
-        {/* SECCIÓN DE MENÚS: Ahora a dos columnas completas */}
+        {/* SECCIÓN DE MENÚS */}
         <div className="grid md:grid-cols-2 gap-8 items-start">
             {menus.map((menu, mi) => (
-              <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] overflow-hidden flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
+              <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
                 <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 flex items-center justify-between">
                   <input
                     value={menu.nombre}
@@ -742,6 +877,73 @@ export const CreateEditPlanForm = ({
                          </div>
                       </div>
 
+                       {/* ─── Bebida y Suplemento alineados al título del tiempo ─── */}
+                       <div className="flex flex-col gap-1 mb-3 px-1">
+                         <div className="flex items-center gap-2">
+                           <Droplets className="w-3.5 h-3.5 text-[#3a9eff] shrink-0" />
+                           <input
+                             type="text"
+                             placeholder="Bebida (ej: 500ml agua con limón)"
+                             value={tiempo.bebida || ''}
+                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
+                             className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                           />
+                         </div>
+                         <div className="flex items-center gap-2">
+                           <Pill className="w-3.5 h-3.5 text-[#a97fff] shrink-0" />
+                           <input
+                             type="text"
+                             placeholder="Suplemento del tiempo (ej: 1 scoop Whey)"
+                             value={tiempo.suplTiempo || ''}
+                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, suplTiempo: e.target.value }))}
+                             className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                           />
+                         </div>
+                       </div>
+
+                       {/* ─── Panel Presupuesto Colapsable ─── */}
+                       {(() => {
+                         const budgetKey = `${mi}-${ti}`;
+                         const budgetItems = getBudgetForTiempo(tiempo);
+                         if (budgetItems.length === 0) return null;
+                         const isOpen = true; // Budget panels are ALWAYS visible for Eyder to track progress in real-time
+                         return (
+                           <div className="mb-3 rounded-[6px] border border-[#2a2a2a] overflow-hidden">
+                             <button
+                               onClick={() => setShowBudgetMap(prev => ({ ...prev, [budgetKey]: !prev[budgetKey] }))}
+                               className="w-full flex items-center justify-between px-3 py-2 text-[9px] font-black text-[#555] uppercase tracking-widest hover:bg-[#181818] transition-colors"
+                             >
+                               <span>Presupuesto de Equivalencias</span>
+                               <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                             </button>
+                             {isOpen && (
+                               <div className="px-3 pb-3 space-y-2 bg-[#111]">
+                                 {budgetItems.map(({ label, used, budget: bdgt }) => {
+                                   const pct = Math.min((used / bdgt) * 100, 100);
+                                   const over = used > bdgt;
+                                   const done = !over && pct >= 85;
+                                   const barColor = over ? '#ef4444' : done ? '#22c55e' : '#555';
+                                   const textColor = over ? 'text-red-400' : done ? 'text-green-400' : 'text-[#8a8a8a]';
+                                   return (
+                                     <div key={label}>
+                                       <div className="flex items-center justify-between mb-0.5">
+                                         <span className="text-[10px] text-[#777]">{label}</span>
+                                         <span className={`text-[10px] font-bold tabular-nums ${textColor}`}>
+                                           {used} / {bdgt} eq {over ? '⚠' : done ? '✓' : ''}
+                                         </span>
+                                       </div>
+                                       <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden">
+                                         <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: barColor }} />
+                                       </div>
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                             )}
+                           </div>
+                         );
+                       })()}
+
                       <div className="space-y-6">
                         {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
                            <div key={`${mi}-${ti}-${pIndex}`} className="p-3 bg-[#111111] border border-[#333] rounded-[8px]">
@@ -780,7 +982,7 @@ export const CreateEditPlanForm = ({
                               <div className="space-y-4">
                                 {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
                                   <SmaeIngredientePicker
-                                    key={ii}
+                                    key={`ing-${mi}-${ti}-${ii}`}
                                     ingrediente={ing}
                                     index={ii}
                                     onUpdate={(updates) =>
@@ -828,19 +1030,28 @@ export const CreateEditPlanForm = ({
                         </button>
 
                         <div className="relative">
-                          <button
-                            onClick={() => setShowPlatilloSelector(showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti ? null : { mIdx: mi, tIdx: ti })}
-                            className="w-full py-2 bg-[#1a1a1a] border border-[#333] text-[#90c2ff] hover:text-white text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider mt-2 flex items-center justify-center gap-2"
-                          >
-                            <BookOpen className="w-3.5 h-3.5" /> Importar de Biblioteca
-                          </button>
+                          <div className="flex gap-2 mt-3">
+                            <button
+                              onClick={() => setShowPlatilloSelector(showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti ? null : { mIdx: mi, tIdx: ti })}
+                              className="flex-1 py-2.5 px-4 bg-[#1a1a1a] border border-[#333] text-[#90c2ff] hover:text-white hover:border-[#90c2ff]/40 hover:bg-[#1d2536] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center justify-center gap-2"
+                            >
+                              <BookOpen className="w-4 h-4" /> Importar Alimentos
+                            </button>
+                            <button
+                              onClick={() => setSavePlatilloModal({ mIdx: mi, tIdx: ti, nombre: tiempo.nombre, categoria: 'Personalizado' })}
+                              className="py-2.5 px-3.5 bg-[#1a1a1a] border border-[#333] text-[#a97fff] hover:text-white hover:border-[#a97fff]/40 hover:bg-[#251d36] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center gap-1.5"
+                              title="Guardar tiempo como Platillo"
+                            >
+                              <Bookmark className="w-4 h-4" /> Guardar
+                            </button>
+                          </div>
                           
                           {showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti && (
-                            <div className="absolute z-50 left-0 right-0 mt-2 bg-[#111] border border-[#333] rounded-[12px] shadow-2xl p-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="absolute z-50 left-0 right-0 bottom-full mb-2 bg-[#111] border border-[#444] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.6)] p-4 animate-in fade-in slide-in-from-bottom-2">
                                {/* Buscador general */}
                                <Input 
-                                 placeholder="Buscar por nombre de platillo..." 
-                                 className="h-8 text-xs mb-3 bg-bg-base"
+                                 placeholder="🔍 Buscar por nombre de platillo..." 
+                                 className="h-9 text-xs mb-3 bg-[#0a0a0a] border-[#333] focus:border-[#90c2ff] rounded-[8px]"
                                  autoFocus
                                  value={platilloSearch}
                                  onChange={(e) => { setPlatilloSearch(e.target.value); if (e.target.value) setPlatilloCatFilter(null); }}
@@ -849,13 +1060,13 @@ export const CreateEditPlanForm = ({
                                {/* Sin búsqueda: mostrar categorías primero */}
                                {!platilloSearch && !platilloCatFilter && (
                                  <div>
-                                   <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-2">Selecciona categoría</p>
-                                   <div className="flex flex-wrap gap-1.5">
+                                   <p className="text-[10px] font-black text-[#666] uppercase tracking-widest mb-3">Selecciona categoría</p>
+                                   <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
                                      {Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort().map(cat => (
                                        <button
                                          key={cat}
                                          onClick={() => setPlatilloCatFilter(cat)}
-                                         className="px-3 py-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#90c2ff] hover:text-[#90c2ff] rounded-[6px] text-[10px] font-bold text-[#8a8a8a] transition-colors uppercase"
+                                         className="px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#90c2ff] hover:text-[#90c2ff] hover:bg-[#1d2536] rounded-[8px] text-[11px] font-bold text-[#8a8a8a] transition-all uppercase text-left truncate"
                                        >
                                          {cat}
                                        </button>
@@ -878,7 +1089,7 @@ export const CreateEditPlanForm = ({
                                      <span className="text-[10px] font-black text-[#90c2ff] uppercase">{platilloCatFilter}</span>
                                    </div>
                                  )}
-                                 <div className="max-h-52 overflow-y-auto space-y-1 custom-scrollbar">
+                                 <div className="max-h-[260px] overflow-y-auto space-y-1 custom-scrollbar">
                                    {(() => {
                                      // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
                                      const LABEL_TO_KEY: Record<string, string> = {
@@ -932,7 +1143,8 @@ export const CreateEditPlanForm = ({
                                                const assigned = distTiempo[barridoKey];
                                                if (assigned != null && assigned > 0) {
                                                  const baseEq = Number(i.eqCantidad) || 1;
-                                                 scaledCant = parseFloat(((Number(i.cantidad) / baseEq) * assigned).toFixed(2));
+                                                 // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
+                                                 scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
                                                  scaledEq = assigned;
                                                }
                                              }
@@ -983,17 +1195,55 @@ export const CreateEditPlanForm = ({
                 </div>
               </div>
             ))}
-            
-          <button
-            onClick={() => setMenus([...menus, emptyMenu(`Menú ${menus.length + 1}`)])}
-            className="h-[100%] min-h-[400px] border-2 border-dashed border-[#333] rounded-[12px] p-10 flex flex-col items-center justify-center gap-4 text-[#8a8a8a] hover:text-white hover:bg-[#181818] hover:border-text-muted transition-all group"
-          >
-            <Plus className="w-10 h-10 group-hover:scale-110 transition-transform duration-300" />
-            <span className="text-[14px] font-medium">Agregar Menú Alternativo</span>
-          </button>
       </div>
     </div>
     </div>
+    {/* ─── Save-as-Platillo Modal ─── */}
+    {savePlatilloModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-[#111] border border-[#2a2a2a] rounded-[16px] p-6 w-full max-w-sm shadow-2xl">
+          <h3 className="text-[16px] font-bold text-white mb-1">Guardar como Platillo</h3>
+          <p className="text-[12px] text-[#8a8a8a] mb-4">Los ingredientes de este tiempo se guardarán en tu biblioteca como un platillo reutilizable.</p>
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Nombre</label>
+              <input
+                autoFocus
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
+                value={savePlatilloModal.nombre}
+                onChange={e => setSavePlatilloModal(p => p ? { ...p, nombre: e.target.value } : p)}
+                placeholder="Ej: Desayuno proteico"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Categoría</label>
+              <input
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
+                value={savePlatilloModal.categoria}
+                onChange={e => setSavePlatilloModal(p => p ? { ...p, categoria: e.target.value } : p)}
+                placeholder="Ej: Desayunos, Colaciones..."
+              />
+            </div>
+          </div>
+          <div className="flex gap-3 mt-5">
+            <button
+              onClick={() => setSavePlatilloModal(null)}
+              className="flex-1 py-2 border border-[#333] rounded-[8px] text-[13px] text-[#8a8a8a] hover:text-white transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleSaveTiempoAsPlatillo}
+              disabled={savingPlatillo}
+              className="flex-1 py-2 bg-brand-primary text-white rounded-[8px] text-[13px] font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+            >
+              {savingPlatillo ? 'Guardando...' : 'Guardar Platillo'}
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
     {ConfirmDialogComponent}
     </>
   );

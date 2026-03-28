@@ -106,6 +106,15 @@ export interface ConsumoCalorico {
   usalmenteCena?: string | null;
 }
 
+export interface Suplemento {
+  id: string;
+  nombre: string;
+  indicaciones: string;
+  fechaInicio: string;
+  fechaFin?: string;       // fecha en que se suspendó (si aplica)
+  activo: boolean;
+}
+
 export interface Valoracion {
   id: string;
   pacienteId: string;
@@ -137,6 +146,7 @@ export interface Valoracion {
   competencia?: Record<string, string>;
   comentarios?: string;
   suplementacion?: string;
+  suplementosDetalle?: Suplemento[];
   temario?: { tema: string; detalle: string }[];
   plan?: Plan;
   medicionNumero?: number;
@@ -170,6 +180,7 @@ export interface Plan {
   getModerado?: number;
   getIntenso?: number;
   menus: Menu[];
+  suplementosDetalle?: Suplemento[];
   proximaSesion?: string;
   proximaSesionHora?: string;
   notasGenerales?: string;
@@ -191,8 +202,16 @@ export interface TiempoComida {
   nombre: string;
   orden?: number;
   nota?: string;
-  notaPie?: string; // Soporte para data bruta de backend
+  notaPie?: string;      // Soporte para data bruta de backend
+  bebida?: string;       // Bebida del tiempo (ej. "500ml agua con limón")
+  suplTiempo?: string;   // Suplemento del tiempo (ej. "1 scoop Whey protein")
+  suplNotas?: string;    // Notas libres / suplementos (solo texto en PDF)
   ingredientes: Ingrediente[];
+}
+
+export interface EquivalenciaItem {
+  cantidad: number | string;
+  grupo: string;
 }
 
 export interface Ingrediente {
@@ -200,8 +219,11 @@ export interface Ingrediente {
   descripcion: string;
   cantidad: number | string;
   unidad: string;
-  eqCantidad?: number | string;
-  eqGrupo?: string;
+  eqCantidad?: number | string;  // legacy – primer grupo
+  eqGrupo?: string;              // legacy – primer grupo
+  equivalencias?: EquivalenciaItem[]; // multi-grupo
+  smaeGrPorEq?: number;          // gramos por 1 eq (ancla SMAE, persiste en BD)
+  fijarEq?: boolean;             // true = no auto-escalar (alimentos procesados)
   nota?: string;
   orden?: number;
   platillo?: string;

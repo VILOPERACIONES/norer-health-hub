@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface AlimentoSMAE {
@@ -370,9 +371,8 @@ const EquivalenciasSMAE = () => {
 
       {/* TABLA */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-8 h-8 border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white rounded-full animate-spin" />
-          <p className="text-[14px] text-text-muted">Cargando catálogo SMAE...</p>
+        <div className="flex flex-col items-center justify-center py-24">
+          <NutritionLoader text="Cargando catálogo SMAE..." />
         </div>
       ) : filtrados.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 border border-dashed border-border-subtle rounded-[12px] text-center">

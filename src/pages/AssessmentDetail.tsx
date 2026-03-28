@@ -1,10 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity } from 'lucide-react';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 // ─── Módulo Plan de la Consulta ───────────────────────────────────────────────
 const PlanSection = ({
@@ -205,8 +206,7 @@ const AssessmentDetail = () => {
 
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center">
-      <div className="w-8 h-8 rounded-full border-2 border-black/20 border-t-black dark:border-white/20 dark:border-t-white animate-spin mb-4" />
-      <p className="text-[14px] font-medium text-text-muted">Cargando valoración...</p>
+      <NutritionLoader text="Cargando valoración..." />
     </div>
   );
 
@@ -244,12 +244,14 @@ const AssessmentDetail = () => {
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 pb-6 border-b border-border-subtle">
         <div className="space-y-2">
-          <button
-            onClick={() => navigate(`/pacientes/${pacienteId}`)}
-            className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors w-fit group mb-4"
-          >
-            <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
-          </button>
+          <div className="flex items-center gap-4 mb-4">
+            <button
+              onClick={() => navigate(`/pacientes/${pacienteId}`)}
+              className="flex items-center gap-2 text-[14px] font-medium text-text-secondary hover:text-text-primary transition-colors group"
+            >
+              <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> Volver al expediente
+            </button>
+          </div>
           <div className="animate-slide-up space-y-1">
             <div className="flex items-center gap-2 mb-2">
               <span className="px-2.5 py-1 bg-[#1a2e1a] text-accent-green rounded-[6px] text-[12px] font-medium">
@@ -358,6 +360,74 @@ const AssessmentDetail = () => {
           </div>
         )}
       </div>
+
+      {/* ESQUEMA DE SUPLEMENTACIÓN */}
+      {val.suplementosDetalle && val.suplementosDetalle.length > 0 && (
+        <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden animate-slide-up">
+          <div className="flex items-center gap-3 p-6 border-b border-border-subtle">
+            <div className="p-2 rounded-[8px] bg-brand-primary/10 text-brand-primary">
+              <Activity className="w-4 h-4" />
+            </div>
+            <h3 className="text-[15px] font-bold text-text-primary m-0 uppercase tracking-wide">Esquema de Suplementación</h3>
+          </div>
+          <div className="overflow-hidden">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-bg-elevated border-b border-border-subtle">
+                  <th className="px-6 py-3 text-[11px] font-black text-text-muted uppercase tracking-widest w-[30%]">Suplemento</th>
+                  <th className="px-6 py-3 text-[11px] font-black text-text-muted uppercase tracking-widest w-[40%]">Indicaciones</th>
+                  <th className="px-6 py-3 text-[11px] font-black text-text-muted uppercase tracking-widest w-[30%] text-right">Tiempo de uso</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-subtle">
+                {[...val.suplementosDetalle]
+                  .sort((a: any, b: any) => (b.activo ? 1 : 0) - (a.activo ? 1 : 0))
+                  .map((sup: any, idx: number) => {
+                    const endDate = sup.activo ? new Date() : (sup.fechaFin ? new Date(sup.fechaFin) : new Date());
+                    const diasMs = endDate.getTime() - new Date(sup.fechaInicio).getTime();
+                    const diasTotales = Math.max(1, Math.floor(diasMs / (1000 * 3600 * 24)));
+                    const meses = Math.floor(diasTotales / 30);
+                    const diasExtra = diasTotales % 30;
+                    const tiempoStr = meses > 0
+                      ? `${meses} mes${meses > 1 ? 'es' : ''}${diasExtra > 0 ? ` y ${diasExtra} d` : ''}`
+                      : `${diasTotales} día${diasTotales > 1 ? 's' : ''}`;
+
+                    return (
+                      <tr key={idx} className="group hover:bg-bg-elevated/50 transition-colors">
+                        <td className="px-6 py-4 align-top">
+                          <div className="flex items-start gap-2">
+                            <div className={`mt-1.5 w-2 h-2 rounded-full shrink-0 ${sup.activo ? 'bg-accent-green' : 'bg-text-muted'}`} />
+                            <div>
+                              <span className={`text-[13px] font-bold leading-tight ${sup.activo ? 'text-text-primary' : 'text-text-muted line-through'}`}>
+                                {sup.nombre}
+                              </span>
+                              <span className={`ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[4px] ${
+                                sup.activo
+                                  ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
+                                  : 'bg-bg-elevated text-text-muted border border-border-subtle'
+                              }`}>
+                                {sup.activo ? 'activo' : 'suspendido'}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 align-top">
+                          <p className="text-[12px] font-medium text-text-secondary m-0 leading-relaxed whitespace-pre-line">{sup.indicaciones}</p>
+                        </td>
+                        <td className="px-6 py-4 align-top text-right">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-brand-primary/10 rounded-[6px] border border-brand-primary/20">
+                            <Clock className="w-3 h-3 text-brand-primary" />
+                            <span className="text-[11px] font-bold uppercase tracking-wider text-brand-primary whitespace-nowrap">{tiempoStr}</span>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* BARRIDO DE EQUIVALENCIAS — componente compartido */}
       <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden">
