@@ -3,6 +3,7 @@ import { X, FileText, Check, Settings2 } from 'lucide-react';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 interface PDFPreviewModalProps {
   isOpen: boolean;
@@ -130,8 +131,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
               
               {loadingPdf && (
                 <div className="absolute inset-0 z-20 bg-[#0a0a0a]/80 backdrop-blur-sm flex flex-col items-center justify-center text-white p-6 text-center">
-                  <div className="w-10 h-10 border-4 border-[#333] border-t-[#90c2ff] rounded-full animate-spin mb-4" />
-                  <p className="text-[14px] font-medium">Actualizando vista...</p>
+                  <NutritionLoader text="Actualizando vista..." />
                 </div>
               )}
 

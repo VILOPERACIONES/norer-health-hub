@@ -98,6 +98,7 @@ const App = () => {
               <Route path="pacientes/:id" element={<PermissionGuard module="pacientes"><PatientProfile /></PermissionGuard>} />
               <Route path="pacientes/:id/valoracion/nueva" element={<PermissionGuard module="pacientes"><NewAssessment /></PermissionGuard>} />
               <Route path="pacientes/:id/valoraciones/:valoracionId" element={<PermissionGuard module="pacientes"><AssessmentDetail /></PermissionGuard>} />
+              <Route path="pacientes/:id/valoraciones/:valoracionId/editar" element={<PermissionGuard module="pacientes"><NewAssessment /></PermissionGuard>} />
               <Route path="pacientes/:id/requerimientos" element={<PermissionGuard module="pacientes"><Requirements /></PermissionGuard>} />
               <Route path="pacientes/:id/planes/nuevo" element={<PermissionGuard module="pacientes"><CreateEditPlan /></PermissionGuard>} />
               <Route path="pacientes/:id/planes/:planId" element={<PermissionGuard module="pacientes"><PlanView /></PermissionGuard>} />

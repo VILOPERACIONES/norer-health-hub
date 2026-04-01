@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { FileText, Send, Check, Download } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 interface Phase4DeliveryProps {
   pacienteId: string;
@@ -116,7 +117,11 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
     }
   };
 
-  if (loadingInitial) return <div className="p-8 text-center text-[#8a8a8a]">Cargando configuración...</div>;
+  if (loadingInitial) return (
+    <div className="flex flex-col items-center justify-center p-8 min-h-[400px]">
+      <NutritionLoader text="Cargando configuración..." />
+    </div>
+  );
 
   return (
     <div className="flex flex-col lg:flex-row w-full lg:h-[700px] gap-6 animate-slide-up pb-8 lg:pb-0">
@@ -164,11 +169,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
       <div className="flex-1 bg-[#0a0a0a] rounded-[24px] overflow-hidden border border-[#2a2a2a] relative shadow-[inset_0_4px_40px_rgba(0,0,0,0.5)] flex flex-col items-center justify-center min-h-[500px]">
           {loadingPdf && (
             <div className="absolute inset-0 z-20 bg-[#0a0a0a]/80 backdrop-blur-sm flex flex-col items-center justify-center text-white p-6 text-center">
-              <div className="relative w-12 h-12 mb-6">
-                <div className="absolute inset-0 border-4 border-[#333] rounded-full" />
-                <div className="absolute inset-0 border-4 border-[#90c2ff] border-t-transparent rounded-full animate-spin" />
-              </div>
-              <p className="text-[16px] font-medium text-white mb-2">Componiendo PDF</p>
+              <NutritionLoader text="Componiendo PDF" />
             </div>
           )}
 

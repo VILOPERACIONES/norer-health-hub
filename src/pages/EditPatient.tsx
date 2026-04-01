@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
@@ -273,9 +274,8 @@ const EditPatient = () => {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
-        <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-        <p className="text-[14px] text-[#8a8a8a]">Cargando expediente para edición...</p>
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+        <NutritionLoader text="Cargando expediente para edición..." />
       </div>
     );
   }

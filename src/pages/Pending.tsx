@@ -4,6 +4,7 @@ import { Search, ChevronRight, Activity, Clock, FileText, CheckCircle2 } from 'l
 import api from '@/lib/api';
 import { formatDate, getBadgeForValuation } from '@/lib/format';
 import type { Valoracion } from '@/types';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 interface PendingItem {
   paciente: {
@@ -94,9 +95,8 @@ const Pending = () => {
   const currentItems = pendingItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   if (loading && pendingItems.length === 0) return (
-    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
-      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-      <p className="text-[14px] text-[#8a8a8a]">Cargando Pendientes...</p>
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+      <NutritionLoader text="Cargando Pendientes..." />
     </div>
   );
 

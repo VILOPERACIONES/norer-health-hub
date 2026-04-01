@@ -4,6 +4,7 @@ import { Search, Plus, ChevronRight } from 'lucide-react';
 import { usePatients } from '@/hooks/usePatients';
 import type { Paciente } from '@/types';
 import { formatDate } from '@/lib/format';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Patients = () => {
   const [search, setSearch]           = useState('');
@@ -26,9 +27,8 @@ const Patients = () => {
   };
 
   if (loading && pacientes.length === 0) return (
-    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
-      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-      <p className="text-[14px] text-[#8a8a8a]">Cargando Directorio Clínico...</p>
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+      <NutritionLoader text="Cargando Directorio Clínico..." />
     </div>
   );
 

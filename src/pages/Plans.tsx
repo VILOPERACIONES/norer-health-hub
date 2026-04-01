@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import type { Plan } from '@/types';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Plans = () => {
   const [planesBase, setPlanesBase] = useState<Plan[]>([]);
@@ -56,9 +57,8 @@ const Plans = () => {
   );
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center gap-4 h-[calc(100vh-120px)]">
-      <div className="w-8 h-8 border-[3px] border-white/20 border-t-white rounded-full animate-spin" />
-      <p className="text-[14px] text-[#8a8a8a]">Cargando menús...</p>
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
+      <NutritionLoader text="Cargando menús..." />
     </div>
   );
 
