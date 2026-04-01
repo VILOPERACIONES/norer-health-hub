@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Shield } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -59,6 +59,9 @@ const NewAssessment = () => {
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [calcomData, setCalcomData] = useState<{ fecha: string; modalidad: string; eventTypeId: number; name: string; email: string; phone: string } | null>(null);
+
+  const [suplementacionActiva, setSuplementacionActiva] = useState(false);
+  const [suplementosDetalle, setSuplementosDetalle] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean; fechaInicio?: string; fechaFin?: string }[]>([]);
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
   const [pendingDraft, setPendingDraft] = useState<any>(null);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
@@ -102,6 +105,8 @@ const NewAssessment = () => {
     if (d.fecha) setFecha(d.fecha);
     if (d.hora) setHora(d.hora);
     if (d.proximaSesion) setProximaSesion(d.proximaSesion);
+    if (d.suplementacionActiva !== undefined) setSuplementacionActiva(d.suplementacionActiva);
+    if (d.suplementosDetalle) setSuplementosDetalle(d.suplementosDetalle);
     if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
     if (d.suplementos) setSuplementos(d.suplementos);
     setIsGrasaModified(true);
@@ -124,7 +129,7 @@ const NewAssessment = () => {
     const vals = p?.valoraciones || [];
     let lastVal = null;
     if (vals.length > 0) {
-       lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+      lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
     }
 
     // Peso (siempre limpio)
@@ -146,9 +151,9 @@ const NewAssessment = () => {
     if (isEdit) return; // No drafts in edit mode
     if (step > 2) return; // Only save draft for steps 1 and 2
     if (!isGrasaModified) return; // Only start saving draft once fat % is touched
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos };
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, isEdit]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -156,58 +161,60 @@ const NewAssessment = () => {
         const { data } = await api.get(`/api/pacientes/${pacienteId}`);
         const p = data?.data || data;
         setPaciente(p);
-        
+
         if (isEdit) {
-           try {
-             const { data: valDataRes } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-             const val = valDataRes?.data || valDataRes;
-             
-             if (val) {
-               setFecha(val.fecha ? val.fecha.split('T')[0] : '');
-               setHora(val.hora || '');
-               setNumeroValoracion(val.numeroValoracion || 1);
-               setPeso(val.pesoActual ? String(val.pesoActual) : String(val.peso || ''));
-               const eVal = val.estatura || val.talla || '';
-               if (eVal) {
-                 const eNum = parseFloat(String(eVal));
-                 setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
-               }
-               setPctGrasa(val.pctGrasa ? String(val.pctGrasa) : '');
-               setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : '');
-               setComentarios(val.comentarios || '');
-               
-               if (val.temarioConsulta && Array.isArray(val.temarioConsulta)) {
-                 setTemario(val.temarioConsulta.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
-               } else if (val.temario && Array.isArray(val.temario)) {
-                 setTemario(val.temario.map((t: any) => ({ ...t, id: Math.random().toString() })));
-               }
+          try {
+            const { data: valDataRes } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
+            const val = valDataRes?.data || valDataRes;
 
-               if (val.evitar) {
-                 const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
-                 setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
-               }
-               
-               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
-                 setTieneSuplementos(true);
-                 setSuplementos(val.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
-               }
+            if (val) {
+              setFecha(val.fecha ? val.fecha.split('T')[0] : '');
+              setHora(val.hora || '');
+              setNumeroValoracion(val.numeroValoracion || 1);
+              setPeso(val.pesoActual ? String(val.pesoActual) : String(val.peso || ''));
+              const eVal = val.estatura || val.talla || '';
+              if (eVal) {
+                const eNum = parseFloat(String(eVal));
+                setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
+              }
+              setPctGrasa(val.pctGrasa ? String(val.pctGrasa) : '');
+              setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : '');
+              setComentarios(val.comentarios || '');
 
-               // Load barrido if exists
-               try {
-                 const br = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`);
-                 const bd = br.data?.data || br.data;
-                 if (bd && (bd.tiempos || bd.kcalTotal)) setBarridoData(bd);
-               } catch {}
-             }
-           } catch {
-             toast({ title: 'Error', description: 'No se pudo cargar la valoración a editar.', variant: 'destructive' });
-           }
+              if (val.temarioConsulta && Array.isArray(val.temarioConsulta)) {
+                setTemario(val.temarioConsulta.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
+              } else if (val.temario && Array.isArray(val.temario)) {
+                setTemario(val.temario.map((t: any) => ({ ...t, id: Math.random().toString() })));
+              }
+
+              if (val.evitar) {
+                const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
+                setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
+              }
+
+              if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
+                setTieneSuplementos(true);
+                setSuplementos(val.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
+                setSuplementacionActiva(true);
+                setSuplementosDetalle(val.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
+              }
+
+              // Load barrido if exists
+              try {
+                const br = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`);
+                const bd = br.data?.data || br.data;
+                if (bd && (bd.tiempos || bd.kcalTotal)) setBarridoData(bd);
+              } catch { }
+            }
+          } catch {
+            toast({ title: 'Error', description: 'No se pudo cargar la valoración a editar.', variant: 'destructive' });
+          }
         } else if (!localStorage.getItem(`draft_assessment_${pacienteId}`)) {
           // Solo pre-llenar nueva valoración si no hay borrador activo
           const vals = p?.valoraciones || [];
           let lastVal = null;
           if (vals.length > 0) {
-             lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+            lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
           }
 
           // Peso (siempre limpio en nueva valoración)
@@ -233,11 +240,20 @@ const NewAssessment = () => {
           // Grasa (siempre lo dejamos manual para capturar Kg o % por solicitud)
           setPctGrasa('');
           setKgGrasa('');
+
+          // Suplementación (arrastrada de la valoración pasada si existe)
+          if (lastVal?.suplementosDetalle && Array.isArray(lastVal.suplementosDetalle) && lastVal.suplementosDetalle.length > 0) {
+            setSuplementosDetalle(lastVal.suplementosDetalle);
+            setSuplementacionActiva(true);
+          } else {
+            setSuplementosDetalle([]);
+            setSuplementacionActiva(false);
+          }
         }
-        
+
         if (!isEdit) {
-           const vals = p?.valoraciones || [];
-           setNumeroValoracion(vals.length + 1);
+          const vals = p?.valoraciones || [];
+          setNumeroValoracion(vals.length + 1);
         }
       } catch (err) {
         console.error('Error cargando paciente:', err);
@@ -321,7 +337,7 @@ const NewAssessment = () => {
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
-      suplementosDetalle: tieneSuplementos ? suplementos : [],
+      suplementosDetalle: suplementacionActiva ? suplementosDetalle : [],
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
@@ -345,16 +361,16 @@ const NewAssessment = () => {
       }
 
       if (valoracionResId && barridoData && barridoData.kcalTotal > 0) {
-        try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch {}
+        try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch { }
       }
-      
+
       // AGENDAR CITA EN SEGUNDO PLANO SI HAY DATOS
       if (calcomData) {
         // Si los datos de contacto cambiaron, actualizamos al paciente primario
-        const hasChanges = calcomData.name !== paciente.nombre || 
-                          calcomData.email !== paciente.email || 
-                          (calcomData.phone && calcomData.phone !== paciente.telefono);
-        
+        const hasChanges = calcomData.name !== paciente.nombre ||
+          calcomData.email !== paciente.email ||
+          (calcomData.phone && calcomData.phone !== paciente.telefono);
+
         if (hasChanges) {
           try {
             await api.put(`/api/pacientes/${pacienteId}`, {
@@ -367,18 +383,29 @@ const NewAssessment = () => {
           }
         }
 
+        // AGENDAR CITA SINCRÓNICAMENTE PARA EVITAR RACE CONDITIONS EN LA SIGUIENTE PANTALLA
         try {
           await api.post('/api/citas/agendar', {
             pacienteId,
+            valoracionId: valoracionResId,
             ...calcomData
           });
-          toast({ title: 'Cita agendada', description: 'Se ha enviado la confirmación por correo.' });
-        } catch (bookingErr) {
+          toast({ title: 'Cita agendada', description: 'Se ha agendado la próxima cita y notificado al paciente.' });
+        } catch (bookingErr: any) {
           console.error('Error al agendar cita:', bookingErr);
-          toast({ 
-            title: 'Valoración guardada, pero la cita falló', 
-            description: 'Intenta agendar manualmente o revisa la configuración de Cal.com.', 
-            variant: 'destructive' 
+          let errorMsg = 'Intenta agendar manualmente o revisa la configuración de Cal.com.';
+          if (bookingErr.response?.data?.details) {
+            errorMsg = typeof bookingErr.response.data.details === 'string' 
+              ? bookingErr.response.data.details 
+              : JSON.stringify(bookingErr.response.data.details);
+          } else if (bookingErr.response?.data?.error) {
+            errorMsg = bookingErr.response.data.error;
+          }
+          toast({
+            title: 'Valoración guardada, pero la cita falló',
+            description: errorMsg,
+            variant: 'destructive',
+            duration: 8000
           });
         }
       }
@@ -400,7 +427,7 @@ const NewAssessment = () => {
 
   return (
     <div className="animate-fade-in w-full min-h-full font-sans flex flex-col pb-6 relative" style={{ backgroundColor: '#0a0a0a' }}>
-      
+
       {/* DRAFT PROMPT MODAL */}
       {showDraftPrompt && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-md animate-fade-in p-4">
@@ -411,13 +438,13 @@ const NewAssessment = () => {
             <h3 className="text-[20px] font-bold text-white mb-2 leading-tight">¿Continuar con la sesión anterior?</h3>
             <p className="text-[14px] text-[#8a8a8a] mb-8">Detectamos un borrador sin finalizar para este paciente. ¿Deseas recuperar los datos o iniciar una consulta nueva?</p>
             <div className="flex flex-col gap-3">
-              <button 
+              <button
                 onClick={applyDraft}
                 className="w-full py-4 bg-white text-black rounded-[12px] text-[14px] font-bold hover:bg-[#e0e0e0] transition-colors"
               >
                 Restaurar Sesión
               </button>
-              <button 
+              <button
                 onClick={discardDraft}
                 className="w-full py-4 bg-[#1a1a1a] text-[#8a8a8a] border border-white/10 rounded-[12px] text-[14px] font-bold hover:bg-[#222] hover:text-white transition-colors"
               >
@@ -432,32 +459,32 @@ const NewAssessment = () => {
         {/* TOP HEADER */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 pb-2 text-[#f0f0f0]">
           {paciente && (
-             <div className="flex items-center gap-2">
-               <div className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#333] text-[#f0f0f0] flex items-center justify-center font-bold text-[12px] uppercase">
-                 {paciente?.nombre?.[0] || ''}{paciente?.apellido?.[0] || ''}
-               </div>
-               <div>
-                  <h2 className="text-[14px] font-bold text-white m-0 tracking-tight leading-tight">
-                    {paciente.nombre} {paciente.apellido}
-                  </h2>
-                  <div className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] mt-0.5">
-                    <span>{paciente.fechaNacimiento ? `${Math.floor((Date.now() - new Date(paciente.fechaNacimiento.includes('T') ? paciente.fechaNacimiento.split('T')[0] : paciente.fechaNacimiento).getTime()) / 31557600000)} años` : '—'}</span>
-                    <span>·</span>
-                     <span>Última visita {(() => {
-                       const vals = paciente.valoraciones || [];
-                       if (vals.length === 0) return 'Ninguna';
-                       const lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
-                       // Parche timezone: anclar a T12:00:00 para evitar restar días en UTC-6
-                       const rawFecha = lastVal.fecha || '';
-                       const cleanFecha = rawFecha.includes('T') ? rawFecha.split('T')[0] + 'T12:00:00' : rawFecha;
-                       const d = new Date(cleanFecha);
-                       return `${d.getDate()} ${d.toLocaleString('es-ES', { month: 'short' })} ${d.getFullYear()}`;
-                    })()}</span>
-                   <span>·</span>
-                   <span className="uppercase">ID {pacienteId?.slice(-6)}</span>
-                  </div>
-               </div>
-             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#333] text-[#f0f0f0] flex items-center justify-center font-bold text-[12px] uppercase">
+                {paciente?.nombre?.[0] || ''}{paciente?.apellido?.[0] || ''}
+              </div>
+              <div>
+                <h2 className="text-[14px] font-bold text-white m-0 tracking-tight leading-tight">
+                  {paciente.nombre} {paciente.apellido}
+                </h2>
+                <div className="flex items-center gap-1.5 text-[11px] text-[#8a8a8a] mt-0.5">
+                  <span>{paciente.fechaNacimiento ? `${Math.floor((Date.now() - new Date(paciente.fechaNacimiento.includes('T') ? paciente.fechaNacimiento.split('T')[0] : paciente.fechaNacimiento).getTime()) / 31557600000)} años` : '—'}</span>
+                  <span>·</span>
+                  <span>Última visita {(() => {
+                    const vals = paciente.valoraciones || [];
+                    if (vals.length === 0) return 'Ninguna';
+                    const lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
+                    // Parche timezone: anclar a T12:00:00 para evitar restar días en UTC-6
+                    const rawFecha = lastVal.fecha || '';
+                    const cleanFecha = rawFecha.includes('T') ? rawFecha.split('T')[0] + 'T12:00:00' : rawFecha;
+                    const d = new Date(cleanFecha);
+                    return `${d.getDate()} ${d.toLocaleString('es-ES', { month: 'short' })} ${d.getFullYear()}`;
+                  })()}</span>
+                  <span>·</span>
+                  <span className="uppercase">ID {pacienteId?.slice(-6)}</span>
+                </div>
+              </div>
+            </div>
           )}
         </div>
 
@@ -493,179 +520,240 @@ const NewAssessment = () => {
                   Medidas antropométricas, notas y temas a tratar con el paciente.
                 </p>
               </div>
-              
+
               <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
-                 {/* COLUMNA 1: ANTROPOMETRÍA Y SUPLEMENTACIÓN */}
-                 <div className="flex flex-col gap-4 shrink-0 h-fit">
-                   <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
-                     <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
-                     <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
-                       <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
-                       <Field label="Hora" value={hora} onChange={setHora} type="time" />
-                       
-                       <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
-                       <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
-                       
-                        <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
-                        <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
-                       <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
-                     </div>
-                   </div>
+                {/* COLUMNA 1: ANTROPOMETRÍA Y SUPLEMENTACIÓN */}
+                <div className="flex flex-col gap-4 shrink-0 h-fit">
+                  <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
+                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
+                    <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+                      <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
+                      <Field label="Hora" value={hora} onChange={setHora} type="time" />
 
-                   <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
-                     <div className="flex items-center justify-between mb-4">
-                       <h4 className="text-[13px] font-bold text-white tracking-widest uppercase m-0">Esquema de Suplementación</h4>
-                       <label className="flex items-center cursor-pointer">
-                         <div className="relative">
-                           <input type="checkbox" className="sr-only" checked={tieneSuplementos} onChange={(e) => setTieneSuplementos(e.target.checked)} />
-                           <div className={`block w-10 h-6 rounded-full transition-colors ${tieneSuplementos ? 'bg-brand-primary' : 'bg-[#333]'}`}></div>
-                           <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${tieneSuplementos ? 'transform translate-x-4' : ''}`}></div>
-                         </div>
-                       </label>
-                     </div>
-                     
-                     {tieneSuplementos && (
-                       <div className="animate-slide-up mt-2 flex flex-col gap-3">
-                          <button onClick={addSuplemento} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center justify-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-2 border border-[#333] rounded-[6px] w-full">
-                            <Plus className="h-3 w-3" strokeWidth={3} /> Agregar Suplemento
+                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
+                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
+
+                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
+                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
+                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* COLUMNA 2: TEMARIO Y NOTAS */}
+                <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
+                  <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas y Temario</h4>
+                  <div className="shrink-0">
+                    <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
+                    <textarea
+                      value={comentarios}
+                      onChange={(e) => setComentarios(e.target.value)}
+                      className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
+                      placeholder="Observaciones relevantes de la consulta..."
+                    />
+                  </div>
+
+                  <div className="shrink-0 mt-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
+                      <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
+                      <button onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
+                        <Plus className="h-2.5 w-2.5" /> Agregar
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {evitar.map((e, idx) => (
+                        <div key={e.id} className="flex gap-2 items-center">
+                          <input
+                            type="text"
+                            value={e.valor}
+                            onChange={(el) => updateEvitar(idx, el.target.value)}
+                            className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            placeholder="Ej. Lácteos, Azúcares..."
+                          />
+                          <button onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
-                          
-                          <div className="space-y-3 mt-2">
-                            {suplementos.length === 0 ? (
-                               <p className="text-[11px] text-[#555] italic text-center py-2">Lista vacía. Presiona agregar para añadir suplementos.</p>
-                            ) : (
-                               suplementos.map((sup, idx) => (
-                                 <div key={sup.id} className="p-3 bg-[#181818] border border-[#333] rounded-[8px] flex flex-col gap-2 relative group">
-                                    <button onClick={() => removeSuplemento(idx)} className="absolute top-2 right-2 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
-                                      <Trash2 className="h-4 w-4" />
-                                    </button>
-                                    <div className="pr-8">
-                                      <input
-                                        type="text"
-                                        placeholder="Nombre del suplemento..."
-                                        value={sup.nombre}
-                                        onChange={(e) => updateSuplemento(idx, 'nombre', e.target.value)}
-                                        className="w-full bg-transparent text-[13px] font-bold text-white outline-none placeholder-[#555] border-none m-0 p-0"
-                                      />
-                                    </div>
-                                    <input
-                                      type="text"
-                                      placeholder="Dosis / Indicaciones (ej. 1 scoop post-entreno)"
-                                      value={sup.indicaciones}
-                                      onChange={(e) => updateSuplemento(idx, 'indicaciones', e.target.value)}
-                                      className="w-full bg-[#111] border border-[#333] focus:border-[#555] rounded-[6px] p-2 text-[12px] font-medium text-[#c0c0c0] outline-none placeholder-[#444] transition-colors"
-                                    />
-                                    <div className="flex items-center justify-between mt-1">
-                                      <span className="text-[10px] text-[#8a8a8a] font-medium tracking-wide">
-                                        Tiempo tomando: {Math.max(0, Math.floor((new Date().getTime() - new Date(sup.fechaInicio).getTime()) / (1000 * 3600 * 24)))} días
-                                      </span>
-                                      <label className="flex items-center gap-2 cursor-pointer">
-                                        <span className={`text-[10px] uppercase font-bold tracking-wider ${sup.activo ? 'text-brand-primary' : 'text-[#8a8a8a]'}`}>{sup.activo ? 'Activo' : 'Suspendido'}</span>
-                                        <input type="checkbox" checked={sup.activo} onChange={(e) => updateSuplemento(idx, 'activo', e.target.checked)} className="accent-brand-primary cursor-pointer" />
-                                      </label>
-                                    </div>
-                                 </div>
-                               ))
-                            )}
+                        </div>
+                      ))}
+                      {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
+                    </div>
+                  </div>
+
+                  <div className="flex-1 flex flex-col min-h-0 mt-4">
+                    <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] shrink-0 mb-3">
+                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temario Abordado</label>
+                      <button onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
+                        <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
+                      </button>
+                    </div>
+
+                    {temario.length === 0 && (
+                      <div className="flex flex-col items-center justify-center py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] shrink-0">
+                        <p className="text-[12px] text-[#8a8a8a] text-center max-w-sm px-4">
+                          Sin temas asignados. Haz clic en "Agregar" para ir alistando el temario a tratar.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
+                      {temario.map((t, idx) => (
+                        <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
+                          <button onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                          <input
+                            type="text"
+                            placeholder="Título del tema..."
+                            value={t.tema}
+                            onChange={(e) => updateTema(idx, 'tema', e.target.value)}
+                            className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
+                          />
+                          <textarea
+                            placeholder="Detalles y comentarios de lo conversado..."
+                            value={t.detalle}
+                            onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
+                            className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* SUPLEMENTACION BLOCK */}
+              <div className="mt-4 bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 animate-slide-up shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase flex items-center gap-2">
+                      <Shield className="w-4 h-4 text-brand-primary" /> Esquema de Suplementación
+                    </h4>
+                    <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
+                      Configura los suplementos que el paciente tomará en esta fase.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={suplementacionActiva}
+                      onChange={(e) => setSuplementacionActiva(e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                    <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{suplementacionActiva ? 'Habilitado' : 'Deshabilitado'}</span>
+                  </label>
+                </div>
+
+                {suplementacionActiva && (
+                  <div className="space-y-4 animate-fade-in mt-6">
+                    <div className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                      <div>Suplemento</div>
+                      <div>Indicaciones / Dosis</div>
+                      <div>Tiempo</div>
+                      <div className="text-center">Estado</div>
+                      <div></div>
+                    </div>
+
+                    <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
+                      {suplementosDetalle.map((sup, idx) => (
+                        <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a] group hover:border-[#444] transition-colors">
+                          <input
+                            type="text"
+                            value={sup.nombre}
+                            onChange={(e) => {
+                              const newArr = [...suplementosDetalle];
+                              newArr[idx].nombre = e.target.value;
+                              setSuplementosDetalle(newArr);
+                            }}
+                            placeholder="Ej. Creatina"
+                            className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                          />
+                          <input
+                            type="text"
+                            value={sup.indicaciones}
+                            onChange={(e) => {
+                              const newArr = [...suplementosDetalle];
+                              newArr[idx].indicaciones = e.target.value;
+                              setSuplementosDetalle(newArr);
+                            }}
+                            placeholder="Ej. 1 scoop post-entreno"
+                            className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                          />
+                          <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
+                            {(() => {
+                              if (!sup.fechaInicio) return 'Nuevo';
+                              const start = new Date(sup.fechaInicio);
+                              const end = sup.activo ? new Date() : (sup.fechaFin ? new Date(sup.fechaFin) : new Date());
+                              if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'Reciente';
+                              const diffTime = Math.max(0, end.getTime() - start.getTime());
+                              const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+                              const meses = Math.floor(diffDays / 30);
+                              const extra = diffDays % 30;
+                              if (meses > 0) return `${meses} mes${meses > 1 ? 'es' : ''}${extra > 0 ? ' y ' + extra + ' d' : ''}`;
+                              return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+                            })()}
                           </div>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-
-                 {/* COLUMNA 2: TEMARIO Y NOTAS */}
-                 <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
-                    <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas y Temario</h4>
-                    <div className="shrink-0">
-                       <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
-                       <textarea
-                         value={comentarios}
-                         onChange={(e) => setComentarios(e.target.value)}
-                         className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
-                         placeholder="Observaciones relevantes de la consulta..."
-                       />
-                    </div>
-
-                    <div className="shrink-0 mt-4">
-                        <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
-                           <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
-                           <button onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
-                             <Plus className="h-2.5 w-2.5" /> Agregar
-                           </button>
-                        </div>
-                        <div className="space-y-2">
-                          {evitar.map((e, idx) => (
-                            <div key={e.id} className="flex gap-2 items-center">
+                          <div className="flex items-center justify-center w-[80px]">
+                            <label className="relative inline-flex items-center cursor-pointer">
                               <input
-                                type="text"
-                                value={e.valor}
-                                onChange={(el) => updateEvitar(idx, el.target.value)}
-                                className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
-                                placeholder="Ej. Lácteos, Azúcares..."
+                                type="checkbox"
+                                className="sr-only peer"
+                                checked={sup.activo}
+                                onChange={(e) => {
+                                  const newArr = [...suplementosDetalle];
+                                  newArr[idx].activo = e.target.checked;
+                                  if (!e.target.checked) {
+                                    newArr[idx].fechaFin = new Date().toISOString();
+                                  } else {
+                                    newArr[idx].fechaFin = undefined;
+                                  }
+                                  setSuplementosDetalle(newArr);
+                                }}
                               />
-                              <button onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-                          ))}
-                          {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
+                              <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                          </div>
+                          <button
+                            onClick={() => setSuplementosDetalle(suplementosDetalle.filter((_, i) => i !== idx))}
+                            className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center ml-auto"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
+                      ))}
+
+                      {suplementosDetalle.length === 0 && (
+                        <div className="py-8 text-center border border-dashed border-[#333] rounded-[8px] bg-[#141414]">
+                          <p className="text-[12px] text-[#8a8a8a] m-0">No hay suplementos agregados.</p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex-1 flex flex-col min-h-0 mt-4">
-                       <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] shrink-0 mb-3">
-                         <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temario Abordado</label>
-                         <button onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
-                           <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
-                         </button>
-                       </div>
-
-                       {temario.length === 0 && (
-                         <div className="flex flex-col items-center justify-center py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] shrink-0">
-                           <p className="text-[12px] text-[#8a8a8a] text-center max-w-sm px-4">
-                             Sin temas asignados. Haz clic en "Agregar" para ir alistando el temario a tratar.
-                           </p>
-                         </div>
-                       )}
-
-                       <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                         {temario.map((t, idx) => (
-                           <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
-                             <button onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
-                               <Trash2 className="h-4 w-4" />
-                             </button>
-                             <input
-                               type="text"
-                               placeholder="Título del tema..."
-                               value={t.tema}
-                               onChange={(e) => updateTema(idx, 'tema', e.target.value)}
-                               className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
-                             />
-                             <textarea
-                               placeholder="Detalles y comentarios de lo conversado..."
-                               value={t.detalle}
-                               onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
-                               className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
-                             />
-                           </div>
-                         ))}
-                       </div>
+                    <div className="flex justify-end pt-2">
+                      <button
+                        onClick={() => setSuplementosDetalle([...suplementosDetalle, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }])}
+                        className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
+                      >
+                        <Plus className="w-4 h-4" /> Agregar Suplemento
+                      </button>
                     </div>
-                 </div>
+                  </div>
+                )}
               </div>
 
               <div className="mt-4">
-                 <CalcomScheduling 
-                   pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
-                   onSelection={(data) => {
-                     setCalcomData(data);
-                     if (data?.fecha) {
-                       setProximaSesion(data.fecha);
-                     } else {
-                       setProximaSesion('');
-                     }
-                   }}
-                 />
+                <CalcomScheduling
+                  pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
+                  onSelection={(data) => {
+                    setCalcomData(data);
+                    if (data?.fecha) {
+                      setProximaSesion(data.fecha);
+                    } else {
+                      setProximaSesion('');
+                    }
+                  }}
+                />
               </div>
             </div>
           )}
@@ -680,15 +768,15 @@ const NewAssessment = () => {
                 </h3>
                 <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
                   {barridoData && barridoData.kcalTotal > 0
-                     ? `Total temporal: ${Math.round(barridoData.kcalTotal).toLocaleString()} kcal`
-                     : 'Asigna el cuadro sintético o los macros del paciente.'}
+                    ? `Total temporal: ${Math.round(barridoData.kcalTotal).toLocaleString()} kcal`
+                    : 'Asigna el cuadro sintético o los macros del paciente.'}
                 </p>
               </div>
 
               <div className="bg-[#111111] px-5 py-4 rounded-[16px] border border-[#2a2a2a] shadow-none flex-1 min-h-0 overflow-y-auto custom-scrollbar">
-                 <div className="-mx-4 md:mx-0">
-                   <BarridoEquivalenciasComp value={barridoData} onChange={(data) => setBarridoData(data)} />
-                 </div>
+                <div className="-mx-4 md:mx-0">
+                  <BarridoEquivalenciasComp value={barridoData} onChange={(data) => setBarridoData(data)} />
+                </div>
               </div>
             </div>
           )}
@@ -696,13 +784,13 @@ const NewAssessment = () => {
           {/* FASE 3: CREACION DEL PLAN */}
           {step === 3 && (
             <div className="space-y-4 animate-slide-up mt-4">
-              <CreateEditPlanForm 
-                pacienteId={pacienteId} 
+              <CreateEditPlanForm
+                pacienteId={pacienteId}
                 valoracionId={valoracionIdGuardada || undefined}
                 initialProximaSesion={proximaSesion || undefined}
                 onSaved={(planId) => {
-                   setPlanIdGuardado(planId);
-                   setStep(4);
+                  setPlanIdGuardado(planId);
+                  setStep(4);
                 }}
                 onCancel={() => navigate(`/pacientes/${pacienteId}`)}
               />
@@ -712,11 +800,11 @@ const NewAssessment = () => {
           {/* FASE 4: OPCIONES DE ENVIO (PDF / WHATSAPP) */}
           {step === 4 && (
             <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar animate-slide-up mt-4">
-               <Phase4Delivery 
-                 pacienteId={pacienteId!} 
-                 planId={planIdGuardado!}
-                 onFinish={() => navigate(`/pacientes/${pacienteId}`)}
-               />
+              <Phase4Delivery
+                pacienteId={pacienteId!}
+                planId={planIdGuardado!}
+                onFinish={() => navigate(`/pacientes/${pacienteId}`)}
+              />
             </div>
           )}
 
@@ -724,26 +812,26 @@ const NewAssessment = () => {
           {step <= 2 && (
             <div className="flex flex-col sm:flex-row items-center justify-between py-2 shrink-0 border-t border-[#1a1a1a]">
               {step > 1 ? (
-                <button 
-                   onClick={() => setStep(step - 1)}
-                   className="text-[12px] font-bold text-[#8a8a8a] hover:text-white transition-colors flex items-center gap-2 px-3 py-2 uppercase tracking-wide"
+                <button
+                  onClick={() => setStep(step - 1)}
+                  className="text-[12px] font-bold text-[#8a8a8a] hover:text-white transition-colors flex items-center gap-2 px-3 py-2 uppercase tracking-wide"
                 >
-                   ← Anterior
+                  ← Anterior
                 </button>
               ) : (
-                <button 
-                   onClick={() => navigate(`/pacientes/${pacienteId}`)}
-                   className="text-[12px] font-bold text-[#8a8a8a] hover:text-white transition-colors flex items-center gap-2 px-3 py-2 uppercase tracking-wide"
+                <button
+                  onClick={() => navigate(`/pacientes/${pacienteId}`)}
+                  className="text-[12px] font-bold text-[#8a8a8a] hover:text-white transition-colors flex items-center gap-2 px-3 py-2 uppercase tracking-wide"
                 >
-                   ← Salir Sin Guardar
+                  ← Salir Sin Guardar
                 </button>
               )}
 
               {/* Dots Indicator */}
               <div className="hidden sm:flex items-center gap-1.5 opacity-50">
-                 {[1, 2, 3, 4].map(s => (
-                   <div key={s} className={`rounded-full transition-all duration-300 ${step === s ? 'w-6 h-1 bg-white' : 'w-1 h-1 bg-[#444]'}`} />
-                 ))}
+                {[1, 2, 3, 4].map(s => (
+                  <div key={s} className={`rounded-full transition-all duration-300 ${step === s ? 'w-6 h-1 bg-white' : 'w-1 h-1 bg-[#444]'}`} />
+                ))}
               </div>
 
               {step < 2 ? (
@@ -765,20 +853,20 @@ const NewAssessment = () => {
               ) : (
                 <div className="flex flex-col-reverse sm:flex-row items-center gap-3 w-full sm:w-auto">
                   <button
-                     onClick={() => handleSave(false)}
-                     disabled={saving || barridoData?.isValid === false}
-                     className="px-5 py-2.5 bg-transparent border border-[#333] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto text-center uppercase tracking-wide"
-                   >
-                     {saving ? 'Guardando...' : 'Sólo Guardar'}
-                   </button>
-                   <button
-                     onClick={() => handleSave(true)}
-                     disabled={saving || barridoData?.isValid === false}
-                     className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-full sm:w-auto justify-center shadow-sm uppercase tracking-wide"
-                     style={{ minWidth: '220px' }}
-                   >
-                     {saving ? <div className="w-4 h-4 border-2 border-[#0a0a0a]/20 border-t-[#0a0a0a] rounded-full animate-spin" /> : <>Guardar y Crear Plan →</>}
-                   </button>
+                    onClick={() => handleSave(false)}
+                    disabled={saving || barridoData?.isValid === false}
+                    className="px-5 py-2.5 bg-transparent border border-[#333] text-white rounded-[8px] text-[12px] font-bold hover:bg-[#1a1a1a] transition-colors disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto text-center uppercase tracking-wide"
+                  >
+                    {saving ? 'Guardando...' : 'Sólo Guardar'}
+                  </button>
+                  <button
+                    onClick={() => handleSave(true)}
+                    disabled={saving || barridoData?.isValid === false}
+                    className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-full sm:w-auto justify-center shadow-sm uppercase tracking-wide"
+                    style={{ minWidth: '220px' }}
+                  >
+                    {saving ? <div className="w-4 h-4 border-2 border-[#0a0a0a]/20 border-t-[#0a0a0a] rounded-full animate-spin" /> : <>Guardar y Crear Plan →</>}
+                  </button>
                 </div>
               )}
             </div>

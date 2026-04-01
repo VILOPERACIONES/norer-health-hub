@@ -58,7 +58,10 @@ const Platillos = () => {
   };
 
   const handleEdit = (p: Platillo) => {
-    setCurrentPlatillo({ ...p });
+    setCurrentPlatillo({ 
+      ...p,
+      ingredientes: (p.ingredientes || []).map(i => ({ ...i, id: i.id || Math.random().toString(36).substr(2, 9) }))
+    });
     setIsEditing(true);
   };
 
@@ -98,6 +101,7 @@ const Platillos = () => {
   const addIngrediente = () => {
     if (!currentPlatillo) return;
     const newIng: Ingrediente = {
+      id: Math.random().toString(36).substr(2, 9),
       descripcion: '',
       cantidad: 0,
       unidad: 'GR',
@@ -412,7 +416,7 @@ const Platillos = () => {
               <div className="bg-bg-base p-6 rounded-2xl border border-border-subtle space-y-6 shadow-inner">
                 {currentPlatillo?.ingredientes?.map((ing, idx) => (
                   <SmaeIngredientePicker 
-                    key={idx}
+                    key={ing.id || idx}
                     index={idx}
                     ingrediente={ing}
                     onUpdate={(upd) => updateIngrediente(idx, upd)}

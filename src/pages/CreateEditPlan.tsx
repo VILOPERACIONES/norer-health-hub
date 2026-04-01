@@ -19,11 +19,13 @@ const emptyMenu = (name: string): Menu => ({
 });
 
 const emptyIngrediente = (): Ingrediente => ({ 
+  id: Math.random().toString(36).substr(2, 9),
   descripcion: '', 
   cantidad: 0, 
   unidad: 'GR', 
   eqCantidad: 0, 
   eqGrupo: '', 
+  equivalencias: [],
   nota: '' 
 });
 
@@ -128,8 +130,10 @@ export const CreateEditPlanForm = ({
           suplNotas: t.suplNotas || metaSuplNotas,
           ingredientes: (t.ingredientes || []).map((i: any) => ({
             ...i,
+            id: i.id || Math.random().toString(36).substr(2, 9),
             cantidad: parseFloat(i.cantidad) || 0,
             eqCantidad: i.eqCantidad != null ? parseFloat(String(i.eqCantidad)) : undefined,
+            equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
             platillo: i.platillo || ''
           }))
         };
@@ -522,6 +526,11 @@ export const CreateEditPlanForm = ({
       toast({ title: 'ERROR ESTRATÉGICO', description: 'La distribución de macronutrientes debe sumar el 100% de la carga energética.', variant: 'destructive' });
       return;
     }
+    // Mejora: validar nombre de plan si es base
+    if (isBasePlan && !nombrePlan.trim()) {
+      toast({ title: 'Nombre requerido', description: 'Por favor asigna un nombre al menú antes de guardarlo.', variant: 'destructive' });
+      return;
+    }
     setSaving(true);
     const body: any = {
       nombre: nombrePlan,
@@ -543,7 +552,9 @@ export const CreateEditPlanForm = ({
           ingredientes: t.ingredientes.map(i => ({
             ...i,
             cantidad: i.cantidad.toString(),
-            eqCantidad: i.eqCantidad?.toString()
+            eqCantidad: i.eqCantidad?.toString(),
+            // Serializar explícitamente para no perder el array
+            equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
           }))
         }))
       })), 
@@ -946,8 +957,8 @@ export const CreateEditPlanForm = ({
 
                       <div className="space-y-6">
                         {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
-                           <div key={`${mi}-${ti}-${pIndex}`} className="p-3 bg-[#111111] border border-[#333] rounded-[8px]">
-                              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
+                           <div key={`${mi}-${ti}-${pIndex}`} className={pName ? 'p-3 bg-[#111111] border border-[#333] rounded-[8px]' : ''}>
+                              {pName ? (<div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
                                  <span className="text-[#8a8a8a] text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
                                  <input 
                                     className="bg-transparent border-none outline-none font-semibold text-white placeholder:text-[#8a8a8a] text-[13px] w-full min-w-0"
@@ -978,14 +989,14 @@ export const CreateEditPlanForm = ({
                                      </button>
                                    )}
                                  </div>
-                              </div>
-                              <div className="space-y-4">
-                                {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
-                                  <SmaeIngredientePicker
-                                    key={`ing-${mi}-${ti}-${ii}`}
-                                    ingrediente={ing}
-                                    index={ii}
-                                    onUpdate={(updates) =>
+                              </div>) : null}
+                                <div className="space-y-4">
+                                  {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
+                                    <SmaeIngredientePicker
+                                      key={ing.id || `ing-${mi}-${ti}-${ii}`}
+                                      ingrediente={ing}
+                                      index={ii}
+                                      onUpdate={(updates) =>
                                       updateTiempo(mi, ti, (t) => ({
                                         ...t,
                                         ingredientes: t.ingredientes.map((x, j) =>
@@ -1012,22 +1023,29 @@ export const CreateEditPlanForm = ({
                            </div>
                         ))}
                         
-                        <button
-                          onClick={() => {
-                             // Generar nombre de platillo nuevo evitando colisiones
-                             let nuevoNombreBase = "Nuevo Platillo";
-                             let nuevoNombre = nuevoNombreBase;
-                             let cnt = 1;
-                             while (tiempo.ingredientes.some(i => i.platillo === nuevoNombre)) {
-                                nuevoNombre = `${nuevoNombreBase} ${cnt}`;
-                                cnt++;
-                             }
-                             updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
-                          }}
-                          className="w-full py-2 bg-transparent border border-dashed border-[#333] text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
-                        >
-                          + Crear Nuevo Platillo
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: '' }] }))}
+                            className="flex-1 py-2 bg-transparent border border-dashed border-[#2a2a2a] hover:border-[#555] text-[#8a8a8a] hover:text-white text-[12px] font-medium rounded-[6px] transition-colors"
+                          >
+                            + Agregar Ingrediente
+                          </button>
+                          <button
+                            onClick={() => {
+                               let nuevoNombreBase = "Nuevo Platillo";
+                               let nuevoNombre = nuevoNombreBase;
+                               let cnt = 1;
+                               while (tiempo.ingredientes.some(i => i.platillo === nuevoNombre)) {
+                                  nuevoNombre = `${nuevoNombreBase} ${cnt}`;
+                                  cnt++;
+                               }
+                               updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
+                            }}
+                            className="flex-1 py-2 bg-transparent border border-dashed border-[#333] text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
+                          >
+                            + Crear Platillo
+                          </button>
+                        </div>
 
                         <div className="relative">
                           <div className="flex gap-2 mt-3">

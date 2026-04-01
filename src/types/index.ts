@@ -214,6 +214,9 @@ export interface EquivalenciaItem {
   grupo: string;
 }
 
+/** Alias para compatibilidad con código de stash */
+export type EqExtra = EquivalenciaItem;
+
 export interface Ingrediente {
   id?: string;
   descripcion: string;

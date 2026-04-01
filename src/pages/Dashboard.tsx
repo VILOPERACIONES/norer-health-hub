@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { usePatients } from '@/hooks/usePatients';
 import { 
   Users, UserPlus, ClipboardList, Activity, Plus,
   MessageSquare, BookOpen, Trophy, MoreHorizontal,
@@ -13,96 +15,84 @@ import { getBadgeForValuation } from '@/lib/format';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Dashboard = () => {
-  const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
-  const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [topClientes, setTopClientes] = useState<{
-    id: string;
-    nombre: string;
-    valoraciones: number;
-  }[]>([]);
-  // Datos para la tabla "Últimos Pacientes" — misma lógica que Pending.tsx
-  const [ultimosPendientes, setUltimosPendientes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { data: pacientesData = [], isLoading: loadingPacientes } = usePatients();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Intentar endpoint dedicado de top-clientes primero
-        const [metRes, alertRes, pacRes] = await Promise.all([
-          api.get('/api/dashboard/metricas'),
-          api.get('/api/dashboard/alertas'),
-          api.get('/api/pacientes'),
-        ]);
+  // Queries para métricas, alertas y top clientes
+  const { data: metricas } = useQuery({
+    queryKey: ['dashboard', 'metricas'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/metricas');
+      return res.data?.data || res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-        setMetricas(metRes.data?.data || metRes.data);
-        setAlertas(alertRes.data?.data || alertRes.data || []);
+  const { data: alertas = [] } = useQuery({
+    queryKey: ['dashboard', 'alertas'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/alertas');
+      return res.data?.data || res.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-        // ── Construir "Últimos Pacientes" con la misma lógica de Pending.tsx ──
-        const pacientesData: any[] = pacRes.data?.data || pacRes.data || [];
-        const pendItems: any[] = [];
-        pacientesData.forEach((pac: any) => {
-          const valArr: any[] = pac.valoraciones || [];
-          valArr.forEach((val: any) => {
-            // Inyectar plan si no viene dentro de la valoración
-            if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
-              const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
-              if (planAsociado) {
-                val.plan = planAsociado;
-                val.planId = planAsociado.id;
-                val.estadoEnvio = planAsociado.estadoEnvio;
-              }
-            }
-            const statusInfo = getBadgeForValuation(val);
-            if (statusInfo.text !== 'Enviado') {
-              pendItems.push({
-                pacienteId: pac.id,
-                nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
-                fecha: val.fecha,
-                numeroValoracion: val.numeroValoracion,
-                val,
-                statusInfo,
-              });
-            }
-          });
-        });
-        // Ordenar por fecha más reciente primero
-        pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-        setUltimosPendientes(pendItems);
+  const { data: topClientesRaw } = useQuery({
+    queryKey: ['dashboard', 'top-clientes'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/top-clientes');
+      return res.data?.data || res.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+  });
 
-        // Top clientes: preferir endpoint dedicado, fallback desde pacientesData
-        try {
-          const topRes = await api.get('/api/dashboard/top-clientes');
-          const topData = topRes.data?.data || topRes.data || [];
-          setTopClientes(topData.slice(0, 10));
-        } catch {
-          const top = pacientesData
-            .map((p: any) => ({
-              id: p.id,
-              nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
-              valoraciones:
-                p._count?.valoraciones ??
-                p.totalValoraciones ??
-                p.numeroValoraciones ??
-                (Array.isArray(p.valoraciones) ? p.valoraciones.length : 0),
-            }))
-            .filter((p: any) => p.valoraciones > 0)
-            .sort((a: any, b: any) => b.valoraciones - a.valoraciones)
-            .slice(0, 10);
-          setTopClientes(top);
+  // Determinar top-clientes (usando el endpoint si tiene datos, o un fallback de pacientesData)
+  const topClientes = useMemo(() => {
+    if (topClientesRaw && topClientesRaw.length > 0) return topClientesRaw.slice(0, 10);
+    return pacientesData
+      .map((p: any) => ({
+        id: p.id,
+        nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
+        valoraciones: p._count?.valoraciones ?? p.totalValoraciones ?? p.numeroValoraciones ?? (Array.isArray(p.valoraciones) ? p.valoraciones.length : 0),
+      }))
+      .filter((p: any) => p.valoraciones > 0)
+      .sort((a: any, b: any) => b.valoraciones - a.valoraciones)
+      .slice(0, 10);
+  }, [topClientesRaw, pacientesData]);
+
+  const ultimosPendientes = useMemo(() => {
+    const pendItems: any[] = [];
+    pacientesData.forEach((pac: any) => {
+      const valArr: any[] = pac.valoraciones || [];
+      valArr.forEach((val: any) => {
+        if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
+          const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
+          if (planAsociado) {
+            val.plan = planAsociado;
+            val.planId = planAsociado.id;
+            val.estadoEnvio = planAsociado.estadoEnvio;
+          }
         }
-      } catch (err) {
-        console.error('Error cargando dashboard:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+        const statusInfo = getBadgeForValuation(val);
+        if (statusInfo.text !== 'Enviado') {
+          pendItems.push({
+            pacienteId: pac.id,
+            nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
+            fecha: val.fecha,
+            numeroValoracion: val.numeroValoracion,
+            val,
+            statusInfo,
+          });
+        }
+      });
+    });
+    return pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  }, [pacientesData]);
+
+  const loading = loadingPacientes && !metricas;
 
   const userName = user?.nombre?.split(' ')[0] || 'Especialista';
 

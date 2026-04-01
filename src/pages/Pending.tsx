@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ChevronRight, Activity, Clock, FileText, CheckCircle2 } from 'lucide-react';
-import api from '@/lib/api';
+import { usePatients } from '@/hooks/usePatients';
 import { formatDate, getBadgeForValuation } from '@/lib/format';
 import type { Valoracion } from '@/types';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
@@ -17,79 +17,56 @@ interface PendingItem {
 }
 
 const Pending = () => {
-  const [pendingItems, setPendingItems] = useState<PendingItem[]>([]);
   const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const navigate = useNavigate();
+  const { data: p = [], isLoading: loading } = usePatients();
 
-  useEffect(() => {
-    const fetchPacientes = async () => {
-      setLoading(true);
-      try {
-        const { data } = await api.get(`/api/pacientes`);
-        const p = data?.data || data;
-        
-        if (Array.isArray(p)) {
-          let items: PendingItem[] = [];
-          
-          p.forEach(pac => {
-            const valArr = pac.valoraciones || [];
-            valArr.forEach((val: any) => {
-              // Si val no trae el plan pero paciente.planes sí lo trae, lo inyectamos
-              if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
-                // Buscamos el plan asociado usando valoracionId
-                const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
-                if (planAsociado) {
-                  val.plan = planAsociado;
-                  val.planId = planAsociado.id;
-                  val.estadoEnvio = planAsociado.estadoEnvio;
-                }
-              }
-
-              const statusInfo = getBadgeForValuation(val);
-              
-              // Consideramos pendiente si el estado NO es "Enviado"
-              if (statusInfo.text !== 'Enviado') {
-                items.push({
-                  paciente: {
-                    id: pac.id,
-                    nombre: pac.nombre,
-                    apellido: pac.apellido || '',
-                    telefono: pac.telefono
-                  },
-                  valoracion: val
-                });
-              }
-            });
-          });
-
-          // Ordenaremos para ver las valoraciones más críticas o recientes primero
-          items.sort((a, b) => new Date(b.valoracion.fecha).getTime() - new Date(a.valoracion.fecha).getTime());
-
-          // Filtrar por búsqueda
-          const filtered = items.filter(item => {
-            const searchTerm = search.toLowerCase();
-            const fullName = `${item.paciente.nombre} ${item.paciente.apellido}`.toLowerCase();
-            return fullName.includes(searchTerm) || (item.paciente.telefono && item.paciente.telefono.includes(searchTerm));
-          });
-
-          setPendingItems(filtered);
+  const pendingItems = useMemo(() => {
+    let items: PendingItem[] = [];
+    
+    p.forEach((pac: any) => {
+      const valArr = pac.valoraciones || [];
+      valArr.forEach((val: any) => {
+        // Si val no trae el plan pero paciente.planes sí lo trae, lo inyectamos
+        if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
+          // Buscamos el plan asociado usando valoracionId
+          const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
+          if (planAsociado) {
+            val.plan = planAsociado;
+            val.planId = planAsociado.id;
+            val.estadoEnvio = planAsociado.estadoEnvio;
+          }
         }
-      } catch (err) {
-        console.error('Error cargando pacientes:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
 
-    const timer = setTimeout(() => {
-      fetchPacientes();
-    }, 500);
+        const statusInfo = getBadgeForValuation(val);
+        
+        // Consideramos pendiente si el estado NO es "Enviado"
+        if (statusInfo.text !== 'Enviado') {
+          items.push({
+            paciente: {
+              id: pac.id,
+              nombre: pac.nombre,
+              apellido: pac.apellido || '',
+              telefono: pac.telefono
+            },
+            valoracion: val
+          });
+        }
+      });
+    });
 
-    return () => clearTimeout(timer);
-  }, [search]);
+    // Ordenaremos para ver las valoraciones más críticas o recientes primero
+    items.sort((a, b) => new Date(b.valoracion.fecha).getTime() - new Date(a.valoracion.fecha).getTime());
+
+    // Filtrar por búsqueda
+    return items.filter(item => {
+      const searchTerm = search.toLowerCase();
+      const fullName = `${item.paciente.nombre} ${item.paciente.apellido}`.toLowerCase();
+      return fullName.includes(searchTerm) || (item.paciente.telefono && item.paciente.telefono.includes(searchTerm));
+    });
+  }, [p, search]);
 
   const totalPages = Math.ceil(pendingItems.length / itemsPerPage);
   const currentItems = pendingItems.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);

@@ -397,6 +397,24 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                        </li>
                      ))}
                    </ul>
+                  
+                  {/* Renderizado de Bebida y Suplementación en UI */}
+                  {(t.bebida || t.suplTiempo) && (
+                    <div className="mt-4 space-y-2 p-3 bg-[#0a0a0a] rounded-[6px] border border-[#2a2a2a]">
+                      {t.bebida && (
+                        <p className="text-[13px] font-medium text-[#c0c0c0] m-0">
+                          Bebida: <span className="text-white">{t.bebida}</span>
+                        </p>
+                      )}
+                      {t.suplTiempo && (
+                        <p className="text-[13px] font-medium text-[#c0c0c0] m-0">
+                          Suplemento: <span className="text-white">{t.suplTiempo}</span>
+                          {t.suplNotas && <span className="text-[#8a8a8a] text-[12px] ml-1">({t.suplNotas})</span>}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   {t.nota && <p className="text-[13px] font-normal text-[#8a8a8a] mt-4 p-3 bg-[#0a0a0a] rounded-[6px] border border-[#2a2a2a] italic m-0">{t.nota}</p>}
                   {((t as any).bebida || (t as any).suplTiempo) && (
                     <div className="flex flex-col gap-1 mt-3 pt-3 border-t border-[#2a2a2a]">
