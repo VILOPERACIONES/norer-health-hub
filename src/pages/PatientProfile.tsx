@@ -389,7 +389,7 @@ const PatientProfile = () => {
         <section className="grid grid-cols-2 lg:grid-cols-5 bg-bg-surface border border-border-subtle rounded-[14px] overflow-hidden shadow-sm">
           <InfoItem label="Edad" value={`${calcAge(paciente.fechaNacimiento)} Años`} icon={Clock} />
           <InfoItem label="Sexo" value={paciente.sexo === 'F' ? 'Femenino' : 'Masculino'} icon={User} />
-          <InfoItem label="Teléfono" value={paciente.telefono} icon={Phone} />
+          <InfoItem label="Teléfono" value={paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-10) : '—'} icon={Phone} />
           <InfoItem label="Email" value={paciente.email || '—'} icon={Mail} />
           <InfoItem label="Registro" value={formatDate(paciente.fechaRegistro)} icon={Calendar} />
         </section>

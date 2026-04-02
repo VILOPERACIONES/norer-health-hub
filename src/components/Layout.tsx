@@ -57,89 +57,92 @@ const Layout = () => {
     return true;
   });
 
-  const sidebarContent = (
-    <div className={`flex flex-col h-full bg-bg-surface border-r border-border-subtle transition-all duration-300 ${collapsed ? 'w-24' : 'w-64'} shadow-none relative`}>
-      <div className={`pt-8 pb-4 flex ${collapsed ? 'flex-col justify-center items-center gap-6 px-0' : 'justify-start px-6 pl-8'} transition-all`}>
-        <Logo size="sm" collapsed={collapsed} />
-      </div>
+  const renderSidebarContent = (isMobileView: boolean) => {
+    const isCollapsed = isMobileView ? false : collapsed;
+    return (
+      <div className={`flex flex-col h-full bg-bg-surface border-r border-border-subtle transition-all duration-300 ${isCollapsed ? 'w-24' : 'w-full'} shadow-none relative`}>
+        <div className={`pt-8 pb-4 flex ${isCollapsed ? 'flex-col justify-center items-center gap-6 px-0' : 'justify-start px-6 pl-8'} transition-all`}>
+          <Logo size="sm" collapsed={isCollapsed} />
+        </div>
 
-      <nav className={`flex-1 px-4 space-y-1 mt-6 overflow-y-auto custom-scrollbar ${collapsed ? 'flex flex-col items-center' : ''}`}>
-        {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4 pt-4">Navegación</p>}
-        {filteredNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            onClick={() => setMobileOpen(false)}
-            title={collapsed ? item.label : ''}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium transition-colors whitespace-nowrap ${
-                isActive
-                  ? 'bg-nav-active-bg text-nav-active-text border-l-2 border-[#444]'
-                  : 'text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg'
-              } ${collapsed ? 'justify-center w-12 border-l-0 px-0' : ''}`
-            }
-          >
-            <item.icon className="h-[18px] w-[18px] shrink-0" />
-            {!collapsed && item.label}
-          </NavLink>
-        ))}
+        <nav className={`flex-1 px-4 space-y-1 mt-6 overflow-y-auto custom-scrollbar ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          {!isCollapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4 pt-4">Navegación</p>}
+          {filteredNavItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              onClick={() => setMobileOpen(false)}
+              title={isCollapsed ? item.label : ''}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium transition-colors whitespace-nowrap ${
+                  isActive
+                    ? 'bg-nav-active-bg text-nav-active-text border-l-2 border-[#444]'
+                    : 'text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg'
+                } ${isCollapsed ? 'justify-center w-12 border-l-0 px-0' : ''}`
+              }
+            >
+              <item.icon className="h-[18px] w-[18px] shrink-0" />
+              {!isCollapsed && item.label}
+            </NavLink>
+          ))}
 
-        {isAdmin && (
-          <div className={`pt-6 mt-6 ${collapsed ? 'px-0' : ''}`}>
-            {!collapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4">Accesos Directos</p>}
-            <div className="space-y-1">
-              {[
-                { label: collapsed ? '' : 'Calendario', icon: Calendar, color: 'text-text-secondary', title: 'Google Calendar' },
-                { label: collapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' }
-              ].map((ext) => (
-                <button
-                  key={ext.title}
-                  title={ext.title}
-                  className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg transition-colors w-full text-left ${collapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
-                >
-                  <ext.icon className={`h-[18px] w-[18px] shrink-0 ${ext.color}`} />
-                  {!collapsed && ext.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-      </nav>
-
-      <div className={`px-4 pb-6 mt-auto shrink-0 space-y-2 pt-4 border-t border-border-subtle/50 ${collapsed ? 'flex flex-col items-center' : ''}`}>
-        <NavLink 
-          to="/configuracion"
-          className={({ isActive }) => `block w-full rounded-[12px] transition-all group/profile ${isActive ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-bg-elevated border-border-subtle'} border ${collapsed ? 'p-2' : 'px-4 py-3'}`}
-        >
-          <div className="flex items-center gap-3">
-            <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-[12px] border transition-colors ${collapsed ? 'mx-auto' : ''} ${user?.rol === 'admin' || (user as any)?.role === 'admin' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/30' : 'bg-[#1a1a1a] text-[#aaa] border-border-default'}`}>
-              {userName[0].toUpperCase()}
-            </div>
-            {!collapsed && (
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] font-bold text-text-primary truncate transition-colors group-hover/profile:text-brand-primary">{userName}</p>
-                <p className="text-[10px] font-black uppercase tracking-tighter text-text-muted mt-0.5 leading-none">{roleLabel}</p>
+          {isAdmin && (
+            <div className={`pt-6 mt-6 ${isCollapsed ? 'px-0' : ''}`}>
+              {!isCollapsed && <p className="text-[11px] font-medium text-text-muted uppercase mb-4 px-4">Accesos Directos</p>}
+              <div className="space-y-1">
+                {[
+                  { label: isCollapsed ? '' : 'Calendario', icon: Calendar, color: 'text-text-secondary', title: 'Google Calendar' },
+                  { label: isCollapsed ? '' : 'Chatwoot', icon: MessageSquare, color: 'text-text-secondary', title: 'Chatwoot Hub' }
+                ].map((ext) => (
+                  <button
+                    key={ext.title}
+                    title={ext.title}
+                    className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-text-primary hover:bg-nav-active-bg transition-colors w-full text-left ${isCollapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
+                  >
+                    <ext.icon className={`h-[18px] w-[18px] shrink-0 ${ext.color}`} />
+                    {!isCollapsed && ext.label}
+                  </button>
+                ))}
               </div>
-            )}
-          </div>
-        </NavLink>
-        <button
-          onClick={handleLogout}
-          title={collapsed ? 'SALIR' : ''}
-          className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-accent-red hover:bg-[#1a1a1a] transition-colors w-full ${collapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
-        >
-          <LogOut className="h-[18px] w-[18px] shrink-0" />
-          {!collapsed && 'Cerrar Sesión'}
-        </button>
+            </div>
+          )}
+        </nav>
+
+        <div className={`px-4 pb-6 mt-auto shrink-0 space-y-2 pt-4 border-t border-border-subtle/50 ${isCollapsed ? 'flex flex-col items-center' : ''}`}>
+          <NavLink 
+            to="/configuracion"
+            className={({ isActive }) => `block w-full rounded-[12px] transition-all group/profile ${isActive ? 'bg-brand-primary/10 border-brand-primary/20' : 'bg-bg-elevated border-border-subtle'} border ${isCollapsed ? 'p-2' : 'px-4 py-3'}`}
+          >
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center font-bold text-[12px] border transition-colors ${isCollapsed ? 'mx-auto' : ''} ${user?.rol === 'admin' || (user as any)?.role === 'admin' ? 'bg-brand-primary/20 text-brand-primary border-brand-primary/30' : 'bg-[#1a1a1a] text-[#aaa] border-border-default'}`}>
+                {userName[0].toUpperCase()}
+              </div>
+              {!isCollapsed && (
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-bold text-text-primary truncate transition-colors group-hover/profile:text-brand-primary">{userName}</p>
+                  <p className="text-[10px] font-black uppercase tracking-tighter text-text-muted mt-0.5 leading-none">{roleLabel}</p>
+                </div>
+              )}
+            </div>
+          </NavLink>
+          <button
+            onClick={handleLogout}
+            title={isCollapsed ? 'SALIR' : ''}
+            className={`flex items-center gap-3 px-4 py-[10px] rounded-[8px] text-[14px] font-medium text-nav-inactive-text hover:text-accent-red hover:bg-[#1a1a1a] transition-colors w-full ${isCollapsed ? 'justify-center w-12 px-0 mx-auto' : ''}`}
+          >
+            <LogOut className="h-[18px] w-[18px] shrink-0" />
+            {!isCollapsed && 'Cerrar Sesión'}
+          </button>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex h-screen bg-bg-base overflow-hidden font-sans selection:bg-brand-primary selection:text-bg-base">
       {/* SIDEBAR PC */}
       <aside className={`relative hidden lg:flex h-full flex-col flex-shrink-0 z-40 bg-bg-surface transition-all duration-300 ${collapsed ? 'w-24' : 'w-64'}`}>
-        {sidebarContent}
+        {renderSidebarContent(false)}
         
         <button 
           onClick={() => setCollapsed(!collapsed)}
@@ -153,8 +156,8 @@ const Layout = () => {
       {mobileOpen && (
         <div className="fixed inset-0 z-[60] lg:hidden">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setMobileOpen(false)} />
-          <aside className="relative w-64 h-full bg-bg-surface shadow-2xl animate-slide-up">
-            {sidebarContent}
+          <aside className="relative w-64 h-full bg-bg-surface shadow-2xl animate-slide-up flex">
+            {renderSidebarContent(true)}
           </aside>
         </div>
       )}

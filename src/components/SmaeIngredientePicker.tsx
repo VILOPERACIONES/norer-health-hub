@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, Check, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import type { Ingrediente, EquivalenciaItem } from '@/types';
@@ -43,6 +43,7 @@ interface SmaeAlimento {
   porcionCasera?: string;
   cantidadPorcion?: number;
   unidadPorcion?: string;
+  equivalencias?: { grupo: string; cantidad: number | string }[]; // Multi-grupo
 }
 
 interface Props {
@@ -179,6 +180,13 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     setUnidad(uFinal);
     setEquivalencias(newEquivs);
 
+    // Restaurar equivalencias adicionales del catálogo SMAE si existen
+    // (se incorporan como grupos adicionales en el array de equivalencias)
+    const eqsExtra = Array.isArray(alimento.equivalencias) ? alimento.equivalencias : [];
+    if (eqsExtra.length > 0) {
+      const allEquivs = [...newEquivs, ...eqsExtra];
+      setEquivalencias(allEquivs);
+    }
     onUpdate({
       descripcion: alimento.nombre,
       cantidad: cantFinal,

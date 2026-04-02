@@ -2,19 +2,36 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
 
 export const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—';
-  // Parche Timezone: si trae formato ISO, centrar a medio día (12:00) 
-  // para evitar restar días en zonas horarias negativas como UTM-6.
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] + 'T12:00:00' : dateStr;
-  const d = new Date(cleanStr);
+  // Si trae "T00:00:00.000Z" (fecha pura de BD) o no trae "T" ni "Z" (YYYY-MM-DD),
+  // le forzamos UTC o medio día para que no se atrase un día en UTC-6.
+  // Pero si trae una hora real (ej: citas de Cal.com con T15:00:00.000Z), lo dejamos convertir a hora local.
+  let isDateOnly = false;
+  if (!dateStr.includes('T') || dateStr.includes('T00:00:00.000Z')) isDateOnly = true;
+
+  const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '—';
+
+  // Si era solo fecha, forzamos usar los métodos UTC para ignorar el desfase local y mostrar la fecha exacta pactada
+  if (isDateOnly) {
+    return `${d.getUTCDate()} de ${MONTHS[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
+  }
+  
+  // Si trae hora real, extraemos en formato local
   return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
 };
 
 export const formatDateShort = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—';
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] + 'T12:00:00' : dateStr;
-  const d = new Date(cleanStr);
+  let isDateOnly = false;
+  if (!dateStr.includes('T') || dateStr.includes('T00:00:00.000Z')) isDateOnly = true;
+
+  const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '—';
+
+  if (isDateOnly) {
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
+  }
+
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
 };
 

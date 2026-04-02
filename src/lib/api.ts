@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 
-// Timeout de 12s — si el backend no responde en 12s, el usuario ve un error
-// en lugar de quedarse esperando indefinidamente.
-const api = axios.create({ timeout: 12_000 });
+// Timeout de 30s — agendar citas en Cal.com toma su tiempo porque envía correos y procesa webhooks internamente.
+const api = axios.create({ timeout: 30_000 });
 
 // ── Request interceptor ───────────────────────────────────────────────────────
 api.interceptors.request.use((config) => {
