@@ -197,7 +197,12 @@ const NewPatient = () => {
       if (patientId) navigate(`/pacientes/${patientId}`);
       else navigate('/pacientes');
     } catch (err: any) {
-      toast({ title: 'Fallo de Sistema', description: 'No se pudo crear el expediente.', variant: 'destructive' });
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || '';
+      if (err.response?.status === 409 || msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('telefono') || msg.toLowerCase().includes('correo') || msg.toLowerCase().includes('email')) {
+         toast({ title: 'Registro Duplicado', description: msg || 'Este paciente ya existe en el sistema.', variant: 'destructive', duration: 7000 });
+      } else {
+         toast({ title: 'Fallo de Sistema', description: msg || 'No se pudo crear el expediente.', variant: 'destructive' });
+      }
     } finally {
       setSaving(false);
     }

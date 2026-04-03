@@ -185,11 +185,11 @@ const Dashboard = () => {
 
   return (
     <div 
-      className="flex flex-col gap-4 animate-fade-in h-full overflow-hidden" 
+      className="flex flex-col gap-6 animate-fade-in h-full overflow-y-auto overflow-x-hidden lg:overflow-hidden pb-12 lg:pb-0" 
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#f0f0f0] m-0 tracking-tight">
             Bienvenido de vuelta, {userName}! 
@@ -198,10 +198,10 @@ const Dashboard = () => {
             Work Hard. Play Hard.
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 w-full md:w-auto">
           <button
             onClick={() => navigate('/pacientes/nuevo')}
-            className="flex items-center gap-2 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] px-[16px] py-[10px] text-[13px] font-semibold transition-colors hover:bg-white border border-transparent shadow-sm"
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] px-[16px] py-[10px] text-[13px] font-semibold transition-colors hover:bg-white border border-transparent shadow-sm"
           >
             <Plus className="h-[16px] w-[16px]" /> Registrar nuevo paciente
           </button>
@@ -209,7 +209,7 @@ const Dashboard = () => {
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c, i) => (
           <div key={i} className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 flex flex-col gap-4">
             {/* Título e ícono */}
@@ -221,13 +221,13 @@ const Dashboard = () => {
             </div>
 
             {/* Número | separador | % badge — DISEÑO ORIGINAL */}
-            <div className="flex items-center justify-between bg-[#181818] border border-[#2a2a2a] rounded-[12px] px-5 py-4">
-              <p className="text-[32px] font-normal text-[#f0f0f0] m-0 leading-none tracking-tight tabular-nums">
+            <div className="flex items-center justify-between bg-[#181818] border border-[#2a2a2a] rounded-[12px] px-4 sm:px-5 py-4">
+              <p className="text-[28px] sm:text-[32px] font-normal text-[#f0f0f0] m-0 leading-none tracking-tight tabular-nums">
                 {c.value}
               </p>
-              <div className="flex items-center gap-4 h-8">
+              <div className="flex items-center gap-3 sm:gap-4 h-8">
                 <div className="w-[1px] h-full bg-[#2a2a2a]" />
-                <span className={`text-[13px] font-normal tracking-wide whitespace-nowrap ${c.badge.color}`}>
+                <span className={`text-[12px] sm:text-[13px] font-normal tracking-wide whitespace-nowrap ${c.badge.color}`}>
                   {c.badge.text}
                 </span>
               </div>
@@ -242,11 +242,11 @@ const Dashboard = () => {
       </div>
 
       {/* SECCIÓN PRINCIPAL: Tablas */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6 flex-1 lg:min-h-0 lg:overflow-hidden shrink-0">
         
         {/* TOP CLIENTES */}
-        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
-          <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a]">
+        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-[300px] lg:min-h-0 lg:overflow-hidden">
+          <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a] shrink-0">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#f59e0b]" />
               <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">Top Clientes</h2>
@@ -306,15 +306,15 @@ const Dashboard = () => {
         </div>
 
         {/* ULTIMOS PACIENTES (2/3 Width on Large Screens) */}
-        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a2a2a]">
+        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-[400px] lg:min-h-0 lg:overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#2a2a2a] shrink-0">
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
               Últimos Pacientes
             </h2>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[500px]">
+          <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar w-full">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="border-b border-[#2a2a2a] whitespace-nowrap">
                   <th className="pl-5 pr-3 py-3 w-12 text-center" style={{ width: '48px' }}>

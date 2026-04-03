@@ -607,7 +607,7 @@ const PatientProfile = () => {
                    onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
                    onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
                    onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
-                   onEditPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}/editar`)}
+                   onEditPlan={(pId) => navigate(`/pacientes/${id}/planes/${pId}/editar?valoracionId=${v.id}`)}
                  />
               ))}
             </div>

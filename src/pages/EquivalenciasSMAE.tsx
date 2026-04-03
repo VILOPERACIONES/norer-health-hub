@@ -10,12 +10,26 @@ interface AlimentoSMAE {
   nombre: string;
   grupo: string;
   pesoGramos: number;
+  unidadBase: string;          // unidad del valor ancla: g, ml, oz, pz, etc.
   porcionCasera: string | null;
   cantidadPorcion: number | null;
   unidadPorcion: string | null;
   notas: string | null;
   esPersonalizado: boolean;
 }
+
+const UNIDADES_BASE = [
+  { value: 'g',         label: 'g — gramos' },
+  { value: 'ml',        label: 'ml — mililitros' },
+  { value: 'oz',        label: 'oz — onzas' },
+  { value: 'pz',        label: 'pz — pieza' },
+  { value: 'paquete',   label: 'paquete' },
+  { value: 'botellita', label: 'botellita' },
+  { value: 'lata',      label: 'lata' },
+  { value: 'tz',        label: 'tz — taza' },
+  { value: 'cdas',      label: 'cdas — cucharadas' },
+  { value: 'sobre',     label: 'sobre' },
+];
 
 // Grupos SMAE con colores
 const GRUPOS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -44,6 +58,7 @@ const EMPTY_FORM: Omit<AlimentoSMAE, 'id'> = {
   nombre: '',
   grupo: 'verduras',
   pesoGramos: 0,
+  unidadBase: 'g',
   porcionCasera: '',
   cantidadPorcion: null,
   unidadPorcion: '',
@@ -135,19 +150,34 @@ const ModalAlimento = ({
             </select>
           </div>
 
-          {/* Peso por 1 equivalente */}
+          {/* Cantidad ancla por 1 equivalente */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-text-secondary m-0">Peso por 1 equivalente (g) *</label>
-            <input
-              type="number"
-              value={form.pesoGramos || ''}
-              onChange={(e) => set('pesoGramos', parseFloat(e.target.value) || 0)}
-              placeholder="Ej. 120"
-              min="0"
-              step="0.1"
-              className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <p className="text-[11px] text-text-muted m-0">Cuántos gramos equivalen a 1 porción del grupo seleccionado</p>
+            <label className="text-[12px] font-medium text-text-secondary m-0">Cantidad por 1 equivalente *</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={form.pesoGramos || ''}
+                onChange={(e) => set('pesoGramos', parseFloat(e.target.value) || 0)}
+                placeholder="Ej. 240"
+                min="0"
+                step="0.1"
+                className="flex-1 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <select
+                value={form.unidadBase || 'g'}
+                onChange={(e) => set('unidadBase', e.target.value)}
+                className="bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              >
+                {UNIDADES_BASE.map(u => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-text-muted m-0">
+              {form.unidadBase === 'g' || form.unidadBase === 'ml'
+                ? `Cuántos ${form.unidadBase} equivalen a 1 porción del grupo seleccionado`
+                : `Cuántas unidades (${form.unidadBase}) equivalen a 1 porción del grupo seleccionado`}
+            </p>
           </div>
 
           {/* Porción casera */}
@@ -199,7 +229,7 @@ const ModalAlimento = ({
           <div className="flex items-center gap-2">
             {form.pesoGramos > 0 && (
               <span className="text-[12px] text-text-muted">
-                → <strong className="text-text-primary">{form.pesoGramos}g</strong> = 1 eq · <GrupoBadge grupo={form.grupo} />
+                → <strong className="text-text-primary">{form.pesoGramos}{form.unidadBase || 'g'}</strong> = 1 eq · <GrupoBadge grupo={form.grupo} />
               </span>
             )}
           </div>
@@ -420,13 +450,19 @@ const EquivalenciasSMAE = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="text-[14px] font-bold text-text-primary">{a.pesoGramos}</span>
-                      <span className="text-[12px] text-text-muted ml-1">g</span>
+                      <span className="text-[12px] text-text-muted ml-1">{a.unidadBase || 'g'}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {a.cantidadPorcion && a.unidadPorcion ? (
+                      {a.porcionCasera ? (
+                        <span className="text-[13px] text-text-secondary">
+                          {a.cantidadPorcion && a.unidadPorcion && !a.porcionCasera.startsWith(String(a.cantidadPorcion))
+                            ? `${a.cantidadPorcion} ${a.unidadPorcion} (${a.porcionCasera})`
+                            : a.porcionCasera
+                          }
+                        </span>
+                      ) : a.cantidadPorcion && a.unidadPorcion ? (
                         <span className="text-[13px] text-text-secondary">
                           {a.cantidadPorcion} {a.unidadPorcion}
-                          {a.porcionCasera ? ` (${a.porcionCasera})` : ''}
                         </span>
                       ) : (
                         <span className="text-[12px] text-text-muted">—</span>

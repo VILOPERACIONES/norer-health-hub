@@ -229,7 +229,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
            
            <div className="flex flex-col sm:flex-row flex-wrap gap-3 w-full sm:w-auto">
               <button
-                onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar`)}
+                onClick={() => navigate(`/pacientes/${pacienteId}/planes/${planId}/editar${plan.valoracionId ? `?valoracionId=${plan.valoracionId}` : ''}`)}
                 className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#181818] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#222] w-full sm:w-auto"
               >
                 <Edit2 className="h-[18px] w-[18px]" /> Editar

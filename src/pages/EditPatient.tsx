@@ -266,7 +266,12 @@ const EditPatient = () => {
       toast({ title: 'Expediente actualizado correctamente' });
       navigate(`/pacientes/${id}`);
     } catch (err: any) {
-      toast({ title: 'Error de Sistema', description: 'No se pudo actualizar el expediente', variant: 'destructive' });
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || '';
+      if (err.response?.status === 409 || msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('telefono') || msg.toLowerCase().includes('correo') || msg.toLowerCase().includes('email')) {
+        toast({ title: 'Dato Duplicado', description: msg, variant: 'destructive', duration: 8000 });
+      } else {
+        toast({ title: 'Error de Sistema', description: msg || 'No se pudo actualizar el expediente.', variant: 'destructive' });
+      }
     } finally {
       setSaving(false);
     }
@@ -314,18 +319,12 @@ const EditPatient = () => {
         </FormSection>
 
         <FormSection title="Dinámica Deportiva" icon={Activity}>
-          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
+          <Input label="Objetivo" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
           <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
           <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />
           <Input label="Duración Sesión" value={form.tiempo} onChange={(v: string) => update('tiempo', v)} placeholder="EJ: 60-90 Minutos" />
           <Select label="Nivel de Actividad" value={form.nivelActividad} onChange={(v: string) => update('nivelActividad', v)} options={['Sedentario', 'Leve', 'Moderado', 'Intenso']} />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 col-span-full">
-            <Input label="Sedentario %" value={form.porcentajeSedentario} onChange={(v: string) => update('porcentajeSedentario', v)} placeholder="0" type="number" />
-            <Input label="Leve %" value={form.porcentajeLeve} onChange={(v: string) => update('porcentajeLeve', v)} placeholder="0" type="number" />
-            <Input label="Moderado %" value={form.porcentajeModerado} onChange={(v: string) => update('porcentajeModerado', v)} placeholder="0" type="number" />
-            <Input label="Intenso %" value={form.porcentajeIntenso} onChange={(v: string) => update('porcentajeIntenso', v)} placeholder="0" type="number" />
-          </div>
         </FormSection>
 
         <FormSection title="Anamnesis y Suplementación" icon={Shield}>

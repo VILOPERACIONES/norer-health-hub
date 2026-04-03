@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill } from 'lucide-react';
+import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
@@ -15,18 +15,18 @@ const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cen
 
 const emptyMenu = (name: string): Menu => ({
   nombre: name,
-  tiempos: defaultTiempos.map((t) => ({ nombre: t.toUpperCase(), ingredientes: [], nota: '' })),
+  tiempos: defaultTiempos.map((t) => ({ nombre: t.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' })),
 });
 
-const emptyIngrediente = (): Ingrediente => ({ 
+const emptyIngrediente = (): Ingrediente => ({
   id: Math.random().toString(36).substr(2, 9),
-  descripcion: '', 
-  cantidad: 0, 
-  unidad: 'GR', 
-  eqCantidad: 0, 
-  eqGrupo: '', 
+  descripcion: '',
+  cantidad: 0,
+  unidad: 'GR',
+  eqCantidad: 0,
+  eqGrupo: '',
   equivalencias: [],
-  nota: '' 
+  nota: ''
 });
 
 /** Redondeo inteligente para porciones prácticas:
@@ -39,32 +39,33 @@ const smartRound = (val: number): number => {
   return Math.round(val); // Math.round ya hace >=0.5 up, <0.5 down
 };
 
-export const CreateEditPlanForm = ({ 
-  pacienteId: propPacienteId, 
-  planId: propPlanId, 
-  valoracionId: propValoracionId, 
-  onSaved, 
+export const CreateEditPlanForm = ({
+  pacienteId: propPacienteId,
+  planId: propPlanId,
+  valoracionId: propValoracionId,
+  onSaved,
   onCancel,
   initialProximaSesion,
-}: { 
-  pacienteId?: string, 
-  planId?: string, 
-  valoracionId?: string, 
-  onSaved?: (planId: string) => void, 
+}: {
+  pacienteId?: string,
+  planId?: string,
+  valoracionId?: string,
+  onSaved?: (planId: string) => void,
   onCancel?: () => void,
   initialProximaSesion?: string,
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  
+
   const isEdit = !!propPlanId;
-  const isBasePlan = !propPacienteId; 
-  
+  const isBasePlan = !propPacienteId;
+
   const pacienteId = propPacienteId;
   const planId = propPlanId;
   const valoracionId = propValoracionId;
-  
+
   const [saving, setSaving] = useState(false);
+  const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [pesoUltimo, setPesoUltimo] = useState(0);
   const [pacienteNombre, setPacienteNombre] = useState<string | null>(null);
 
@@ -85,7 +86,7 @@ export const CreateEditPlanForm = ({
   const [valData, setValData] = useState<any>(null);
   const [suplementosDetalle, setSuplementosDetalle] = useState<any[]>([]); // 💊 State independiente para persistencia
   const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
-  
+
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
   const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
   const [platilloSearch, setPlatilloSearch] = useState('');
@@ -112,6 +113,7 @@ export const CreateEditPlanForm = ({
         let metaBebida = '';
         let metaSuplTiempo = '';
         let metaSuplNotas = '';
+        let metaAdemas = '';
         const metaMatch = rawNote.match(/\n?<!--META:(.*?)-->/);
         if (metaMatch) {
           try {
@@ -119,6 +121,7 @@ export const CreateEditPlanForm = ({
             metaBebida = parsed.bebida || '';
             metaSuplTiempo = parsed.suplTiempo || '';
             metaSuplNotas = parsed.suplNotas || '';
+            metaAdemas = parsed.ademas || '';
           } catch { /* ignore parse errors */ }
           nota = rawNote.replace(/\n?<!--META:.*?-->/, '');
         }
@@ -128,42 +131,84 @@ export const CreateEditPlanForm = ({
           bebida: t.bebida || metaBebida,
           suplTiempo: t.suplTiempo || metaSuplTiempo,
           suplNotas: t.suplNotas || metaSuplNotas,
-          ingredientes: (t.ingredientes || []).map((i: any) => ({
-            ...i,
-            id: i.id || Math.random().toString(36).substr(2, 9),
-            cantidad: parseFloat(i.cantidad) || 0,
-            eqCantidad: i.eqCantidad != null ? parseFloat(String(i.eqCantidad)) : undefined,
-            equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : [],
-            platillo: i.platillo || ''
-          }))
+          ademas: t.ademas || metaAdemas,
+          ingredientes: (t.ingredientes || []).map((i: any) => {
+            let eqArray = [];
+            if (Array.isArray(i.equivalencias)) {
+              eqArray = i.equivalencias;
+            } else if (typeof i.equivalencias === 'string' && i.equivalencias.trim() !== '') {
+              try { eqArray = JSON.parse(i.equivalencias); } catch (e) { console.warn("Failed to parse equivalencias:", i.equivalencias); }
+            }
+            return {
+              ...i,
+              id: i.id || Math.random().toString(36).substr(2, 9),
+              cantidad: parseFloat(i.cantidad) || 0,
+              eqCantidad: i.eqCantidad != null ? parseFloat(String(i.eqCantidad)) : undefined,
+              equivalencias: eqArray,
+              platillo: i.platillo || ''
+            };
+          })
         };
       })
     })) || [emptyMenu('Menú 1'), emptyMenu('Menú 2')];
   };
 
   useEffect(() => {
-    if (pacienteId) {
-      api.get(`/api/pacientes/${pacienteId}`)
-         .then(res => {
-           const p = res.data?.data || res.data;
-           if (p) {
-             setPacienteNombre(`${p.nombre} ${p.apellido || ''}`.trim());
-           }
-         })
-         .catch(e => console.error("Error loading patient name", e));
-    }
-  }, [pacienteId]);
+    const fetchAllData = async () => {
+      setLoadingInitialData(true);
+      try {
+        let pacientePromise = Promise.resolve(null);
+        if (pacienteId) {
+          pacientePromise = api.get(`/api/pacientes/${pacienteId}`);
+        }
 
-  useEffect(() => {
-    // Si estamos editando un plan existente
-    if (isEdit) {
-      const fetchPlan = async () => {
-        try {
-          const url = isBasePlan 
-            ? `/api/planes/${planId}` 
+        let planPromise = Promise.resolve(null);
+        let valPromise = Promise.resolve(null);
+        let barridoPromise = Promise.resolve(null);
+
+        if (isEdit) {
+          const url = isBasePlan
+            ? `/api/planes/${planId}`
             : `/api/pacientes/${pacienteId}/planes/${planId}`;
-          const { data } = await api.get(url);
-          const p = data?.data || data;
+          planPromise = api.get(url).catch(() => null);
+        }
+        
+        // Siempre cargar la valoración si está disponible para tener el conteo de equivalencias activo
+        if (pacienteId && valoracionId) {
+          valPromise = api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`).catch(() => null);
+          barridoPromise = api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null);
+        }
+
+        const platillosPromise = api.get('/api/platillos').catch(() => null);
+
+        // Disparamos todas las peticiones en paralelo
+        const [pacienteRes, planRes, valRes, barridoRes, platillosRes] = await Promise.all([
+          pacientePromise,
+          planPromise,
+          valPromise,
+          barridoPromise,
+          platillosPromise
+        ]);
+
+        // Procesar paciente
+        if (pacienteRes?.data) {
+          const p = pacienteRes.data?.data || pacienteRes.data;
+          if (p) {
+            const fullName = `${p.nombre} ${p.apellido || ''}`.trim();
+            setPacienteNombre(fullName);
+            if (!isEdit) {
+              const hoy = new Date();
+              const dd = String(hoy.getDate()).padStart(2, '0');
+              const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+              const yyyy = hoy.getFullYear();
+              setNombrePlan(`${fullName} ${dd}/${mm}/${yyyy}`);
+            }
+          }
+        }
+
+        // Procesar plan
+        if (isEdit && planRes?.data) {
+          const p = planRes.data.data || planRes.data;
           if (p) {
             setNombrePlan(p.nombre || '');
             setTipo(p.tipoPlan || p.tipo || 'Balanceada');
@@ -171,7 +216,7 @@ export const CreateEditPlanForm = ({
             setProteinas((p.proteinasPct || p.macros?.proteinas || 30).toString());
             setCarbohidratos((p.carbohidratosPct || p.macros?.carbohidratos || 40).toString());
             setGrasas((p.grasasPct || p.macros?.grasas || 30).toString());
-            
+
             if (p.proximaSesion) {
               const d = new Date(p.proximaSesion);
               if (!isNaN(d.getTime())) {
@@ -182,68 +227,84 @@ export const CreateEditPlanForm = ({
               setProximaSesion('');
               setProximaSesionHora('');
             }
-            
             setNotas(p.notasGenerales || p.notas || '');
             setMenus(mapMenusFromBackend(p.menus));
             setSuplementosDetalle(p.suplementosDetalle || []);
           }
-        } catch (err) {
-          console.error('Error cargando plan:', err);
         }
-      };
-      fetchPlan();
-    } 
-    // Si estamos creando uno nuevo para un paciente, intentar cargar valoración
-    else if (pacienteId && valoracionId) {
-      const fetchPatientData = async () => {
-        try {
-          const { data: vData } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-          const v = vData?.data || vData;
-          if (v) {
-             const bRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null);
-             let barrido = bRes?.data;
-             while (barrido?.data) barrido = barrido.data;
-             if (typeof barrido === 'string') {
-               try { barrido = JSON.parse(barrido); } catch (e) {}
-             }
-             if (barrido?.barrido) barrido = barrido.barrido; 
-             if (typeof barrido === 'string') {
-               try { barrido = JSON.parse(barrido); } catch (e) {}
-             }
-             
-             setPesoUltimo(v.peso || 0);
-             setValData({ ...v, barridoEquivalencias: barrido });
-             setSuplementosDetalle(v.suplementosDetalle || []);
-             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
-             if (barrido?.tiempos?.length > 0 && !isEdit) {
-               // Mostrar TODOS los tiempos del barrido, tengan o no equivalencias asignadas.
-               // El nutriólogo puede llenar cualquier tiempo manualmente con productos procesados.
-               const assessmentTiempos = barrido.tiempos.map((t: string) => ({
-                 nombre: t.toUpperCase(),
-                 ingredientes: [],
-                 nota: ''
-               }));
-               
-               if (assessmentTiempos.length > 0) {
-                 setMenus([
-                   { nombre: 'Menú 1', tiempos: assessmentTiempos },
-                   { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
-                 ]);
-               }
-             }
-           }
-        } catch (err) {
-          console.error('Error cargando datos del paciente:', err);
+        // Procesar valoración/barrido (tanto para NEW como para EDIT para el panel presupuestal)
+        let vData = valRes?.data?.data || valRes?.data;
+        let bData = barridoRes?.data;
+
+        // RECUPERACIÓN DE EMERGENCIA: Si estamos editando y no teníamos valoracionId en URL,
+        // pero el plan sí lo tiene, cargamos la valoración ahora.
+        if (isEdit && !valoracionId && planRes?.data) {
+          const p = planRes.data.data || planRes.data;
+          const recoveredValId = p?.valoracionId;
+          if (recoveredValId) {
+            try {
+              const [vRes, bRes] = await Promise.all([
+                api.get(`/api/pacientes/${pacienteId}/valoraciones/${recoveredValId}`),
+                api.get(`/api/pacientes/${pacienteId}/valoraciones/${recoveredValId}/barrido`)
+              ]);
+              vData = vRes.data?.data || vRes.data;
+              bData = bRes.data;
+            } catch (e) {
+              console.warn("No se pudo recuperar la valoración del plan:", e);
+            }
+          }
         }
-      };
-      fetchPatientData();
-    }
-    
-    // Cargar biblioteca de platillos
-    api.get('/api/platillos').then(res => {
-      setPlatilloLibrary(res.data?.data || []);
-    }).catch(e => console.error("Error loading platillos library", e));
+
+        if (vData) {
+          const v = vData;
+          let barrido = bData;
+          while (barrido?.data) barrido = barrido.data;
+          if (typeof barrido === 'string') {
+            try { barrido = JSON.parse(barrido); } catch (e) { }
+          }
+          if (barrido?.barrido) barrido = barrido.barrido;
+          if (typeof barrido === 'string') {
+            try { barrido = JSON.parse(barrido); } catch (e) { }
+          }
+
+          setValData({ ...v, barridoEquivalencias: barrido });
+          // Siempre actualizar el último peso para los cálculos de G/kg (incluso en Edit)
+          setPesoUltimo(v.peso || 0);
+
+          // Logica especifica para crear uno nuevo (inicializar vacios, auto calcular macro iniciales)
+          if (!isEdit) {
+            setSuplementosDetalle(v.suplementosDetalle || []);
+            if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
+
+            if (barrido?.tiempos?.length > 0) {
+              const assessmentTiempos = barrido.tiempos.map((t: string) => ({
+                nombre: t.toUpperCase(),
+                ingredientes: [],
+                nota: ''
+              }));
+              if (assessmentTiempos.length > 0) {
+                setMenus([
+                  { nombre: 'Menú 1', tiempos: assessmentTiempos },
+                  { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
+                ]);
+              }
+            }
+          }
+        }
+        // Procesar platillos
+        if (platillosRes?.data) {
+          setPlatilloLibrary(platillosRes.data?.data || []);
+        }
+
+      } catch (e) {
+        console.error("Error al cargar datos iniciales:", e);
+      } finally {
+        setLoadingInitialData(false);
+      }
+    };
+
+    fetchAllData();
   }, [planId, isEdit, pacienteId, valoracionId, isBasePlan]);
 
 
@@ -306,30 +367,30 @@ export const CreateEditPlanForm = ({
   // ─── LÓGICA DE MACROS DEL BARRIDO ───────────────────────────────────────────
   // Gramos aproximados por cada equivalente SMAE (P, C, G)
   const MACROS_SMAE: Record<string, { p: number; c: number; g: number }> = {
-    verduras:     { p: 2, c: 4,  g: 0 },
-    frutas:       { p: 0, c: 15, g: 0 },
+    verduras: { p: 2, c: 4, g: 0 },
+    frutas: { p: 0, c: 15, g: 0 },
     cerealSinGr: { p: 2, c: 15, g: 0 },
     cerealConGr: { p: 2, c: 15, g: 5 },
-    leguminosas:  { p: 8, c: 20, g: 1 },
-    aoaMuyBajo:   { p: 7, c: 0,  g: 1 },
-    aoaBajo:      { p: 7, c: 0,  g: 3 },
-    aoaModerado:  { p: 7, c: 0,  g: 5 },
-    aoaAlto:      { p: 7, c: 0,  g: 8 },
-    lecheDesc:    { p: 9, c: 12, g: 2 },
-    lecheSemi:    { p: 9, c: 12, g: 4 },
-    lecheEntera:  { p: 9, c: 12, g: 8 },
-    lecheAz:      { p: 9, c: 30, g: 5 },
-    grasaSinProt: { p: 0, c: 0,  g: 5 },
-    grasaConProt: { p: 3, c: 3,  g: 5 },
-    azSinGr:      { p: 0, c: 10, g: 0 },
-    azConGr:      { p: 0, c: 10, g: 5 },
+    leguminosas: { p: 8, c: 20, g: 1 },
+    aoaMuyBajo: { p: 7, c: 0, g: 1 },
+    aoaBajo: { p: 7, c: 0, g: 3 },
+    aoaModerado: { p: 7, c: 0, g: 5 },
+    aoaAlto: { p: 7, c: 0, g: 8 },
+    lecheDesc: { p: 9, c: 12, g: 2 },
+    lecheSemi: { p: 9, c: 12, g: 4 },
+    lecheEntera: { p: 9, c: 12, g: 8 },
+    lecheAz: { p: 9, c: 30, g: 5 },
+    grasaSinProt: { p: 0, c: 0, g: 5 },
+    grasaConProt: { p: 3, c: 3, g: 5 },
+    azSinGr: { p: 0, c: 10, g: 0 },
+    azConGr: { p: 0, c: 10, g: 5 },
     // Aliases para nombres con espacios/mayúsculas del picker
     'Cereal s/grasa': { p: 2, c: 15, g: 0 }, 'Cereal c/grasa': { p: 2, c: 15, g: 5 },
-    'AOA Muy Bajo':   { p: 7, c: 0,  g: 1 }, 'AOA Bajo':      { p: 7, c: 0,  g: 3 },
-    'AOA Moderado':   { p: 7, c: 0,  g: 5 }, 'AOA Alto':      { p: 7, c: 0,  g: 8 },
-    'Leche Descrem.': { p: 9, c: 12, g: 2 }, 'Leche Semi':    { p: 9, c: 12, g: 4 },
-    'Leche Entera':   { p: 9, c: 12, g: 8 }, 'Leche Azucarada':{ p: 9, c: 30, g: 5 },
-    'Grasa s/prot':   { p: 0, c: 0,  g: 5 }, 'Grasa c/prot':   { p: 3, c: 3,  g: 5 },
+    'AOA Muy Bajo': { p: 7, c: 0, g: 1 }, 'AOA Bajo': { p: 7, c: 0, g: 3 },
+    'AOA Moderado': { p: 7, c: 0, g: 5 }, 'AOA Alto': { p: 7, c: 0, g: 8 },
+    'Leche Descrem.': { p: 9, c: 12, g: 2 }, 'Leche Semi': { p: 9, c: 12, g: 4 },
+    'Leche Entera': { p: 9, c: 12, g: 8 }, 'Leche Azucarada': { p: 9, c: 30, g: 5 },
+    'Grasa s/prot': { p: 0, c: 0, g: 5 }, 'Grasa c/prot': { p: 3, c: 3, g: 5 },
     'Azúcar s/grasa': { p: 0, c: 10, g: 0 }, 'Azúcar c/grasa': { p: 0, c: 10, g: 5 },
   };
 
@@ -367,14 +428,14 @@ export const CreateEditPlanForm = ({
 
 
     const getBarridoKey = (grupo: string) => groupToBarridoKey(normalizeGroup(grupo));
-    
-    
+
+
     setMenus(prevMenus => prevMenus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map(tiempo => {
         const tiempoNameLower = (tiempo.nombre || '').toLowerCase().trim();
         const barridoTiempoKey = nextBarridoData.tiempos.find(t => t.toLowerCase().trim() === tiempoNameLower);
-        
+
         if (!barridoTiempoKey) return tiempo;
 
         return {
@@ -383,12 +444,12 @@ export const CreateEditPlanForm = ({
             if (ing.platillo && ing.eqGrupo) {
               const bKey = getBarridoKey(ing.eqGrupo);
               const assignedEq = nextBarridoData.distribucion[barridoTiempoKey]?.[bKey] || 0;
-              
+
               if (assignedEq >= 0) {
                 // EXCEPCIÓN: Si es verdura y el barrido le asignó 0 (libre), no la desaparecemos a 0. 
                 // Mantenemos la porción base que traía el platillo.
                 if (assignedEq === 0 && bKey === 'verduras') {
-                  return ing; 
+                  return ing;
                 }
 
                 const baseEq = Number(ing.eqCantidad) || 1;
@@ -435,22 +496,22 @@ export const CreateEditPlanForm = ({
       if (pIndex + dir < 0 || pIndex + dir >= platillos.length) return t;
 
       const targetPlatillo = platillos[pIndex + dir];
-      
+
       platillos[pIndex] = targetPlatillo;
       platillos[pIndex + dir] = platilloName;
-      
+
       const groups: Record<string, any[]> = {};
       t.ingredientes.forEach(ing => {
         const p = ing.platillo || '';
         if (!groups[p]) groups[p] = [];
         groups[p].push(ing);
       });
-      
+
       let newIngredientes: any[] = [];
       platillos.forEach(p => {
         if (groups[p]) newIngredientes = newIngredientes.concat(groups[p]);
       });
-      
+
       return { ...t, ingredientes: newIngredientes };
     });
   };
@@ -464,16 +525,28 @@ export const CreateEditPlanForm = ({
 
     setSavingPlatillo(true);
     try {
-      const ingredientes = tiempo.ingredientes.map(ing => ({
-        descripcion: ing.descripcion,
-        cantidad: ing.cantidad,
-        unidad: ing.unidad,
-        platillo: ing.platillo || '',
-        equivalencias: ing.equivalencias || (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: normalizeGroup(ing.eqGrupo) }] : []),
-        eqCantidad: ing.eqCantidad,
-        eqGrupo: ing.eqGrupo ? normalizeGroup(ing.eqGrupo) : '',
-        smaeGrPorEq: ing.smaeGrPorEq,
-      }));
+      const ingredientes = tiempo.ingredientes.map(ing => {
+        // Filtrar equivalencias vacías que se generan cuando el usuario escribe libre sin
+        // seleccionar del catálogo SMAE. Si el array está vacío tras el filtro, reconstruir
+        // desde eqGrupo/eqCantidad (legacy) si existen.
+        const rawEquivs = (ing.equivalencias || []).filter(
+          (e) => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null
+        );
+        const equivalencias = rawEquivs.length > 0
+          ? rawEquivs
+          : ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: normalizeGroup(ing.eqGrupo) }] : [];
+
+        return {
+          descripcion: ing.descripcion,
+          cantidad: ing.cantidad,
+          unidad: ing.unidad,
+          platillo: ing.platillo || '',
+          equivalencias,
+          eqCantidad: ing.eqCantidad,
+          eqGrupo: ing.eqGrupo ? normalizeGroup(ing.eqGrupo) : '',
+          smaeGrPorEq: ing.smaeGrPorEq,
+        };
+      });
 
       const { data } = await api.post('/api/platillos', { nombre: nombre.trim(), categoria, ingredientes });
       const saved = data?.data || data;
@@ -488,7 +561,7 @@ export const CreateEditPlanForm = ({
   };
 
   // ─── Presupuesto de equivalencias por tiempo (del barrido) ──────────────────
-  const getBudgetForTiempo = (tiempo: TiempoComida): { label: string; used: number; budget: number }[] => {
+  const getBudgetForTiempo = (tiempo: TiempoComida): { label: string; groupKey: string; used: number; budget: number; missing: number }[] => {
     const barridoData = valData?.barridoEquivalencias;
     if (!barridoData?.tiempos || !barridoData?.distribucion) return [];
 
@@ -517,7 +590,7 @@ export const CreateEditPlanForm = ({
         // Encontrar etiqueta canónica para mostrar
         const canonEntry = Object.entries(CANONICAL_TO_BARRIDO_KEY).find(([, v]) => v === barridoKey);
         const label = canonEntry ? canonEntry[0] : barridoKey;
-        return { label, used: parseFloat(used.toFixed(2)), budget };
+        return { label, groupKey: barridoKey, used: parseFloat(used.toFixed(2)), budget, missing: parseFloat((budget - used).toFixed(2)) };
       });
   };
 
@@ -534,32 +607,39 @@ export const CreateEditPlanForm = ({
     setSaving(true);
     const body: any = {
       nombre: nombrePlan,
-      tipoPlan: tipo, 
+      tipoPlan: tipo,
       calorias: parseFloat(calorias),
-      proteinasPct: parseFloat(proteinas), 
-      carbohidratosPct: parseFloat(carbohidratos), 
+      proteinasPct: parseFloat(proteinas),
+      carbohidratosPct: parseFloat(carbohidratos),
       grasasPct: parseFloat(grasas),
       proximaSesion,
       proximaSesionHora,
       menus: menus.map(m => ({
         nombre: m.nombre,
-        tiemposComida: m.tiempos.map(t => ({
-          nombre: t.nombre,
-          notaPie: t.nota || '',
-          bebida: t.bebida || '',
-          suplTiempo: t.suplTiempo || '',
-          suplNotas: t.suplNotas || '',
+        tiemposComida: m.tiempos.map(t => {
+          let injectedNota = t.nota || '';
+          if (t.ademas && t.ademas.trim()) {
+            injectedNota += `\n<!--META:${JSON.stringify({ ademas: t.ademas.trim() })}-->`;
+          }
+          return {
+            nombre: t.nombre,
+            notaPie: injectedNota,
+            bebida: t.bebida || '',
+            suplTiempo: t.suplTiempo || '',
+            suplNotas: t.suplNotas || '',
           ingredientes: t.ingredientes.map(i => ({
             ...i,
-            cantidad: i.cantidad.toString(),
-            eqCantidad: i.eqCantidad?.toString(),
+            cantidad: String(i.cantidad),
+            eqCantidad: String(i.eqCantidad || ''),
+            smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
             // Serializar explícitamente para no perder el array
             equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
           }))
-        }))
-      })), 
-      notasGenerales: notas,
-      suplementosDetalle,
+        };
+      })
+    })),
+    notasGenerales: notas,
+    suplementosDetalle,
     };
 
     if (!isBasePlan) {
@@ -581,9 +661,9 @@ export const CreateEditPlanForm = ({
         const url = isBasePlan ? `/api/planes` : `/api/pacientes/${pacienteId}/planes`;
         const { data } = await api.post(url, body);
         serverData = data?.data || data;
-      } 
+      }
       toast({ title: 'MENÚ GUARDADO' });
-      
+
       if (onSaved) {
         onSaved(serverData?.id || planId);
       } else {
@@ -617,233 +697,253 @@ export const CreateEditPlanForm = ({
     }
   };
 
+  if (loadingInitialData) {
+    return (
+      <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
+          <div className="space-y-4 w-full md:w-1/3">
+            <div className="h-4 w-24 bg-[#111] animate-pulse rounded" />
+            <div className="h-8 w-64 bg-[#111] animate-pulse rounded" />
+            <div className="h-4 w-48 bg-[#111] animate-pulse rounded" />
+          </div>
+          <div className="h-10 w-32 bg-[#111] animate-pulse rounded" />
+        </div>
+        <div className="bg-[#111] rounded-[12px] h-64 border border-[#2a2a2a] animate-pulse" />
+        <div className="grid md:grid-cols-2 gap-8 items-start">
+          <div className="bg-[#111] rounded-[12px] h-96 border border-[#2a2a2a] animate-pulse" />
+          <div className="bg-[#111] rounded-[12px] h-96 border border-[#2a2a2a] animate-pulse" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
-    <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
-        <div className="space-y-2">
-          {(!onSaved || onCancel) && (
-            <button onClick={() => onCancel ? onCancel() : navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-[#c0c0c0] hover:text-white transition-colors w-fit group mb-4">
-              <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> {onCancel ? 'Salir Sin Guardar' : 'Volver'}
+      <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
+          <div className="space-y-2">
+            {(!onSaved || onCancel) && (
+              <button onClick={() => onCancel ? onCancel() : navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-[#c0c0c0] hover:text-white transition-colors w-fit group mb-4">
+                <ArrowLeft className="h-[18px] w-[18px] group-hover:-translate-x-1 transition-transform" /> {onCancel ? 'Salir Sin Guardar' : 'Volver'}
+              </button>
+            )}
+            <div className="animate-slide-up space-y-1">
+              <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">
+                {pacienteNombre ? pacienteNombre : isBasePlan ? (isEdit ? 'Editar Menú' : 'Nuevo Menú') : (isEdit ? 'Personalizar Menú' : 'Configurar Menú')}
+              </h1>
+              <p className="text-[#c0c0c0] font-normal text-[14px] m-0 uppercase tracking-widest">
+                {pacienteNombre ? (isEdit ? 'Personalizar Menú' : 'Configurar Menú') : isBasePlan ? 'Definición de menú base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            {/* Botón Guardar Cambios / Generar Menú arriba - Ahora siempre visible */}
+            <button
+              onClick={handleSave}
+              disabled={saving || macroSum !== 100}
+              className="w-full sm:w-auto px-[18px] py-[10px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Save className="h-[18px] w-[18px]" />
+              )}
+              {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
+            </button>
+
+          </div>
+
+          {isBasePlan && isEdit && (
+            <button
+              onClick={handleDelete}
+              className="px-[18px] py-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium rounded-[8px] hover:bg-[#3d1a1a] transition-colors flex items-center gap-2"
+            >
+              <Trash2 className="h-[18px] w-[18px]" /> Eliminar menú
             </button>
           )}
-          <div className="animate-slide-up space-y-1">
-            <h1 className="text-[26px] font-bold text-white m-0 tracking-tight">
-              {pacienteNombre ? pacienteNombre : isBasePlan ? (isEdit ? 'Editar Menú' : 'Nuevo Menú') : (isEdit ? 'Personalizar Menú' : 'Configurar Menú')}
-            </h1>
-            <p className="text-[#c0c0c0] font-normal text-[14px] m-0 uppercase tracking-widest">
-              {pacienteNombre ? (isEdit ? 'Personalizar Menú' : 'Configurar Menú') : isBasePlan ? 'Definición de menú base para la biblioteca' : 'Ajuste de requerimientos y personalización de tiempos'}
-            </p>
-          </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          {/* Botón Guardar Cambios / Generar Menú arriba - Ahora siempre visible */}
-          <button
-            onClick={handleSave}
-            disabled={saving || macroSum !== 100}
-            className="w-full sm:w-auto px-[18px] py-[10px] bg-brand-primary text-bg-base rounded-[8px] text-[14px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="h-[18px] w-[18px]" />
-            )}
-            {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
-          </button>
-
-        </div>
-
-        {isBasePlan && isEdit && (
-          <button
-            onClick={handleDelete}
-            className="px-[18px] py-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium rounded-[8px] hover:bg-[#3d1a1a] transition-colors flex items-center gap-2"
-          >
-            <Trash2 className="h-[18px] w-[18px]" /> Eliminar menú
-          </button>
-        )}
-      </div>
-
-      <div className="space-y-6">
-        {/* DASHBOARD DE REQUERIMIENTOS: Unificado en la parte superior */}
-        <div className="bg-[#111111] p-8 rounded-[12px] animate-slide-up border border-[#2a2a2a] shadow-xl">
-          <div className="flex flex-col gap-10">
-            {/* CABECERA DE REQUERIMIENTOS: Unificada y Simplificada */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border-b border-[#2a2a2a] pb-8">
-              {/* Parte 1: Perfil Energético */}
-              <div className="lg:col-span-5 border-r border-[#2a2a2a] pr-10">
-                {isBasePlan ? (
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest ml-1">Nombre Menú</label>
-                      <input
-                        type="text"
-                        value={nombrePlan}
-                        onChange={(e) => setNombrePlan(e.target.value)}
-                        placeholder="Ej: Balanceado 1800"
-                        className="w-full bg-transparent text-[16px] font-bold text-white outline-none border-b border-transparent focus:border-brand-primary pb-1 transition-colors"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-2">
-                       <div className="space-y-1">
-                         <span className="text-[9px] font-bold text-[#555] uppercase block">Kcal</span>
-                         <input 
-                           type="number" 
-                           value={calorias} 
-                           onChange={(e) => setCalorias(e.target.value)} 
-                           className="w-full bg-transparent text-[28px] font-black text-brand-primary outline-none" 
-                         />
-                       </div>
-                       <div className="space-y-1">
-                         <span className="text-[9px] font-bold text-[#555] uppercase block">Tipo</span>
-                         <select
-                           value={tipo}
-                           onChange={(e) => setTipo(e.target.value)}
-                           className="w-full bg-transparent text-[14px] font-bold text-white outline-none appearance-none cursor-pointer"
-                         >
-                           <option value="Balanceada">Balanceada</option>
-                           <option value="Keto / Low Carb">Keto / Low Carb</option>
-                           <option value="Vegetariana">Vegetariana</option>
-                           <option value="Hipercalórica">Hipercalórica</option>
-                           <option value="Hipocalórica">Hipocalórica</option>
-                           <option value="Personalizada">Personalizada</option>
-                         </select>
-                       </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex flex-col items-center lg:items-start group">
-                      <span className="text-[10px] font-black text-[#666] uppercase tracking-widest mb-1 group-hover:text-brand-primary transition-colors">Meta Calórica Diaria</span>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-[44px] font-black text-white leading-none tracking-tighter">
-                          {calorias || '—'}
-                        </span>
-                        <span className="text-[18px] font-bold text-brand-primary">kcal</span>
-                      </div>
-                      <div className="mt-3 flex items-center gap-2 bg-[#181818] px-3 py-1.5 rounded-full border border-[#333]">
-                        <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(144,194,255,0.5)]" />
-                        <span className="text-[10px] text-[#8a8a8a] font-bold uppercase tracking-tight">
-                          {valData ? `Objetivo Estratégico Barrido #${valData.numeroValoracion}` : 'Asignación Manual'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* Parte 2: Requerimientos Esenciales (Macros y Objetivo) */}
-              <div className="lg:col-span-7">
-                <div className="grid grid-cols-3 gap-6">
-                  {[
-                    { label: 'Prot %', key: 'pPct', val: proteinas, set: setProteinas, color: '#ef8c8c', bg: 'rgba(239, 140, 140, 0.1)' },
-                    { label: 'Carb %', key: 'cPct', val: carbohidratos, set: setCarbohidratos, color: '#90c2ff', bg: 'rgba(144, 194, 255, 0.1)' },
-                    { label: 'Gras %', key: 'gPct', val: grasas, set: setGrasas, color: '#f5c842', bg: 'rgba(245, 200, 66, 0.1)' },
-                  ].map((m) => (
-                    <div key={m.label} className="group flex flex-col items-center">
-                      <label 
-                        className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 transition-colors"
-                        style={{ color: m.color }}
-                      >
-                        {m.label}
-                      </label>
-                      <div className="relative w-full aspect-square max-w-[80px]">
-                        {/* Círculo decorativo de fondo */}
-                        <div className="absolute inset-0 rounded-full border-2 border-white/5 bg-[#111111] overflow-hidden">
-                           <div className="absolute inset-0 opacity-20 blur-xl" style={{ backgroundColor: m.color }} />
-                        </div>
-                        
+        <div className="space-y-6">
+          {/* DASHBOARD DE REQUERIMIENTOS: Unificado en la parte superior */}
+          <div className="bg-[#111111] p-8 rounded-[12px] animate-slide-up border border-[#2a2a2a] shadow-xl">
+            <div className="flex flex-col gap-10">
+              {/* CABECERA DE REQUERIMIENTOS: Unificada y Simplificada */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border-b border-[#2a2a2a] pb-8">
+                {/* Parte 1: Perfil Energético */}
+                <div className="lg:col-span-5 border-r border-[#2a2a2a] pr-10">
+                  {isBasePlan ? (
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest ml-1">Nombre Menú</label>
                         <input
-                          type="number"
-                          value={m.val}
-                          onChange={(e) => m.set(e.target.value)}
-                          className="absolute inset-0 w-full h-full bg-transparent text-[20px] font-black text-center text-white outline-none z-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          type="text"
+                          value={nombrePlan}
+                          onChange={(e) => setNombrePlan(e.target.value)}
+                          placeholder="Ej: Balanceado 1800"
+                          className="w-full bg-transparent text-[16px] font-bold text-white outline-none border-b border-transparent focus:border-brand-primary pb-1 transition-colors"
                         />
-                        
-                        {/* Indicador de progreso circular (visual) */}
-                        <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
-                           <circle
-                             cx="50" cy="50" r="46"
-                             fill="none"
-                             stroke="currentColor"
-                             strokeWidth="4"
-                             className="text-white/5"
-                           />
-                           <circle
-                             cx="50" cy="50" r="46"
-                             fill="none"
-                             stroke={m.color}
-                             strokeWidth="4"
-                             strokeDasharray={289}
-                             strokeDashoffset={289 - (289 * (Number(m.val) || 0)) / 100}
-                             strokeLinecap="round"
-                             className="transition-all duration-1000 ease-out"
-                           />
-                        </svg>
                       </div>
-
-                      {/* Objetivo del Barrido (Solo porcentaje) */}
-                      {macrosBarridoResult && (
-                        <div className="mt-3 flex flex-col items-center gap-0.5">
-                           <span className="text-[8px] font-bold text-[#444] uppercase tracking-widest">Barrido</span>
-                           <span className="text-[14px] font-black text-white/80 leading-none">
-                             {macrosBarridoResult[m.key as keyof typeof macrosBarridoResult]}%
-                           </span>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-[#555] uppercase block">Kcal</span>
+                          <input
+                            type="number"
+                            value={calorias}
+                            onChange={(e) => setCalorias(e.target.value)}
+                            className="w-full bg-transparent text-[28px] font-black text-brand-primary outline-none"
+                          />
                         </div>
-                      )}
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-bold text-[#555] uppercase block">Tipo</span>
+                          <select
+                            value={tipo}
+                            onChange={(e) => setTipo(e.target.value)}
+                            className="w-full bg-transparent text-[14px] font-bold text-white outline-none appearance-none cursor-pointer"
+                          >
+                            <option value="Balanceada">Balanceada</option>
+                            <option value="Keto / Low Carb">Keto / Low Carb</option>
+                            <option value="Vegetariana">Vegetariana</option>
+                            <option value="Hipercalórica">Hipercalórica</option>
+                            <option value="Hipocalórica">Hipocalórica</option>
+                            <option value="Personalizada">Personalizada</option>
+                          </select>
+                        </div>
+                      </div>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center lg:items-start group">
+                        <span className="text-[10px] font-black text-[#666] uppercase tracking-widest mb-1 group-hover:text-brand-primary transition-colors">Meta Calórica Diaria</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-[44px] font-black text-white leading-none tracking-tighter">
+                            {calorias || '—'}
+                          </span>
+                          <span className="text-[18px] font-bold text-brand-primary">kcal</span>
+                        </div>
+                        <div className="mt-3 flex items-center gap-2 bg-[#181818] px-3 py-1.5 rounded-full border border-[#333]">
+                          <div className="w-1.5 h-1.5 rounded-full bg-brand-primary shadow-[0_0_8px_rgba(144,194,255,0.5)]" />
+                          <span className="text-[10px] text-[#8a8a8a] font-bold uppercase tracking-tight">
+                            {valData ? `Objetivo Estratégico Barrido #${valData.numeroValoracion}` : 'Asignación Manual'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
-                {macroSum !== 100 && (
-                  <div className="mt-6 flex items-center justify-center gap-2 text-rose-500 bg-rose-500/5 py-2 rounded-lg border border-rose-500/10">
-                    <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Suma {macroSum}% (Ajuste a 100%)</span>
+                {/* Parte 2: Requerimientos Esenciales (Macros y Objetivo) */}
+                <div className="lg:col-span-7">
+                  <div className="grid grid-cols-3 gap-6">
+                    {[
+                      { label: 'Prot %', key: 'pPct', val: proteinas, set: setProteinas, color: '#ef8c8c', bg: 'rgba(239, 140, 140, 0.1)' },
+                      { label: 'Carb %', key: 'cPct', val: carbohidratos, set: setCarbohidratos, color: '#90c2ff', bg: 'rgba(144, 194, 255, 0.1)' },
+                      { label: 'Gras %', key: 'gPct', val: grasas, set: setGrasas, color: '#f5c842', bg: 'rgba(245, 200, 66, 0.1)' },
+                    ].map((m) => (
+                      <div key={m.label} className="group flex flex-col items-center">
+                        <label
+                          className="text-[10px] font-black uppercase tracking-[0.2em] mb-4 transition-colors"
+                          style={{ color: m.color }}
+                        >
+                          {m.label}
+                        </label>
+                        <div className="relative w-full aspect-square max-w-[80px]">
+                          {/* Círculo decorativo de fondo */}
+                          <div className="absolute inset-0 rounded-full border-2 border-white/5 bg-[#111111] overflow-hidden">
+                            <div className="absolute inset-0 opacity-20 blur-xl" style={{ backgroundColor: m.color }} />
+                          </div>
+
+                          <input
+                            type="number"
+                            value={m.val}
+                            onChange={(e) => m.set(e.target.value)}
+                            className="absolute inset-0 w-full h-full bg-transparent text-[20px] font-black text-center text-white outline-none z-10 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+
+                          {/* Indicador de progreso circular (visual) */}
+                          <svg className="absolute inset-0 w-full h-full -rotate-90 pointer-events-none" viewBox="0 0 100 100">
+                            <circle
+                              cx="50" cy="50" r="46"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="4"
+                              className="text-white/5"
+                            />
+                            <circle
+                              cx="50" cy="50" r="46"
+                              fill="none"
+                              stroke={m.color}
+                              strokeWidth="4"
+                              strokeDasharray={289}
+                              strokeDashoffset={289 - (289 * (Number(m.val) || 0)) / 100}
+                              strokeLinecap="round"
+                              className="transition-all duration-1000 ease-out"
+                            />
+                          </svg>
+                        </div>
+
+                        {/* Objetivo del Barrido (Solo porcentaje) */}
+                        {macrosBarridoResult && (
+                          <div className="mt-3 flex flex-col items-center gap-0.5">
+                            <span className="text-[8px] font-bold text-[#444] uppercase tracking-widest">Barrido</span>
+                            <span className="text-[14px] font-black text-white/80 leading-none">
+                              {macrosBarridoResult[m.key as keyof typeof macrosBarridoResult]}%
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
+
+                  {macroSum !== 100 && (
+                    <div className="mt-6 flex items-center justify-center gap-2 text-rose-500 bg-rose-500/5 py-2 rounded-lg border border-rose-500/10">
+                      <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Suma {macroSum}% (Ajuste a 100%)</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* TABLA DE EQUIVALENCIAS (BARRIDO) */}
-        {!isBasePlan && valData?.barridoEquivalencias && (
-          <div className="bg-[#111] rounded-[12px] border border-[#2a2a2a] overflow-hidden">
-             <div 
-               className="bg-[#181818] px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-[#1d1d1d] transition-all"
-               onClick={() => setShowBarridoRef(!showBarridoRef)}
-             >
+          {/* TABLA DE EQUIVALENCIAS (BARRIDO) */}
+          {!isBasePlan && valData?.barridoEquivalencias && (
+            <div className="bg-[#111] rounded-[12px] border border-[#2a2a2a] overflow-hidden">
+              <div
+                className="bg-[#181818] px-6 py-4 flex items-center justify-between cursor-pointer hover:bg-[#1d1d1d] transition-all"
+                onClick={() => setShowBarridoRef(!showBarridoRef)}
+              >
                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-brand-primary/10 rounded-lg">
-                      <Activity className="h-4 w-4 text-brand-primary" />
-                   </div>
-                   <div>
-                      <h3 className="text-[14px] font-bold text-white uppercase tracking-wider">Carga Estratégica de Equivalencias (Barrido)</h3>
-                      <p className="text-[11px] text-[#8a8a8a]">Sincronización automática con porciones asignadas</p>
-                   </div>
+                  <div className="p-2 bg-brand-primary/10 rounded-lg">
+                    <Activity className="h-4 w-4 text-brand-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-[14px] font-bold text-white uppercase tracking-wider">Carga Estratégica de Equivalencias (Barrido)</h3>
+                    <p className="text-[11px] text-[#8a8a8a]">Sincronización automática con porciones asignadas</p>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
-                   <ChevronDown className={`h-5 w-5 text-[#555] transition-transform duration-300 ${showBarridoRef ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-5 w-5 text-[#555] transition-transform duration-300 ${showBarridoRef ? 'rotate-180' : ''}`} />
                 </div>
-             </div>
-             
-             {showBarridoRef && (
-               <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300">
-                  <BarridoEquivalenciasComp 
-                    value={valData.barridoEquivalencias} 
+              </div>
+
+              {showBarridoRef && (
+                <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300">
+                  <BarridoEquivalenciasComp
+                    value={valData.barridoEquivalencias}
                     onChange={(data) => {
                       setValData({ ...valData, barridoEquivalencias: data });
                       autoScaleIngredients(data);
-                    }} 
+                    }}
                   />
-               </div>
-             )}
-          </div>
-        )}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* SECCIÓN DE MENÚS */}
-        <div className="grid md:grid-cols-2 gap-8 items-start">
+          {/* SECCIÓN DE MENÚS */}
+          <div className="grid md:grid-cols-2 gap-8 items-start">
             {menus.map((menu, mi) => (
               <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
                 <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 flex items-center justify-between">
@@ -853,11 +953,11 @@ export const CreateEditPlanForm = ({
                     className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-white selection:bg-brand-primary placeholder:text-[#8a8a8a]"
                     placeholder="Nombre del menú"
                   />
-                  
+
                   <div className="flex items-center gap-2">
                     <button
-                       onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
-                       className="p-2 text-[#8a8a8a] hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
+                      onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
+                      className="p-2 text-[#8a8a8a] hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -868,161 +968,162 @@ export const CreateEditPlanForm = ({
                   {menu.tiempos.map((tiempo, ti) => (
                     <div key={ti} className="p-4 rounded-[8px] border border-[#2a2a2a] bg-[#181818] group relative">
                       <div className="flex items-center justify-between mb-4">
-                         <input
-                           value={tiempo.nombre}
-                           onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value }))}
-                           className="text-[14px] font-semibold text-white bg-transparent border-none outline-none w-[70%]"
-                           placeholder="Nombre del tiempo"
-                         />
-                         <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                           <button onClick={() => moveTiempo(mi, ti, -1)} disabled={ti === 0} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
-                             <ChevronUp className="h-3.5 w-3.5" />
-                           </button>
-                           <button onClick={() => moveTiempo(mi, ti, 1)} disabled={ti === menu.tiempos.length - 1} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
-                             <ChevronDown className="h-3.5 w-3.5" />
-                           </button>
-                           <div className="w-[1px] h-4 bg-[#333] hidden sm:block mx-1"></div>
-                           <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-[#8a8a8a] hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors">
-                             <Trash2 className="h-3.5 w-3.5" />
-                           </button>
-                         </div>
+                        <input
+                          value={tiempo.nombre}
+                          onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value }))}
+                          className="text-[14px] font-semibold text-white bg-transparent border-none outline-none w-[70%]"
+                          placeholder="Nombre del tiempo"
+                        />
+                        <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={() => moveTiempo(mi, ti, -1)} disabled={ti === 0} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                            <ChevronUp className="h-3.5 w-3.5" />
+                          </button>
+                          <button onClick={() => moveTiempo(mi, ti, 1)} disabled={ti === menu.tiempos.length - 1} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          </button>
+                          <div className="w-[1px] h-4 bg-[#333] hidden sm:block mx-1"></div>
+                          <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-[#8a8a8a] hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </div>
 
-                       {/* ─── Bebida y Suplemento alineados al título del tiempo ─── */}
-                       <div className="flex flex-col gap-1 mb-3 px-1">
-                         <div className="flex items-center gap-2">
-                           <Droplets className="w-3.5 h-3.5 text-[#3a9eff] shrink-0" />
-                           <input
-                             type="text"
-                             placeholder="Bebida (ej: 500ml agua con limón)"
-                             value={tiempo.bebida || ''}
-                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
-                             className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
-                           />
-                         </div>
-                         <div className="flex items-center gap-2">
-                           <Pill className="w-3.5 h-3.5 text-[#a97fff] shrink-0" />
-                           <input
-                             type="text"
-                             placeholder="Suplemento del tiempo (ej: 1 scoop Whey)"
-                             value={tiempo.suplTiempo || ''}
-                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, suplTiempo: e.target.value }))}
-                             className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
-                           />
-                         </div>
-                       </div>
+                      {/* ─── Bebida y Suplemento alineados al título del tiempo ─── */}
+                      <div className="flex flex-col gap-1 mb-3 px-1">
+                        <div className="flex items-center gap-2">
+                          <Droplets className="w-3.5 h-3.5 text-[#3a9eff] shrink-0" />
+                          <input
+                            type="text"
+                            placeholder="Bebida (ej: 500ml agua con limón)"
+                            value={tiempo.bebida || ''}
+                            onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
+                            className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Pill className="w-3.5 h-3.5 text-[#a97fff] shrink-0" />
+                          <input
+                            type="text"
+                            placeholder="Suplemento del tiempo (ej: 1 scoop Whey)"
+                            value={tiempo.suplTiempo || ''}
+                            onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, suplTiempo: e.target.value }))}
+                            className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                          />
+                        </div>
+                      </div>
 
-                       {/* ─── Panel Presupuesto Colapsable ─── */}
-                       {(() => {
-                         const budgetKey = `${mi}-${ti}`;
-                         const budgetItems = getBudgetForTiempo(tiempo);
-                         if (budgetItems.length === 0) return null;
-                         const isOpen = true; // Budget panels are ALWAYS visible for Eyder to track progress in real-time
-                         return (
-                           <div className="mb-3 rounded-[6px] border border-[#2a2a2a] overflow-hidden">
-                             <button
-                               onClick={() => setShowBudgetMap(prev => ({ ...prev, [budgetKey]: !prev[budgetKey] }))}
-                               className="w-full flex items-center justify-between px-3 py-2 text-[9px] font-black text-[#555] uppercase tracking-widest hover:bg-[#181818] transition-colors"
-                             >
-                               <span>Presupuesto de Equivalencias</span>
-                               <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                             </button>
-                             {isOpen && (
-                               <div className="px-3 pb-3 space-y-2 bg-[#111]">
-                                 {budgetItems.map(({ label, used, budget: bdgt }) => {
-                                   const pct = Math.min((used / bdgt) * 100, 100);
-                                   const over = used > bdgt;
-                                   const done = !over && pct >= 85;
-                                   const barColor = over ? '#ef4444' : done ? '#22c55e' : '#555';
-                                   const textColor = over ? 'text-red-400' : done ? 'text-green-400' : 'text-[#8a8a8a]';
-                                   return (
-                                     <div key={label}>
-                                       <div className="flex items-center justify-between mb-0.5">
-                                         <span className="text-[10px] text-[#777]">{label}</span>
-                                         <span className={`text-[10px] font-bold tabular-nums ${textColor}`}>
-                                           {used} / {bdgt} eq {over ? '⚠' : done ? '✓' : ''}
-                                         </span>
-                                       </div>
-                                       <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden">
-                                         <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: barColor }} />
-                                       </div>
-                                     </div>
-                                   );
-                                 })}
-                               </div>
-                             )}
-                           </div>
-                         );
-                       })()}
+                      {/* ─── Panel Presupuesto Colapsable ─── */}
+                      {(() => {
+                        const budgetKey = `${mi}-${ti}`;
+                        const budgetItems = getBudgetForTiempo(tiempo);
+                        if (budgetItems.length === 0) return null;
+                        const isOpen = showBudgetMap[budgetKey] !== false; // Abierto por defecto
+                        return (
+                          <div className="mb-3 rounded-[6px] border border-[#2a2a2a] overflow-hidden">
+                            <button
+                              onClick={() => setShowBudgetMap(prev => ({ ...prev, [budgetKey]: !prev[budgetKey] }))}
+                              className="w-full flex items-center justify-between px-3 py-2 text-[9px] font-black text-[#555] uppercase tracking-widest hover:bg-[#181818] transition-colors"
+                            >
+                              <span>Presupuesto de Equivalencias</span>
+                              <ChevronDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                            </button>
+                            {isOpen && (
+                              <div className="px-3 pb-3 space-y-2 bg-[#111]">
+                                {budgetItems.map(({ label, used, budget: bdgt }) => {
+                                  const pct = Math.min((used / bdgt) * 100, 100);
+                                  const over = used > bdgt;
+                                  const done = !over && pct >= 85;
+                                  const barColor = over ? '#ef4444' : done ? '#22c55e' : '#555';
+                                  const textColor = over ? 'text-red-400' : done ? 'text-green-400' : 'text-[#8a8a8a]';
+                                  return (
+                                    <div key={label}>
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <span className="text-[10px] text-[#777]">{label}</span>
+                                        <span className={`text-[10px] font-bold tabular-nums ${textColor}`}>
+                                          {used} / {bdgt} eq {over ? '⚠' : done ? '✓' : ''}
+                                        </span>
+                                      </div>
+                                      <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: barColor }} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       <div className="space-y-6">
                         {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
-                           <div key={`${mi}-${ti}-${pIndex}`} className={pName ? 'p-3 bg-[#111111] border border-[#333] rounded-[8px]' : ''}>
-                              {pName ? (<div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
-                                 <span className="text-[#8a8a8a] text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
-                                 <input 
-                                    className="bg-transparent border-none outline-none font-semibold text-white placeholder:text-[#8a8a8a] text-[13px] w-full min-w-0"
-                                    value={pName}
-                                    onChange={(e) => {
-                                      const newName = e.target.value;
-                                      updateTiempo(mi, ti, t => ({
-                                         ...t,
-                                         ingredientes: t.ingredientes.map(ing => (ing.platillo || '') === pName ? { ...ing, platillo: newName } : ing)
-                                      }))
-                                    }}
-                                    placeholder="Ej: Sándwich de Pollo (Opcional)"
-                                 />
-                                 
-                                 <div className="flex items-center gap-1 ml-auto shrink-0">
-                                   <button onClick={() => movePlatillo(mi, ti, pName, -1)} disabled={pIndex === 0} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
-                                     <ChevronUp className="h-3 w-3" />
-                                   </button>
-                                   <button onClick={() => movePlatillo(mi, ti, pName, 1)} disabled={pIndex === Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).length - 1} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
-                                     <ChevronDown className="h-3 w-3" />
-                                   </button>
-                                   {pName && (
-                                     <button 
-                                        onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
-                                        className="text-[10px] uppercase font-bold text-[#8a8a8a] hover:text-accent-red ml-1 px-1.5 py-1 rounded-[4px] hover:bg-[#2e1a1a] whitespace-nowrap transition-colors tracking-wider"
-                                     >
-                                       Borrar
-                                     </button>
-                                   )}
-                                 </div>
-                              </div>) : null}
-                                <div className="space-y-4">
-                                  {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
-                                    <SmaeIngredientePicker
-                                      key={ing.id || `ing-${mi}-${ti}-${ii}`}
-                                      ingrediente={ing}
-                                      index={ii}
-                                      onUpdate={(updates) =>
-                                      updateTiempo(mi, ti, (t) => ({
-                                        ...t,
-                                        ingredientes: t.ingredientes.map((x, j) =>
-                                          j === ii ? { ...x, ...updates } : x
-                                        ),
-                                      }))
-                                    }
-                                    onRemove={() =>
-                                      updateTiempo(mi, ti, (t) => ({
-                                        ...t,
-                                        ingredientes: t.ingredientes.filter((_, j) => j !== ii),
-                                      }))
-                                    }
-                                  />
-                                ) : null)}
-                                
-                                <button
-                                  onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: pName }] }))}
-                                  className="w-full py-2 bg-transparent border border-dashed border-[#2a2a2a] hover:border-[#333] text-[#c0c0c0] hover:text-white text-[12px] font-medium rounded-[6px] transition-colors"
-                                >
-                                  + Agregar Alimento
+                          <div key={`${mi}-${ti}-${pIndex}`} className={pName ? 'p-3 bg-[#111111] border border-[#333] rounded-[8px]' : ''}>
+                            {pName ? (<div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
+                              <span className="text-[#8a8a8a] text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
+                              <input
+                                className="bg-transparent border-none outline-none font-semibold text-white placeholder:text-[#8a8a8a] text-[13px] w-full min-w-0"
+                                value={pName}
+                                onChange={(e) => {
+                                  const newName = e.target.value;
+                                  updateTiempo(mi, ti, t => ({
+                                    ...t,
+                                    ingredientes: t.ingredientes.map(ing => (ing.platillo || '') === pName ? { ...ing, platillo: newName } : ing)
+                                  }))
+                                }}
+                                placeholder="Ej: Sándwich de Pollo (Opcional)"
+                              />
+
+                              <div className="flex items-center gap-1 ml-auto shrink-0">
+                                <button onClick={() => movePlatillo(mi, ti, pName, -1)} disabled={pIndex === 0} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
+                                  <ChevronUp className="h-3 w-3" />
                                 </button>
+                                <button onClick={() => movePlatillo(mi, ti, pName, 1)} disabled={pIndex === Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).length - 1} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
+                                  <ChevronDown className="h-3 w-3" />
+                                </button>
+                                {pName && (
+                                  <button
+                                    onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
+                                    className="text-[10px] uppercase font-bold text-[#8a8a8a] hover:text-accent-red ml-1 px-1.5 py-1 rounded-[4px] hover:bg-[#2e1a1a] whitespace-nowrap transition-colors tracking-wider"
+                                  >
+                                    Borrar
+                                  </button>
+                                )}
                               </div>
-                           </div>
+                            </div>) : null}
+                            <div className="space-y-4">
+                              {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
+                                <SmaeIngredientePicker
+                                  key={ing.id || `ing-${mi}-${ti}-${ii}`}
+                                  ingrediente={ing}
+                                  index={ii}
+                                  gapByGroup={getBudgetForTiempo(tiempo).reduce((acc, b) => ({ ...acc, [b.groupKey]: b.missing > 0 ? b.missing : 0 }), {} as Record<string, number>)}
+                                  onUpdate={(updates) =>
+                                    updateTiempo(mi, ti, (t) => ({
+                                      ...t,
+                                      ingredientes: t.ingredientes.map((x, j) =>
+                                        j === ii ? { ...x, ...updates } : x
+                                      ),
+                                    }))
+                                  }
+                                  onRemove={() =>
+                                    updateTiempo(mi, ti, (t) => ({
+                                      ...t,
+                                      ingredientes: t.ingredientes.filter((_, j) => j !== ii),
+                                    }))
+                                  }
+                                />
+                              ) : null)}
+
+                              <button
+                                onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: pName }] }))}
+                                className="w-full py-2 bg-transparent border border-dashed border-[#2a2a2a] hover:border-[#333] text-[#c0c0c0] hover:text-white text-[12px] font-medium rounded-[6px] transition-colors"
+                              >
+                                + Agregar Alimento
+                              </button>
+                            </div>
+                          </div>
                         ))}
-                        
+
                         <div className="flex gap-2">
                           <button
                             onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: '' }] }))}
@@ -1032,14 +1133,14 @@ export const CreateEditPlanForm = ({
                           </button>
                           <button
                             onClick={() => {
-                               let nuevoNombreBase = "Nuevo Platillo";
-                               let nuevoNombre = nuevoNombreBase;
-                               let cnt = 1;
-                               while (tiempo.ingredientes.some(i => i.platillo === nuevoNombre)) {
-                                  nuevoNombre = `${nuevoNombreBase} ${cnt}`;
-                                  cnt++;
-                               }
-                               updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
+                              let nuevoNombreBase = "Nuevo Platillo";
+                              let nuevoNombre = nuevoNombreBase;
+                              let cnt = 1;
+                              while (tiempo.ingredientes.some(i => i.platillo === nuevoNombre)) {
+                                nuevoNombre = `${nuevoNombreBase} ${cnt}`;
+                                cnt++;
+                              }
+                              updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: nuevoNombre }] }))
                             }}
                             className="flex-1 py-2 bg-transparent border border-dashed border-[#333] text-brand-primary hover:text-brand-primary/80 text-[12px] font-bold rounded-[6px] transition-colors uppercase tracking-wider"
                           >
@@ -1056,151 +1157,167 @@ export const CreateEditPlanForm = ({
                               <BookOpen className="w-4 h-4" /> Importar Alimentos
                             </button>
                             <button
-                              onClick={() => setSavePlatilloModal({ mIdx: mi, tIdx: ti, nombre: tiempo.nombre, categoria: 'Personalizado' })}
+                              onClick={() => setSavePlatilloModal({ mIdx: mi, tIdx: ti, nombre: tiempo.nombre, categoria: 'PERSONALIZADO' })}
                               className="py-2.5 px-3.5 bg-[#1a1a1a] border border-[#333] text-[#a97fff] hover:text-white hover:border-[#a97fff]/40 hover:bg-[#251d36] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center gap-1.5"
                               title="Guardar tiempo como Platillo"
                             >
                               <Bookmark className="w-4 h-4" /> Guardar
                             </button>
                           </div>
-                          
+
                           {showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti && (
                             <div className="absolute z-50 left-0 right-0 bottom-full mb-2 bg-[#111] border border-[#444] rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,0.6)] p-4 animate-in fade-in slide-in-from-bottom-2">
-                               {/* Buscador general */}
-                               <Input 
-                                 placeholder="🔍 Buscar por nombre de platillo..." 
-                                 className="h-9 text-xs mb-3 bg-[#0a0a0a] border-[#333] focus:border-[#90c2ff] rounded-[8px]"
-                                 autoFocus
-                                 value={platilloSearch}
-                                 onChange={(e) => { setPlatilloSearch(e.target.value); if (e.target.value) setPlatilloCatFilter(null); }}
-                               />
-                               
-                               {/* Sin búsqueda: mostrar categorías primero */}
-                               {!platilloSearch && !platilloCatFilter && (
-                                 <div>
-                                   <p className="text-[10px] font-black text-[#666] uppercase tracking-widest mb-3">Selecciona categoría</p>
-                                   <div className="grid grid-cols-2 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
-                                     {Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort().map(cat => (
-                                       <button
-                                         key={cat}
-                                         onClick={() => setPlatilloCatFilter(cat)}
-                                         className="px-3 py-2 bg-[#1a1a1a] border border-[#333] hover:border-[#90c2ff] hover:text-[#90c2ff] hover:bg-[#1d2536] rounded-[8px] text-[11px] font-bold text-[#8a8a8a] transition-all uppercase text-left truncate"
-                                       >
-                                         {cat}
-                                       </button>
-                                     ))}
-                                   </div>
-                                 </div>
-                               )}
+                              {/* Controles de búsqueda y filtros combinados */}
+                              <div className="space-y-2 mb-3">
+                                <Input
+                                  placeholder="🔍 Buscar por nombre de platillo..."
+                                  className="h-9 text-xs bg-[#0a0a0a] border-[#333] focus:border-[#90c2ff] rounded-[8px]"
+                                  autoFocus
+                                  value={platilloSearch}
+                                  onChange={(e) => setPlatilloSearch(e.target.value)}
+                                />
+                                <div className="relative">
+                                  <select
+                                    value={platilloCatFilter || ''}
+                                    onChange={(e) => setPlatilloCatFilter(e.target.value ? e.target.value : null)}
+                                    className="w-full h-9 text-xs bg-[#0a0a0a] border border-[#333] text-white rounded-[8px] pl-3 pr-8 outline-none focus:border-[#90c2ff] appearance-none"
+                                  >
+                                    <option value="">TODOS</option>
+                                    {Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort().map(cat => (
+                                      <option key={cat} value={cat}>{cat} ({platilloLibrary.filter(p => p.categoria === cat).length})</option>
+                                    ))}
+                                  </select>
+                                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555] pointer-events-none" />
+                                </div>
+                              </div>
 
-                               {/* Categoría seleccionada: header + lista de platillos */}
-                               {(platilloSearch || platilloCatFilter) && (
-                               <>
-                                 {platilloCatFilter && !platilloSearch && (
-                                   <div className="flex items-center gap-2 mb-2">
-                                     <button
-                                       onClick={() => setPlatilloCatFilter(null)}
-                                       className="text-[9px] text-[#555] hover:text-white transition-colors uppercase font-bold"
-                                     >
-                                       ← Categorías
-                                     </button>
-                                     <span className="text-[10px] font-black text-[#90c2ff] uppercase">{platilloCatFilter}</span>
-                                   </div>
-                                 )}
-                                 <div className="max-h-[260px] overflow-y-auto space-y-1 custom-scrollbar">
-                                   {(() => {
-                                     // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
-                                     const LABEL_TO_KEY: Record<string, string> = {
-                                       'Verduras': 'verduras', 'Verdura': 'verduras',
-                                       'Frutas': 'frutas', 'Fruta': 'frutas',
-                                       'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
-                                       'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
-                                       'Leguminosas': 'leguminosas',
-                                       'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
-                                       'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
-                                       'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
-                                       'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
-                                       'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
-                                       'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
-                                       'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
-                                       'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
-                                       'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
-                                       'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
-                                       'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
-                                       'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
-                                     };
-                                     
-                                     const results = platilloLibrary.filter(p => {
-                                       if (platilloSearch) {
-                                         return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
-                                                p.categoria.toLowerCase().includes(platilloSearch.toLowerCase());
-                                       }
-                                       return p.categoria === platilloCatFilter;
-                                     });
+                              {/* Lista de platillos renderizada siempre por defecto (TODOS) */}
+                              <div className="max-h-[260px] overflow-y-auto space-y-1 custom-scrollbar">
+                                {(() => {
+                                  // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
+                                  const LABEL_TO_KEY: Record<string, string> = {
+                                        'Verduras': 'verduras', 'Verdura': 'verduras',
+                                        'Frutas': 'frutas', 'Fruta': 'frutas',
+                                        'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
+                                        'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
+                                        'Leguminosas': 'leguminosas',
+                                        'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
+                                        'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
+                                        'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
+                                        'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
+                                        'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
+                                        'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
+                                        'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
+                                        'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
+                                        'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
+                                        'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
+                                        'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
+                                        'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
+                                      };
 
-                                     if (results.length === 0) return <p className="text-center py-4 text-[10px] text-[#555]">Sin resultados.</p>;
+                                      const results = platilloLibrary.filter(p => {
+                                        if (platilloSearch) {
+                                          return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
+                                            p.categoria.toLowerCase().includes(platilloSearch.toLowerCase());
+                                        }
+                                        return !platilloCatFilter || p.categoria === platilloCatFilter;
+                                      });
 
-                                     return results.map(p => (
-                                       <button
-                                         key={p.id}
-                                         onClick={() => {
-                                           const d = valData?.barridoEquivalencias?.distribucion;
-                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                           const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
-                                             (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
-                                           );
-                                           const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
+                                      if (results.length === 0) return <p className="text-center py-4 text-[10px] text-[#555]">Sin resultados.</p>;
 
-                                           const ings = p.ingredientes.map((i: any, idx: number) => {
-                                             let scaledCant = Number(i.cantidad);
-                                             let scaledEq = Number(i.eqCantidad);
+                                      return results.map(p => (
+                                        <button
+                                          key={p.id}
+                                          onClick={() => {
+                                            const d = valData?.barridoEquivalencias?.distribucion;
+                                            // Encontrar el tiempo del barrido que coincide con este tiempo de comida
+                                            const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
+                                              (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
+                                            );
+                                            const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
 
-                                             if (i.eqGrupo && distTiempo) {
-                                               // Traduce el label del platillo al key del barrido
-                                               const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
-                                               const assigned = distTiempo[barridoKey];
-                                               if (assigned != null && assigned > 0) {
-                                                 const baseEq = Number(i.eqCantidad) || 1;
-                                                 // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
-                                                 scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
-                                                 scaledEq = assigned;
-                                               }
-                                             }
+                                            const ings = p.ingredientes.map((i: any, idx: number) => {
+                                              let scaledCant = Number(i.cantidad);
+                                              let scaledEq = Number(i.eqCantidad);
 
-                                             return {
-                                               ...i,
-                                               cantidad: scaledCant,
-                                               eqCantidad: scaledEq,
-                                               platillo: p.nombre,
-                                               orden: (tiempo.ingredientes.length || 0) + idx + 1
-                                             };
-                                           });
+                                              // Unidades discretas (procesados, empaquetados): NO escalar cantidad
+                                              const UNIDADES_DISCRETAS = ['PZ', 'PAQUETE', 'BOTELLA', 'PIEZA', 'LATA', 'BOLSA', 'BARRA', 'SOBRE', 'TARRO', 'FRASCO'];
+                                              const esDiscreta = UNIDADES_DISCRETAS.includes((i.unidad || '').toUpperCase().trim());
 
-                                           updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
-                                           setShowPlatilloSelector(null);
-                                           setPlatilloSearch('');
-                                           setPlatilloCatFilter(null);
-                                         }}
-                                         className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
-                                       >
-                                         <div>
-                                           <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
-                                           <p className="text-[10px] text-[#555]">{p.categoria}</p>
-                                         </div>
-                                         <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
-                                       </button>
-                                     ));
-                                   })()}
-                                 </div>
-                               </>
-                               )}
+                                              // Parsear equivalencias si vienen como string
+                                              let eqArray = [];
+                                              if (Array.isArray(i.equivalencias)) {
+                                                eqArray = i.equivalencias;
+                                              } else if (typeof i.equivalencias === 'string' && i.equivalencias.trim() !== '') {
+                                                try { eqArray = JSON.parse(i.equivalencias); } catch (e) { }
+                                              }
+
+                                              // Sanitizar equivalencias heredadas: eliminar entradas fantasma con grupo vacío
+                                              const rawEquivs = eqArray.filter(
+                                                (e: any) => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null
+                                              );
+
+                                              // Si tiene más de una equivalencia o fue ingresado sin gramos, se considera complejo y no se escala
+                                              const esComplejo = rawEquivs.length > 1 || (Number(i.cantidad) === 0);
+
+                                              if (!esDiscreta && !esComplejo && i.eqGrupo && distTiempo) {
+                                                // Traduce el label del platillo al key del barrido
+                                                const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
+                                                const assigned = distTiempo[barridoKey];
+                                                if (assigned != null && assigned > 0) {
+                                                  const baseEq = Number(i.eqCantidad) || 1;
+                                                  // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
+                                                  scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
+                                                  scaledEq = assigned;
+                                                }
+                                              }
+
+                                              // Calcular factor de escala para equivalencias
+                                              const origCant = Number(i.cantidad) || 0;
+                                              const scaleFactor = (scaledCant !== origCant && origCant > 0) ? (scaledCant / origCant) : 1;
+
+                                              const cleanEquivencias = rawEquivs.length > 0
+                                                ? rawEquivs.map((e: any) => ({
+                                                  grupo: e.grupo,
+                                                  // Escalar cada grupo proporcionalmente al mismo factor que la cantidad física
+                                                  cantidad: scaleFactor !== 1 ? smartRound(Number(e.cantidad) * scaleFactor) : Number(e.cantidad),
+                                                }))
+                                                : i.eqGrupo ? [{ cantidad: scaledEq, grupo: i.eqGrupo }] : [];
+
+                                              return {
+                                                ...i,
+                                                cantidad: scaledCant,
+                                                eqCantidad: scaledEq,
+                                                smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
+                                                equivalencias: cleanEquivencias,
+                                                platillo: p.nombre,
+                                                orden: (tiempo.ingredientes.length || 0) + idx + 1
+                                              };
+                                            });
+
+                                            updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
+                                            setShowPlatilloSelector(null);
+                                            setPlatilloSearch('');
+                                            setPlatilloCatFilter(null);
+                                          }}
+                                          className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
+                                        >
+                                          <div>
+                                            <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
+                                            <p className="text-[10px] text-[#555]">{p.categoria}</p>
+                                          </div>
+                                          <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
+                                        </button>
+                                      ));
+                                  })()}
+                                </div>
                             </div>
                           )}
                         </div>
                       </div>
                     </div>
                   ))}
-                  
+
                   <div className="flex-1" />
                   <button
                     onClick={() => updateMenu(mi, (m) => ({
@@ -1213,56 +1330,64 @@ export const CreateEditPlanForm = ({
                 </div>
               </div>
             ))}
-      </div>
-    </div>
-    </div>
-    {/* ─── Save-as-Platillo Modal ─── */}
-    {savePlatilloModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-        <div className="bg-[#111] border border-[#2a2a2a] rounded-[16px] p-6 w-full max-w-sm shadow-2xl">
-          <h3 className="text-[16px] font-bold text-white mb-1">Guardar como Platillo</h3>
-          <p className="text-[12px] text-[#8a8a8a] mb-4">Los ingredientes de este tiempo se guardarán en tu biblioteca como un platillo reutilizable.</p>
-          <div className="space-y-3">
-            <div>
-              <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Nombre</label>
-              <input
-                autoFocus
-                className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
-                value={savePlatilloModal.nombre}
-                onChange={e => setSavePlatilloModal(p => p ? { ...p, nombre: e.target.value } : p)}
-                placeholder="Ej: Desayuno proteico"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Categoría</label>
-              <input
-                className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
-                value={savePlatilloModal.categoria}
-                onChange={e => setSavePlatilloModal(p => p ? { ...p, categoria: e.target.value } : p)}
-                placeholder="Ej: Desayunos, Colaciones..."
-              />
-            </div>
-          </div>
-          <div className="flex gap-3 mt-5">
-            <button
-              onClick={() => setSavePlatilloModal(null)}
-              className="flex-1 py-2 border border-[#333] rounded-[8px] text-[13px] text-[#8a8a8a] hover:text-white transition-colors"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveTiempoAsPlatillo}
-              disabled={savingPlatillo}
-              className="flex-1 py-2 bg-brand-primary text-white rounded-[8px] text-[13px] font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {savingPlatillo ? 'Guardando...' : 'Guardar Platillo'}
-            </button>
           </div>
         </div>
       </div>
-    )}
+      {/* ─── Save-as-Platillo Modal ─── */}
+      {savePlatilloModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#111] border border-[#2a2a2a] rounded-[16px] p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-[16px] font-bold text-white mb-1">Guardar como Platillo</h3>
+            <p className="text-[12px] text-[#8a8a8a] mb-4">Los ingredientes de este tiempo se guardarán en tu biblioteca como un platillo reutilizable.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Nombre</label>
+                <input
+                  autoFocus
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
+                  value={savePlatilloModal.nombre}
+                  onChange={e => setSavePlatilloModal(p => p ? { ...p, nombre: e.target.value } : p)}
+                  placeholder="Ej: Desayuno proteico"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black text-[#555] uppercase tracking-widest block mb-1">Categoría</label>
+                <select
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded-[8px] px-3 py-2 text-[14px] text-white outline-none focus:border-brand-primary"
+                  value={savePlatilloModal.categoria}
+                  onChange={e => setSavePlatilloModal(p => p ? { ...p, categoria: e.target.value } : p)}
+                >
+                  <option value="DESAYUNO">Desayuno</option>
+                  <option value="ALMUERZO">Almuerzo</option>
+                  <option value="COLACIÓN">Colación</option>
+                  <option value="PRE-ENTRENO">Pre-Entreno</option>
+                  <option value="POST-ENTRENO">Post-Entreno</option>
+                  <option value="CENA">Cena</option>
+                  <option value="PROCESADO">Procesado</option>
+                  <option value="PERSONALIZADO">Personalizado</option>
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 mt-5">
+              <button
+                onClick={() => setSavePlatilloModal(null)}
+                className="flex-1 py-2 border border-[#333] rounded-[8px] text-[13px] text-[#8a8a8a] hover:text-white transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveTiempoAsPlatillo}
+                disabled={savingPlatillo}
+                className="flex-1 py-2 bg-brand-primary text-black rounded-[8px] text-[13px] font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              >
+                {savingPlatillo ? 'Guardando...' : 'Guardar Platillo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-    {ConfirmDialogComponent}
+      {ConfirmDialogComponent}
     </>
   );
 };
@@ -1275,10 +1400,10 @@ export default function CreateEditPlan() {
   const valoracionId = searchParams.get('valoracionId') || undefined;
 
   return (
-    <CreateEditPlanForm 
-      pacienteId={pacienteId} 
-      planId={planId} 
-      valoracionId={valoracionId} 
+    <CreateEditPlanForm
+      pacienteId={pacienteId}
+      planId={planId}
+      valoracionId={valoracionId}
     />
   );
 }
