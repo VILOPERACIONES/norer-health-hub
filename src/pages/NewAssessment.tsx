@@ -349,6 +349,35 @@ const NewAssessment = () => {
     }
 
     try {
+      // 1. Verificamos cambios de contacto ANTES de guardar la valoración
+      if (calcomData) {
+        const hasChanges = calcomData.name !== paciente?.nombre ||
+          calcomData.email !== paciente?.email ||
+          (calcomData.phone && calcomData.phone !== paciente?.telefono);
+
+        if (hasChanges) {
+          try {
+            await api.put(`/api/pacientes/${pacienteId}`, {
+              nombre: calcomData.name,
+              email: calcomData.email,
+              telefono: calcomData.phone
+            });
+          } catch (updateErr: any) {
+            const msg = updateErr.response?.data?.error || updateErr.response?.data?.message || updateErr.message || '';
+            if (updateErr.response?.status === 409 || msg.toLowerCase().includes('telefono') || msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('correo') || msg.toLowerCase().includes('email')) {
+               toast({ title: 'Dato Duplicado en Contacto', description: msg, variant: 'destructive', duration: 8000 });
+               setSaving(false);
+               return; // Detenemos la ejecución si hay un duplicado crítico
+            }
+            console.error('Error actualizando paciente:', updateErr);
+            toast({ title: 'Error de Contacto', description: msg, variant: 'destructive' });
+            // Dejamos que pase la respuesta de error de actualizar contacto para no bloquear el plan si es otro tipo de error? No, mejor abortar.
+            setSaving(false);
+            return;
+          }
+        }
+      }
+
       let valoracionResId = valoracionId;
       if (isEdit) {
         await api.put(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`, body);
@@ -366,23 +395,6 @@ const NewAssessment = () => {
 
       // AGENDAR CITA EN SEGUNDO PLANO SI HAY DATOS
       if (calcomData) {
-        // Si los datos de contacto cambiaron, actualizamos al paciente primario
-        const hasChanges = calcomData.name !== paciente.nombre ||
-          calcomData.email !== paciente.email ||
-          (calcomData.phone && calcomData.phone !== paciente.telefono);
-
-        if (hasChanges) {
-          try {
-            await api.put(`/api/pacientes/${pacienteId}`, {
-              nombre: calcomData.name,
-              email: calcomData.email,
-              telefono: calcomData.phone
-            });
-          } catch (updateErr) {
-            console.error('Error actualizando paciente:', updateErr);
-          }
-        }
-
         // AGENDAR CITA SINCRÓNICAMENTE PARA EVITAR RACE CONDITIONS EN LA SIGUIENTE PANTALLA
         try {
           await api.post('/api/citas/agendar', {

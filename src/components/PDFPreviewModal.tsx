@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, FileText, Check, Settings2 } from 'lucide-react';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
@@ -50,20 +50,37 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
     }
   };
 
-  useEffect(() => {
-    if (isOpen && planId) {
-      fetchPdf(meta);
-    }
-  }, [isOpen, planId]);
+  // Ref para distinguir entre la carga inicial y cambios del usuario en meta
+  const isInitialLoad = useRef(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isOpen && planId) {
-      const handler = setTimeout(() => {
-        fetchPdf(meta);
-      }, 1000);
-      return () => clearTimeout(handler);
+    if (!isOpen || !planId) {
+      // Al cerrar: limpiar estado para la próxima apertura
+      if (!isOpen) {
+        isInitialLoad.current = true;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      }
+      return;
     }
-  }, [meta, isOpen, planId]);
+
+    if (isInitialLoad.current) {
+      // Primera apertura: cargar inmediatamente sin debounce
+      isInitialLoad.current = false;
+      fetchPdf(meta);
+    } else {
+      // Cambios subsecuentes (toggles del usuario): debounce de 900ms
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        fetchPdf(meta);
+      }, 900);
+    }
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [isOpen, meta, planId]);
+
 
   const handleToggle = (key: string) => {
     setMeta({ ...meta, [key]: !meta[key] });
