@@ -181,10 +181,21 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     setShowDropdown(filtered.length > 0);
   }, [query, allAlimentos]);
 
+  // ─── Sistema de redondeo especial para EQUIVALENCIAS ────────────────────
+  // Regla: decimal ≤ 0.3 → entero hacia abajo  |  0.4 → 0.5  |  ≥ 0.5 y ≤ 0.6 → 0.5  |  > 0.6 → entero hacia arriba
+  // Resumen: solo puede resultar en entero o .5
+  const roundEq = (val: number): number => {
+    const base = Math.floor(val);
+    const dec  = val - base;
+    if (dec <= 0.3) return base;            // baja al entero
+    if (dec <= 0.6) return base + 0.5;     // punto medio
+    return base + 1;                        // sube al entero
+  };
+
   // ─── Función núcleo: calcular eq a partir de gramos ───────────────────────
-  // Usa smaeGrPorEq. Sólo actualiza el primer grupo de equivalencias (el del catálogo).
+  // Usa smaeGrPorEq. Redondea con roundEq para solo producir enteros o .5
   const grToEq = (gr: number, grxeq: number): number =>
-    grxeq > 0 ? parseFloat((gr / grxeq).toFixed(2)) : 0;
+    grxeq > 0 ? roundEq(gr / grxeq) : 0;
 
   // ─── Función inversa: calcular gramos a partir de eq ─────────────────────
   const eqToGr = (eq: number, grxeq: number): number =>
@@ -252,113 +263,126 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     });
   };
 
-  // ─── Cambio en GRAMOS → recalcular eq ────────────────────────────────────
-  // Sólo funciona cuando smaeGrPorEq > 0 (alimento del catálogo)
+  // ─── Cambio en GRAMOS (o cualquier cantidad) → recalcular eq ─────────────
+  // Prioridad: 1) ancla smaeGrPorEq en GR  2) ancla inferida  3) sin ancla
   const handleCantidadChange = (val: string) => {
     const num = parseFloat(val);
-    const prevCantNum = parseFloat(cantidad);
     setCantidad(val);
 
-    // Intentar inferir anclaje si no lo tenemos (para ingredientes manuales/importados)
+    if (isNaN(num) || num <= 0) {
+      onUpdate({ cantidad: 0, unidad, smaeGrPorEq });
+      return;
+    }
+
+    // Leer ancla actual
     let activeAnchor = smaeGrPorEq;
     const firstEqNum = parseFloat(equivalencias[0]?.cantidad?.toString() || '0');
-    if (activeAnchor === 0 && prevCantNum > 0 && firstEqNum > 0) {
-      activeAnchor = parseFloat((prevCantNum / firstEqNum).toFixed(3));
+    const prevCantNum = parseFloat(cantidad);
+
+    // Inferir ancla solo si NO la tenemos y estamos en GR
+    if (activeAnchor === 0 && prevCantNum > 0 && firstEqNum > 0 && unidad === 'GR') {
+      activeAnchor = parseFloat((prevCantNum / firstEqNum).toFixed(6));
       setSmaeGrPorEq(activeAnchor);
     }
 
-    if (activeAnchor > 0 && num > 0) {
-      if (unidad !== 'GR' && equivalencias[0] && prevCantNum > 0) {
-        // Regla de tres inversa para mantener unidades como "PIEZAS"
-        const prevEq = parseFloat(equivalencias[0].cantidad.toString());
-        if (prevEq > 0) {
-          const eqVal = parseFloat(((num / prevCantNum) * prevEq).toFixed(2));
-          const newEquivs = equivalencias.map((e, i) => i === 0 ? { ...e, cantidad: eqVal } : e);
-          setEquivalencias(newEquivs);
-          onUpdate({ cantidad: num, unidad, equivalencias: newEquivs, eqCantidad: eqVal, eqGrupo: newEquivs[0].grupo, smaeGrPorEq: activeAnchor });
-          
-          lastSentUpdate.current = JSON.stringify({
-            cantidad: num,
-            unidad,
-            descripcion: query,
-            equivalencias: newEquivs,
-            smaeGrPorEq: activeAnchor
-          });
-          return;
+    if (activeAnchor > 0) {
+      let eqVal: number;
+
+      if (unidad === 'GR') {
+        // Canónico: gramos ÷ ancla = eq  (siempre exacto)
+        eqVal = grToEq(num, activeAnchor);
+      } else {
+        // Unidad casera (PZA, taza…)
+        // La ancla ya incluye la relación gramos/eq del catálogo.
+        // Para convertir piezas → eq necesitamos saber cuántas piezas = 1 eq.
+        // Eso lo tenemos como: piezas_por_eq = prevCantNum / prevEq  (calculado en la primera selección).
+        // Como smaeGrPorEq es g/eq y el alimento tiene cantidadPorcion piezas = 1 eq,
+        // usamos la última relación conocida (prevCant piezas = prevEq eq) para escalar.
+        if (prevCantNum > 0 && firstEqNum > 0) {
+          // piezas_por_eq = prevCantNum / firstEqNum  (ratio fijo, no deriva)
+          // eq = num / piezas_por_eq = num * firstEqNum / prevCantNum   ← usamos roundEq
+          // Pero prevCant puede cambiar en ciclos; para que no derive, lo fijamos:
+          // eq basada en ancla: 1 eq = alimento.cantidadPorcion piezas
+          // La información de cuántas piezas = 1 eq está implícita en smaeGrPorEq:
+          // si unidad!=GR, el primer update cargó prevCant=cantidadPorcion y prevEq=eqVal
+          // El ratio piezas/eq es estable = prevCantNum/firstEqNum SOLO si no hubo cambio de eq previo.
+          // Para evitar deriva, calculamos eq usando la relación fijada:
+          eqVal = roundEq((num * firstEqNum) / prevCantNum);
+        } else {
+          eqVal = firstEqNum; // fallback: no cambia eq
         }
       }
-      
-      // Fallback a GR absoluto si no había historial de piezas
-      const eqVal = grToEq(num, activeAnchor);
+
       const newEquivs = equivalencias.map((e, i) => i === 0 ? { ...e, cantidad: eqVal } : e);
       setEquivalencias(newEquivs);
-      setUnidad('GR');
-      onUpdate({ cantidad: num, unidad: 'GR', equivalencias: newEquivs, eqCantidad: eqVal, eqGrupo: newEquivs[0].grupo, smaeGrPorEq: activeAnchor });
-      
-      lastSentUpdate.current = JSON.stringify({
-        cantidad: num,
-        unidad: 'GR',
-        descripcion: query,
+      onUpdate({
+        cantidad: num, unidad,
         equivalencias: newEquivs,
-        smaeGrPorEq: activeAnchor
+        eqCantidad: eqVal,
+        eqGrupo: newEquivs[0]?.grupo,
+        smaeGrPorEq: activeAnchor,
       });
+      lastSentUpdate.current = JSON.stringify({ cantidad: num, unidad, descripcion: query, equivalencias: newEquivs, smaeGrPorEq: activeAnchor });
     } else {
-      onUpdate({ cantidad: num || 0, unidad, smaeGrPorEq: activeAnchor });
-      lastSentUpdate.current = JSON.stringify({
-        cantidad: num || 0,
-        unidad,
-        descripcion: query,
-        equivalencias,
-        smaeGrPorEq: activeAnchor
-      });
+      // Sin ancla: guardamos solo la cantidad sin tocar las eq
+      onUpdate({ cantidad: num, unidad, smaeGrPorEq: 0 });
+      lastSentUpdate.current = JSON.stringify({ cantidad: num, unidad, descripcion: query, equivalencias, smaeGrPorEq: 0 });
     }
   };
 
-  // ─── Cambio en EQ (primer grupo o cualquiera) ─────────────────────
-  // Si idx === 0 y tiene ancla SMAE (o podemos inferir ratio), el cambio regenera los gramos
+  // ─── Cambio en EQ (primer grupo o cualquiera) ─────────────────────────────
+  // Si idx === 0 y tiene ancla SMAE, el cambio regenera la cantidad con exactitud
   const handleEqChange = (idx: number, val: string) => {
     const eqNum = parseFloat(val);
     const oldEquivs = [...equivalencias];
+    // Guardamos el valor raw mientras el usuario escribe; si es número lo almacenamos como tal
     const newEquivs = oldEquivs.map((e, i) =>
       i === idx ? { ...e, cantidad: isNaN(eqNum) ? val : eqNum } : e
     );
     setEquivalencias(newEquivs);
 
-    // Inferir ancla de gramaje si es 0
+    // Leer ancla actual
     let activeAnchor = smaeGrPorEq;
-    const oldEq0 = parseFloat(oldEquivs[0]?.cantidad?.toString() || '0');
+    const oldEq0  = parseFloat(oldEquivs[0]?.cantidad?.toString() || '0');
     const oldCant = parseFloat(cantidad);
-    
-    if (activeAnchor === 0 && oldCant > 0 && oldEq0 > 0) {
-      activeAnchor = parseFloat((oldCant / oldEq0).toFixed(3));
+
+    // Inferir ancla SOLO si no la tenemos y tenemos suficiente info en GR
+    if (activeAnchor === 0 && oldCant > 0 && oldEq0 > 0 && unidad === 'GR') {
+      activeAnchor = parseFloat((oldCant / oldEq0).toFixed(6));
       setSmaeGrPorEq(activeAnchor);
     }
 
     let updates: Partial<Ingrediente> = {
       equivalencias: newEquivs,
-      eqCantidad: parseFloat(newEquivs[0].cantidad.toString()) || 0,
+      eqCantidad: isNaN(eqNum) ? 0 : eqNum,
       eqGrupo: newEquivs[0].grupo,
       smaeGrPorEq: activeAnchor,
     };
 
-    // Si es el primer grupo, intentamos escalar los gramos
-    if (idx === 0 && eqNum > 0) {
+    // Si es el primer grupo y el número es válido, recalculamos la cantidad
+    if (idx === 0 && !isNaN(eqNum) && eqNum > 0) {
       if (activeAnchor > 0) {
-        // Método A: Usar ancla absoluta (preferido)
         if (unidad === 'GR') {
-           const newGr = eqToGr(eqNum, activeAnchor);
-           setCantidad(newGr.toString());
-           updates.cantidad = newGr;
-           updates.unidad = 'GR';
-        } else if (oldEq0 > 0 && oldCant > 0) {
-           // Si no es GR (ej. PZA), escalamos proporcionalmente
-           const newCant = parseFloat(((oldCant / oldEq0) * eqNum).toFixed(1));
-           setCantidad(newCant.toString());
-           updates.cantidad = newCant;
+          // ✅ Canónico GR: ancla × eq = gramos EXACTOS (nunca deriva)
+          const newGr = eqToGr(eqNum, activeAnchor);
+          setCantidad(newGr.toString());
+          updates.cantidad = newGr;
+          updates.unidad = 'GR';
+        } else {
+          // Unidad casera: rescalamos proporcionalmente (piezas_por_eq × eqNum)
+          // piezas_por_eq = oldCant / oldEq0  (ratio estable fijado al seleccionar el alimento)
+          if (oldEq0 > 0 && oldCant > 0) {
+            // Calculamos cuántas piezas corresponden a 1 eq y multiplicamos
+            const piezasPorEq = oldCant / oldEq0;
+            const newCant = parseFloat((piezasPorEq * eqNum).toFixed(2));
+            setCantidad(newCant.toString());
+            updates.cantidad = newCant;
+          }
         }
       } else if (oldEq0 > 0 && oldCant > 0) {
-        // Método B: Sin ancla, usamos regla de tres basada en el valor actual
-        const newCant = parseFloat(((oldCant / oldEq0) * eqNum).toFixed(1));
+        // Sin ancla en absoluto: regla de tres simple
+        const scale = eqNum / oldEq0;
+        const newCant = parseFloat((oldCant * scale).toFixed(2));
         setCantidad(newCant.toString());
         updates.cantidad = newCant;
       }
@@ -366,7 +390,6 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
 
     onUpdate(updates);
 
-    // Evitar que el useEffect nos sobreescriba esta actualización inmediata
     lastSentUpdate.current = JSON.stringify({
       cantidad: updates.cantidad ?? Number(cantidad),
       unidad: updates.unidad ?? unidad,

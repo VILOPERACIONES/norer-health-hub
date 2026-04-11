@@ -6,7 +6,8 @@ import {
   Users, UserPlus, ClipboardList, Activity, Plus,
   MessageSquare, BookOpen, Trophy, MoreHorizontal,
   Clock, Check, Square, ChevronDown, ChevronsLeft,
-  ChevronLeft, ChevronRight, ChevronsRight, ArrowUpRight, ArrowDownRight
+  ChevronLeft, ChevronRight, ChevronsRight, ArrowUpRight, ArrowDownRight,
+  CalendarCheck2, AlertTriangle
 } from 'lucide-react';
 import api from '@/lib/api';
 import type { DashboardMetricas, Alerta } from '@/types';
@@ -78,6 +79,12 @@ const Dashboard = () => {
         }
         const statusInfo = getBadgeForValuation(val);
         if (statusInfo.text !== 'Enviado') {
+          // Próxima sesión: fuente primaria = cita vinculada a la valoración (val.tieneCita)
+          // Fallback = plan.proximaSesion (guardado al confirmar desde el plan)
+          const planData = val.plan;
+          const proximaSesion = val.tieneCita
+            ? (val.proximaCita || true)
+            : (planData?.proximaSesion || null);
           pendItems.push({
             pacienteId: pac.id,
             nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
@@ -85,6 +92,7 @@ const Dashboard = () => {
             numeroValoracion: val.numeroValoracion,
             val,
             statusInfo,
+            proximaSesion,
           });
         }
       });
@@ -323,6 +331,7 @@ const Dashboard = () => {
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Nombre de Paciente</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Estatus</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Fecha de Consulta</th>
+                  <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a] text-center">Próxima sesión</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
@@ -338,6 +347,7 @@ const Dashboard = () => {
                       ? new Date(item.fecha.includes('T') ? item.fecha.split('T')[0] + 'T12:00:00' : item.fecha)
                           .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—';
+                    const hasNextSession = !!item.proximaSesion;
                     return (
                       <tr
                         key={`${item.pacienteId}-${item.val.id || i}`}
@@ -357,6 +367,17 @@ const Dashboard = () => {
                         </td>
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
                           {dateStr}
+                        </td>
+                        <td className="px-3 py-[14px] text-center">
+                          {hasNextSession ? (
+                            <span title={item.proximaSesion} className="inline-flex items-center justify-center">
+                              <CalendarCheck2 className="w-4 h-4 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span title="Sin cita agendada" className="inline-flex items-center justify-center">
+                              <AlertTriangle className="w-4 h-4 text-amber-500/60" />
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );

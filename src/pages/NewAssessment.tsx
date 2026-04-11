@@ -328,6 +328,27 @@ const NewAssessment = () => {
     if (!estatura) { toast({ title: 'Campo requerido', description: 'La estatura es obligatoria.', variant: 'destructive' }); return; }
 
     setSaving(true);
+    
+    // Asignar fechas al esquema de suplementos justo al guardar (estrategia de mutación en frío)
+    const suplementosParaGuardar = suplementacionActiva ? suplementosDetalle.map(sup => {
+      const s = { ...sup };
+      if (s.activo) {
+        // Si estaba suspendido previamente (tiene fechaFin) y lo reactivan, es una 'Nueva Cuenta' (ciclo 0)
+        if (s.fechaFin) {
+          s.fechaInicio = new Date().toISOString();
+          s.fechaFin = undefined;
+        } else if (!s.fechaInicio) {
+          s.fechaInicio = new Date().toISOString();
+        }
+      } else {
+        // Lo apagan en esta sesión, congelamos el tiempo en este instante
+        if (!s.fechaFin) {
+          s.fechaFin = new Date().toISOString();
+        }
+      }
+      return s;
+    }) : [];
+
     const body: Record<string, any> = {
       fecha, hora,
       numeroValoracion,
@@ -337,7 +358,7 @@ const NewAssessment = () => {
       comentarios,
       temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
-      suplementosDetalle: suplementacionActiva ? suplementosDetalle : [],
+      suplementosDetalle: suplementosParaGuardar,
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
@@ -694,16 +715,30 @@ const NewAssessment = () => {
                           />
                           <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
                             {(() => {
-                              if (!sup.fechaInicio) return 'Nuevo';
+                              if (!sup.fechaInicio) return '0 días';
+                              
+                              let end = new Date();
+                              let suffix = '';
+
+                              if (sup.activo) {
+                                // Si está encendido pero ya tenía una fechaFin de antes, significa que lo están "Reactivando" ahora mismo.
+                                if (sup.fechaFin) return '0 días';
+                                suffix = ' (En curso)';
+                              } else {
+                                // Si está apagado, calculamos los días congelados (o hasta hoy si recién se apaga en la UI)
+                                end = sup.fechaFin ? new Date(sup.fechaFin) : new Date();
+                                suffix = ' (Pausado)';
+                              }
+
                               const start = new Date(sup.fechaInicio);
-                              const end = sup.activo ? new Date() : (sup.fechaFin ? new Date(sup.fechaFin) : new Date());
-                              if (isNaN(start.getTime()) || isNaN(end.getTime())) return 'Reciente';
+                              if (isNaN(start.getTime()) || isNaN(end.getTime())) return '0 días';
+                              
                               const diffTime = Math.max(0, end.getTime() - start.getTime());
                               const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
                               const meses = Math.floor(diffDays / 30);
-                              const extra = diffDays % 30;
-                              if (meses > 0) return `${meses} mes${meses > 1 ? 'es' : ''}${extra > 0 ? ' y ' + extra + ' d' : ''}`;
-                              return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+                              
+                              if (meses > 0) return `${meses} mes${meses > 1 ? 'es' : ''}${suffix}`;
+                              return `${diffDays} día${diffDays !== 1 ? 's' : ''}${suffix}`;
                             })()}
                           </div>
                           <div className="flex items-center justify-center w-[80px]">
@@ -715,11 +750,8 @@ const NewAssessment = () => {
                                 onChange={(e) => {
                                   const newArr = [...suplementosDetalle];
                                   newArr[idx].activo = e.target.checked;
-                                  if (!e.target.checked) {
-                                    newArr[idx].fechaFin = new Date().toISOString();
-                                  } else {
-                                    newArr[idx].fechaFin = undefined;
-                                  }
+                                  // Las fechas se asignan o limpian de verdad al hacer submit (handleSave).
+                                  // Aquí el toggle es puramente visual para que el nutriólogo no pierda los días si lo activa por error.
                                   setSuplementosDetalle(newArr);
                                 }}
                               />

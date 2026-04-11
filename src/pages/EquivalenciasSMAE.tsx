@@ -1,10 +1,15 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal, Minus } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+interface EquivalenciaExtra {
+  grupo: string;
+  cantidad: number | string;
+}
+
 interface AlimentoSMAE {
   id: string;
   nombre: string;
@@ -16,6 +21,7 @@ interface AlimentoSMAE {
   unidadPorcion: string | null;
   notas: string | null;
   esPersonalizado: boolean;
+  equivalencias?: EquivalenciaExtra[] | string | null; // Grupos SMAE adicionales
 }
 
 const UNIDADES_BASE = [
@@ -64,6 +70,7 @@ const EMPTY_FORM: Omit<AlimentoSMAE, 'id'> = {
   unidadPorcion: '',
   notas: '',
   esPersonalizado: true,
+  equivalencias: [],
 };
 
 // ─── Badge de grupo ──────────────────────────────────────────────────────────
@@ -75,6 +82,16 @@ const GrupoBadge = ({ grupo }: { grupo: string }) => {
       {g.label}
     </span>
   );
+};
+
+// ─── Componentes auxiliares ───────────────────────────────────────────────────
+const parseEquivs = (raw: AlimentoSMAE['equivalencias']): EquivalenciaExtra[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(e => e.grupo);
+  if (typeof raw === 'string') {
+    try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr.filter((e: any) => e.grupo) : []; } catch { return []; }
+  }
+  return [];
 };
 
 // ─── Modal Alimento ──────────────────────────────────────────────────────────
@@ -92,6 +109,17 @@ const ModalAlimento = ({
   );
   const [saving, setSaving] = useState(false);
 
+  // ─── Equivalencias adicionales (multi-grupo) ────────────────────────
+
+  const [extraEquivs, setExtraEquivs] = useState<EquivalenciaExtra[]>(
+    parseEquivs(inicial?.equivalencias)
+  );
+
+  const addEquiv   = () => setExtraEquivs(prev => [...prev, { grupo: '', cantidad: '' }]);
+  const removeEquiv = (i: number) => setExtraEquivs(prev => prev.filter((_, idx) => idx !== i));
+  const updateEquiv = (i: number, field: keyof EquivalenciaExtra, val: string) =>
+    setExtraEquivs(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: field === 'cantidad' ? (parseFloat(val) || val) : val } : e));
+
   const set = (k: keyof typeof form, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async () => {
@@ -99,7 +127,8 @@ const ModalAlimento = ({
     if (!form.pesoGramos || form.pesoGramos <= 0) return;
     setSaving(true);
     try {
-      await onSave(form);
+      const validEquivs = extraEquivs.filter(e => e.grupo.trim());
+      await onSave({ ...form, equivalencias: validEquivs.length > 0 ? validEquivs : [] });
     } finally {
       setSaving(false);
     }
@@ -180,6 +209,56 @@ const ModalAlimento = ({
             </p>
           </div>
 
+          {/* Equivalencias adicionales */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-text-secondary m-0">Equivalencias adicionales <span className="text-text-muted font-normal">(opcional)</span></label>
+              <button
+                type="button"
+                onClick={addEquiv}
+                className="flex items-center gap-1 text-[11px] text-[#90c2ff] hover:text-white transition-colors px-2 py-1 rounded-[6px] hover:bg-[#1a2a3a] border border-[#90c2ff]/20"
+              >
+                <Plus className="w-3 h-3" /> Añadir grupo
+              </button>
+            </div>
+            {extraEquivs.length === 0 && (
+              <p className="text-[11px] text-text-muted italic">
+                Usa esto si el alimento cuenta como más de 1 grupo SMAE. Ej: leche entera = 1 eq leche + 1 eq grasa.
+              </p>
+            )}
+            {extraEquivs.map((eq, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={eq.cantidad.toString()}
+                  onChange={e => updateEquiv(idx, 'cantidad', e.target.value)}
+                  placeholder="Cant."
+                  min="0"
+                  step="0.5"
+                  className="w-20 bg-bg-elevated rounded-[8px] px-2 py-2 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="text-[11px] text-text-muted flex-shrink-0">eq</span>
+                <select
+                  value={eq.grupo}
+                  onChange={e => updateEquiv(idx, 'grupo', e.target.value)}
+                  className="flex-1 bg-bg-elevated rounded-[8px] px-2 py-2 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none"
+                >
+                  <option value="">Selecciona grupo...</option>
+                  {GRUPOS_KEYS.map(k => (
+                    <option key={k} value={GRUPOS_CONFIG[k].label}>{GRUPOS_CONFIG[k].label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeEquiv(idx)}
+                  className="p-1.5 text-text-muted hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+
           {/* Porción casera */}
           <div className="space-y-3">
             <label className="text-[12px] font-medium text-text-secondary m-0">Porción casera (opcional)</label>
@@ -222,15 +301,22 @@ const ModalAlimento = ({
               className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none resize-none"
             />
           </div>
+
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 pb-6 gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             {form.pesoGramos > 0 && (
-              <span className="text-[12px] text-text-muted">
+              <div className="flex flex-wrap items-center gap-2 text-[12px] text-text-muted">
                 → <strong className="text-text-primary">{form.pesoGramos}{form.unidadBase || 'g'}</strong> = 1 eq · <GrupoBadge grupo={form.grupo} />
-              </span>
+                {extraEquivs.filter(e => e.grupo && e.cantidad).map((eq, i) => (
+                  <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
+                    <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>
+                    <span className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-wider">{eq.grupo}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex gap-2">
@@ -446,7 +532,15 @@ const EquivalenciasSMAE = () => {
                       {a.notas && <p className="text-[12px] text-text-muted m-0 mt-0.5 italic">{a.notas}</p>}
                     </td>
                     <td className="px-4 py-3">
-                      <GrupoBadge grupo={a.grupo} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <GrupoBadge grupo={a.grupo} />
+                        {parseEquivs(a.equivalencias).map((eq, i) => (
+                          <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
+                            <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>
+                            <span className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-wider">{eq.grupo}</span>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="text-[14px] font-bold text-text-primary">{a.pesoGramos}</span>

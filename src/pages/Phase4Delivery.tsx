@@ -12,14 +12,20 @@ interface Phase4DeliveryProps {
 
 export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryProps) {
   const { toast } = useToast();
-  const [meta, setMeta] = useState<any>({
-    showPageHistorial: true,
-    showPageMenus: true,
-    showPageIntercambio: true,
-    showPageExtras: true,
-    notaAmarilla: '',
-    precioEspecial: '',
-    soloEquivalencias: false,
+  const [meta, setMeta] = useState<any>(() => {
+    const saved = localStorage.getItem('norder_pdfCustomMetaPrefs');
+    const defaultPrefs = saved ? JSON.parse(saved) : {};
+    return {
+      showPageHistorial: true,
+      showPageMenus: true,
+      showPageIntercambio: true,
+      showPageExtras: true,
+      showContacto: true,
+      soloEquivalencias: false,
+      ...defaultPrefs, // Aplica las que tengan guardadas en localStorage
+      notaAmarilla: '',
+      precioEspecial: '',
+    };
   });
 
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -73,7 +79,19 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   }, [meta, loadingInitial]);
 
   const handleToggle = (key: string) => {
-    setMeta({ ...meta, [key]: !meta[key] });
+    const newMeta = { ...meta, [key]: !meta[key] };
+    setMeta(newMeta);
+    
+    // Guardar opciones booleanas en preferencias
+    const prefsToSave = {
+      showPageHistorial: newMeta.showPageHistorial !== false,
+      showPageMenus: newMeta.showPageMenus !== false,
+      showPageIntercambio: newMeta.showPageIntercambio !== false,
+      showPageExtras: newMeta.showPageExtras !== false,
+      showContacto: newMeta.showContacto !== false,
+      soloEquivalencias: newMeta.soloEquivalencias === true,
+    };
+    localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
   const handleTextChange = (key: string, value: string) => {
     setMeta({ ...meta, [key]: value });
@@ -137,6 +155,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
             <h3 className="text-[12px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Selección de Hojas</h3>
             <div className="space-y-2.5">
               <ToggleItem label="1. Historial y Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
+              <ToggleItem label="Correo y Teléfono del paciente" active={meta.showContacto !== false} onChange={() => handleToggle('showContacto')} isSubItem />
               <ToggleItem label="2. Menús de Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
               <ToggleItem label="Solo equivalencias (Sin platillos)" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
               <ToggleItem label="3. Lista de Intercambio (SMAE)" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />

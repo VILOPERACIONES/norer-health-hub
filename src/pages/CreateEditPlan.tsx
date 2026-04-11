@@ -1156,13 +1156,15 @@ export const CreateEditPlanForm = ({
                             >
                               <BookOpen className="w-4 h-4" /> Importar Alimentos
                             </button>
-                            <button
-                              onClick={() => setSavePlatilloModal({ mIdx: mi, tIdx: ti, nombre: tiempo.nombre, categoria: 'PERSONALIZADO' })}
-                              className="py-2.5 px-3.5 bg-[#1a1a1a] border border-[#333] text-[#a97fff] hover:text-white hover:border-[#a97fff]/40 hover:bg-[#251d36] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center gap-1.5"
-                              title="Guardar tiempo como Platillo"
-                            >
-                              <Bookmark className="w-4 h-4" /> Guardar
-                            </button>
+                            {tiempo.ingredientes.length > 0 && (
+                              <button
+                                onClick={() => setSavePlatilloModal({ mIdx: mi, tIdx: ti, nombre: tiempo.nombre, categoria: 'PERSONALIZADO' })}
+                                className="py-2.5 px-3.5 bg-[#1a1a1a] border border-[#333] text-[#a97fff] hover:text-white hover:border-[#a97fff]/40 hover:bg-[#251d36] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center gap-1.5"
+                                title="Guardar tiempo como Platillo"
+                              >
+                                <Bookmark className="w-4 h-4" /> Guardar
+                              </button>
+                            )}
                           </div>
 
                           {showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti && (
