@@ -36,13 +36,26 @@ const KpiCardCompact = ({ label, value, active, icon: Icon }: { label: string, v
   </div>
 );
 
-const ChartBox = ({ title, children, extra }: { title: string, children: React.ReactNode, extra?: React.ReactNode }) => (
-  <div className="border border-border-subtle p-6 bg-bg-surface flex flex-col rounded-[12px] min-h-[300px]">
+const ChartBox = ({ title, children, extra, onExpand }: { title: string, children: React.ReactNode, extra?: React.ReactNode, onExpand?: () => void }) => (
+  <div 
+    onClick={onExpand}
+    className={`border border-border-subtle p-6 bg-bg-surface flex flex-col rounded-[12px] min-h-[300px] transition-all ${onExpand ? 'cursor-pointer hover:border-[#555]' : ''}`}
+  >
     <div className="flex items-center justify-between mb-6">
-      <h2 className="text-[12px] font-medium uppercase tracking-widest text-text-secondary leading-none">
-        {title}
-      </h2>
-      {extra}
+      <div className="flex items-center gap-3">
+        <h2 className="text-[12px] font-medium uppercase tracking-widest text-text-secondary leading-none">
+          {title}
+        </h2>
+        {onExpand && (
+          <button className="text-[9px] bg-bg-elevated px-2 py-0.5 rounded border border-border-subtle hover:bg-[#333] transition-colors text-text-primary uppercase font-bold tracking-wider mt-[-2px] hover:text-white pointer-events-none">
+            Ver Todo
+          </button>
+        )}
+      </div>
+      {/* prevent clicking the extra buttons (like % | KG) from bubbling up */}
+      <div onClick={(e) => e.stopPropagation()}>
+        {extra}
+      </div>
     </div>
     <div className="w-full flex-1 min-h-0">
       {children}
@@ -235,6 +248,9 @@ const PatientProfile = () => {
   const [loading, setLoading] = useState(true);
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
+  const [fullChartModal, setFullChartModal] = useState<{ 
+    isOpen: boolean, title: string, baseDataKey: string, baseName: string, isFatModal?: boolean
+  }>({ isOpen: false, title: '', baseDataKey: '', baseName: '' });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -323,7 +339,8 @@ const PatientProfile = () => {
   };
 
   const currentVal = valoraciones[0];
-  const historyData = [...valoraciones].reverse();
+  const fullHistoryData = [...valoraciones].reverse();
+  const previewHistoryData = valoraciones.length > 5 ? [...valoraciones].slice(0, 5).reverse() : fullHistoryData;
 
   return (
     <>
@@ -463,9 +480,12 @@ const PatientProfile = () => {
 
         {/* PROGRESS CHARTS HIGH-CONTRAST */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <ChartBox title="Evolución de Peso (KG)">
+          <ChartBox 
+            title="Evolución de Peso (KG)" 
+            onExpand={() => setFullChartModal({ isOpen: true, title: 'Evolución de Peso Completa', baseDataKey: 'pesoEvolucion', baseName: 'Peso' })}
+          >
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
                 <defs>
                   <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f0f0f0" stopOpacity={0.15}/>
@@ -506,9 +526,12 @@ const PatientProfile = () => {
             </ResponsiveContainer>
           </ChartBox>
 
-          <ChartBox title="Masa Magra (KG)">
+          <ChartBox 
+            title="Masa Magra (KG)"
+            onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Masa Magra', baseDataKey: 'masaMagraEvolucion', baseName: 'Masa Magra' })}
+          >
                <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
                 <XAxis 
                   dataKey="fecha" 
@@ -540,6 +563,8 @@ const PatientProfile = () => {
 
           <ChartBox 
             title="Grasa Corporal" 
+            onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Grasa Corporal', baseDataKey: '', baseName: '', isFatModal: true })}
+
             extra={
               <div className="flex bg-bg-elevated p-0.5 rounded-[6px] border border-border-subtle">
                 <button 
@@ -558,7 +583,7 @@ const PatientProfile = () => {
             }
           >
              <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={historyData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
                 <XAxis 
                   dataKey="fecha" 
@@ -579,7 +604,7 @@ const PatientProfile = () => {
                   key={fatChartMode}
                   type="monotone" 
                   dataKey={fatChartMode === 'pct' ? "grasaEvolucion" : "kgGrasaEvolucion"} 
-                  name={fatChartMode === 'pct' ? "Porcenteja de Grasa (%)" : "Kilos Grasa (KG)"}
+                  name={fatChartMode === 'pct' ? "Porcentaje de Grasa (%)" : "Kilos Grasa (KG)"}
                   stroke={fatChartMode === 'pct' ? "#f0f0f0" : "#f0f0f0"} 
                   strokeWidth={2} 
                   fill="rgba(240, 240, 240, 0.05)"
@@ -620,6 +645,57 @@ const PatientProfile = () => {
         </section>
       </div>
     </div>
+
+    {/* MODAL HISTORIAL COMPLETO */}
+    {fullChartModal.isOpen && (
+      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setFullChartModal(prev => ({...prev, isOpen: false}))}>
+        <div className="bg-bg-base border border-border-default rounded-[16px] w-full max-w-4xl p-8 relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+          <button 
+            onClick={() => setFullChartModal(prev => ({...prev, isOpen: false}))}
+            className="absolute top-6 right-6 p-2 rounded-[8px] bg-bg-surface hover:bg-bg-elevated text-text-secondary hover:text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <div className="mb-8">
+            <h2 className="text-[20px] font-bold text-white uppercase tracking-wider m-0">{fullChartModal.title}</h2>
+            <p className="text-[13px] text-text-muted mt-1 m-0">Gráfica detallada de toda la evolución temporal del paciente ({fullHistoryData.length} registros)</p>
+          </div>
+          
+          <div style={{ width: '100%', height: '400px', marginTop: '16px' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={fullHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                 <XAxis 
+                   dataKey="fecha" 
+                   tickFormatter={(val) => formatDateShort(val)}
+                   tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                   axisLine={false}
+                   tickLine={false}
+                   dy={10}
+                 />
+                 <YAxis 
+                   tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                   axisLine={false}
+                   tickLine={false}
+                   domain={['auto', 'auto']}
+                 />
+                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0', fontSize: '12px' }} itemStyle={{ color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                 <Area 
+                   type="monotone" 
+                   dataKey={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'grasaEvolucion' : 'kgGrasaEvolucion') : fullChartModal.baseDataKey} 
+                   name={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'Porcentaje de Grasa (%)' : 'Kilos Grasa (KG)') : fullChartModal.baseName}
+                   stroke="#f0f0f0" 
+                   strokeWidth={2} 
+                   fill="rgba(240, 240, 240, 0.05)"
+                   dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                 />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+    )}
+
     {ConfirmDialogComponent}
   </>
   );

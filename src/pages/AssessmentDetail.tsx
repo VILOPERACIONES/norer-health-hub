@@ -220,19 +220,19 @@ const AssessmentDetail = () => {
       });
       toast({ title: 'Cita agendada correctamente', description: 'El paciente recibirá una invitación por correo.' });
       setCalcomData(null);
-      
+
       // Refrescar valoración Y citas del paciente
       const [valRes] = await Promise.all([
         api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`),
         fetchPacienteCitas(),
       ]);
       setVal(valRes.data?.data || valRes.data);
-      
+
     } catch (err: any) {
       let errorMsg = 'Hubo un problema al contactar con la API.';
       if (err.response?.data?.details) {
-        errorMsg = typeof err.response.data.details === 'string' 
-          ? err.response.data.details 
+        errorMsg = typeof err.response.data.details === 'string'
+          ? err.response.data.details
           : JSON.stringify(err.response.data.details);
       } else if (err.response?.data?.error) {
         errorMsg = err.response.data.error;
@@ -333,7 +333,7 @@ const AssessmentDetail = () => {
             ) : (
               <h1 className="text-[28px] font-bold text-text-primary tracking-tight m-0">Detalles de Consulta</h1>
             )}
-            
+
             {val.paciente && (
               <p className="text-[18px] font-semibold text-text-primary mt-1 tracking-tight">
                 Detalles de Consulta
@@ -468,11 +468,10 @@ const AssessmentDetail = () => {
                               <span className={`text-[13px] font-bold leading-tight ${sup.activo ? 'text-text-primary' : 'text-text-muted line-through'}`}>
                                 {sup.nombre}
                               </span>
-                              <span className={`ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[4px] ${
-                                sup.activo
+                              <span className={`ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[4px] ${sup.activo
                                   ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
                                   : 'bg-bg-elevated text-text-muted border border-border-subtle'
-                              }`}>
+                                }`}>
                                 {sup.activo ? 'activo' : 'suspendido'}
                               </span>
                             </div>
@@ -587,8 +586,8 @@ const AssessmentDetail = () => {
                       <CalendarIcon className="w-4 h-4" />
                     </div>
                     <div>
-                       <h3 className="text-[15px] font-semibold text-text-primary m-0">Seguimiento Programado</h3>
-                       <p className="text-[12px] text-text-muted m-0 mt-0.5">Cita agendada para esta consulta</p>
+                      <h3 className="text-[15px] font-semibold text-text-primary m-0">Seguimiento Programado</h3>
+                      <p className="text-[12px] text-text-muted m-0 mt-0.5">Cita agendada para esta consulta</p>
                     </div>
                   </div>
                 </div>
@@ -609,18 +608,18 @@ const AssessmentDetail = () => {
             <>
               <div className="flex items-center justify-between border-b border-border-subtle pb-4">
                 <div className="flex items-center gap-3">
-                   <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
-                     <CalendarIcon className="w-4 h-4" />
-                   </div>
-                   <div>
-                      <h3 className="text-[15px] font-semibold text-text-primary m-0">Agendar Seguimiento</h3>
-                      <p className="text-[12px] text-text-muted m-0 mt-0.5">Envía una invitación formal al paciente usando Cal.com</p>
-                   </div>
+                  <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                    <CalendarIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-text-primary m-0">Agendar Seguimiento</h3>
+                    <p className="text-[12px] text-text-muted m-0 mt-0.5">Envía una invitación formal al paciente usando Cal.com</p>
+                  </div>
                 </div>
               </div>
 
               <div className="pt-2">
-                <CalcomScheduling 
+                <CalcomScheduling
                   pacienteData={val?.paciente ? { nombre: val.paciente.nombre, email: val.paciente.email, telefono: val.paciente.telefono } : undefined}
                   onSelection={setCalcomData}
                 />
