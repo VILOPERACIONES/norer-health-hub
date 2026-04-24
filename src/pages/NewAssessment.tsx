@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -56,6 +56,7 @@ const NewAssessment = () => {
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
   const [proximaSesion, setProximaSesion] = useState('');
+  const [showScheduling, setShowScheduling] = useState(false);
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [calcomData, setCalcomData] = useState<{ fecha: string; modalidad: string; eventTypeId: number; name: string; email: string; phone: string } | null>(null);
@@ -786,18 +787,52 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              <div className="mt-4">
-                <CalcomScheduling
-                  pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
-                  onSelection={(data) => {
-                    setCalcomData(data);
-                    if (data?.fecha) {
-                      setProximaSesion(data.fecha);
-                    } else {
-                      setProximaSesion('');
-                    }
-                  }}
-                />
+              {/* BLOQUE AGENDAR PRÓXIMA CITA — OPCIONAL, COLAPSABLE */}
+              <div className="mt-4 bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 shrink-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase flex items-center gap-2">
+                      <CalendarIcon className="w-4 h-4 text-brand-primary" /> Agendar Próxima Cita
+                    </h4>
+                    <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
+                      Opcional — agenda la siguiente consulta directamente desde aquí.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={showScheduling}
+                      onChange={(e) => {
+                        setShowScheduling(e.target.checked);
+                        if (!e.target.checked) {
+                          setCalcomData(null);
+                          setProximaSesion('');
+                        }
+                      }}
+                    />
+                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                    <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">
+                      {showScheduling ? 'Habilitado' : 'Deshabilitado'}
+                    </span>
+                  </label>
+                </div>
+
+                {showScheduling && (
+                  <div className="mt-4 animate-fade-in">
+                    <CalcomScheduling
+                      pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
+                      onSelection={(data) => {
+                        setCalcomData(data);
+                        if (data?.fecha) {
+                          setProximaSesion(data.fecha);
+                        } else {
+                          setProximaSesion('');
+                        }
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
