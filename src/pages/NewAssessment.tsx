@@ -9,6 +9,21 @@ import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
 import CalcomScheduling from '@/components/CalcomScheduling';
 
+const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
+
+const parseCompetenciaFromTemario = (items: { tema: string; detalle: string }[] | undefined) => {
+  if (!items) return { comp: { antes: '', durante: '', despues: '' }, rest: [] as typeof items };
+  const compItem = items.find(t => t.tema === COMP_NOTES_MARKER);
+  const rest = items.filter(t => t.tema !== COMP_NOTES_MARKER);
+  if (!compItem) return { comp: { antes: '', durante: '', despues: '' }, rest };
+  try {
+    const parsed = JSON.parse(compItem.detalle || '{}');
+    return { comp: { antes: parsed.antes || '', durante: parsed.durante || '', despues: parsed.despues || '' }, rest };
+  } catch {
+    return { comp: { antes: '', durante: '', despues: '' }, rest };
+  }
+};
+
 const Field = ({
   label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '',
 }: {
@@ -53,6 +68,8 @@ const NewAssessment = () => {
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [evitar, setEvitar] = useState<{ id: string; valor: string }[]>([]);
+  const [competencia, setCompetencia] = useState<{ antes: string; durante: string; despues: string }>({ antes: '', durante: '', despues: '' });
+  const [showCompetencia, setShowCompetencia] = useState(false);
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
   const [proximaSesion, setProximaSesion] = useState('');
@@ -101,7 +118,12 @@ const NewAssessment = () => {
     if (d.estatura) setEstatura(d.estatura);
     if (d.pctGrasa) setPctGrasa(d.pctGrasa);
     if (d.comentarios) setComentarios(d.comentarios);
-    if (d.temario) setTemario(d.temario);
+    if (d.temario) {
+      const { comp, rest } = parseCompetenciaFromTemario(d.temario);
+      setTemario(rest.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
+      setCompetencia(comp);
+      if (comp.antes || comp.durante || comp.despues) setShowCompetencia(true);
+    }
     if (d.barridoData) setBarridoData(d.barridoData);
     if (d.fecha) setFecha(d.fecha);
     if (d.hora) setHora(d.hora);
@@ -152,9 +174,13 @@ const NewAssessment = () => {
     if (isEdit) return; // No drafts in edit mode
     if (step > 2) return; // Only save draft for steps 1 and 2
     if (!isGrasaModified) return; // Only start saving draft once fat % is touched
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle };
+    const hasComp = competencia.antes || competencia.durante || competencia.despues;
+    const temarioParaDraft = hasComp
+      ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
+      : temario;
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, isEdit]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -182,11 +208,13 @@ const NewAssessment = () => {
               setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : '');
               setComentarios(val.comentarios || '');
 
-              if (val.temarioConsulta && Array.isArray(val.temarioConsulta)) {
-                setTemario(val.temarioConsulta.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
-              } else if (val.temario && Array.isArray(val.temario)) {
-                setTemario(val.temario.map((t: any) => ({ ...t, id: Math.random().toString() })));
-              }
+              const rawItems = (val.temarioConsulta && Array.isArray(val.temarioConsulta))
+                ? val.temarioConsulta
+                : (val.temario && Array.isArray(val.temario) ? val.temario : []);
+              const { comp, rest } = parseCompetenciaFromTemario(rawItems);
+              setTemario(rest.map((t: any) => ({ ...t, id: t.id || Math.random().toString() })));
+              setCompetencia(comp);
+              if (comp.antes || comp.durante || comp.despues) setShowCompetencia(true);
 
               if (val.evitar) {
                 const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
@@ -357,7 +385,12 @@ const NewAssessment = () => {
       estatura: estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum,
       imc: parseFloat(imc.toFixed(2)),
       comentarios,
-      temario: temario.map(({ tema, detalle }) => ({ tema, detalle })),
+      temario: (() => {
+        const base = temario.map(({ tema, detalle }) => ({ tema, detalle }));
+        const hasComp = competencia.antes || competencia.durante || competencia.despues;
+        if (hasComp) base.push({ tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) });
+        return base;
+      })(),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
       suplementosDetalle: suplementosParaGuardar,
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
@@ -551,7 +584,7 @@ const NewAssessment = () => {
                   Datos Clínicos y Valoración
                 </h3>
                 <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
-                  Medidas antropométricas, notas y temas a tratar con el paciente.
+                  Medidas antropométricas y notas en consulta.
                 </p>
               </div>
 
@@ -577,7 +610,7 @@ const NewAssessment = () => {
 
                 {/* COLUMNA 2: TEMARIO Y NOTAS */}
                 <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
-                  <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas y Temario</h4>
+                  <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas en Consulta</h4>
                   <div className="shrink-0">
                     <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
                     <textarea
@@ -616,7 +649,7 @@ const NewAssessment = () => {
 
                   <div className="flex-1 flex flex-col min-h-0 mt-4">
                     <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] shrink-0 mb-3">
-                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temario Abordado</label>
+                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Notas en Consulta</label>
                       <button onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
                         <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
                       </button>
@@ -625,7 +658,7 @@ const NewAssessment = () => {
                     {temario.length === 0 && (
                       <div className="flex flex-col items-center justify-center py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] shrink-0">
                         <p className="text-[12px] text-[#8a8a8a] text-center max-w-sm px-4">
-                          Sin temas asignados. Haz clic en "Agregar" para ir alistando el temario a tratar.
+                          Sin notas asignadas. Haz clic en "Agregar" para registrar notas de la consulta.
                         </p>
                       </div>
                     )}
@@ -652,6 +685,37 @@ const NewAssessment = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Notas de Competencia (deportistas) */}
+                  <div className="shrink-0 mt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowCompetencia(s => !s)}
+                      className="w-full flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3 hover:opacity-80 transition-opacity"
+                    >
+                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest cursor-pointer">
+                        Notas de Competencia <span className="text-[#555] normal-case tracking-normal">(deportistas — opcional)</span>
+                      </label>
+                      <span className="text-[14px] font-bold text-[#8a8a8a]">{showCompetencia ? '−' : '+'}</span>
+                    </button>
+                    {showCompetencia && (
+                      <div className="space-y-3">
+                        {(['antes', 'durante', 'despues'] as const).map((fase) => (
+                          <div key={fase}>
+                            <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1 uppercase tracking-widest">
+                              {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'} de competencia
+                            </label>
+                            <textarea
+                              value={competencia[fase]}
+                              onChange={(e) => setCompetencia(c => ({ ...c, [fase]: e.target.value }))}
+                              placeholder={fase === 'antes' ? 'Ej. 3h antes: 1 taza avena + plátano + 1 cda crema cacahuate...' : fase === 'durante' ? 'Ej. Cada 30 min: 200ml bebida isotónica + 1 gel cada 45 min...' : 'Ej. 30 min post: 30g whey + 50g carbo simple; 2h post: comida completa...'}
+                              className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-white outline-none min-h-[60px] resize-y placeholder-[#444] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

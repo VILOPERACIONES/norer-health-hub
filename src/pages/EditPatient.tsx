@@ -1,27 +1,28 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen } from 'lucide-react';
+import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <input 
+    <input
       type={type}
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       readOnly={readOnly}
-      className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`} 
-      placeholder={placeholder} 
+      className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`}
+      placeholder={placeholder}
     />
   </div>
 );
 
 const LADAS = [
   { code: '52', label: '+52 (MX)' },
-  { code: '1',  label: '+1 (US/CA)' },
+  { code: '1', label: '+1 (US/CA)' },
   { code: '34', label: '+34 (ES)' },
   { code: '54', label: '+54 (AR)' },
   { code: '57', label: '+57 (CO)' },
@@ -54,9 +55,9 @@ const PhoneInput = ({ label, ladaValue, onLadaChange, phoneValue, onPhoneChange,
 const Select = ({ label, value, onChange, options }: any) => (
   <div className="space-y-2 group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <select 
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default appearance-none cursor-pointer"
       style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
     >
@@ -68,11 +69,11 @@ const Select = ({ label, value, onChange, options }: any) => (
 const TextArea = ({ label, value, onChange, placeholder }: any) => (
   <div className="space-y-2 col-span-full group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <textarea 
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
-      className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default min-h-[120px] resize-y" 
-      placeholder={placeholder} 
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default min-h-[120px] resize-y"
+      placeholder={placeholder}
     />
   </div>
 );
@@ -99,11 +100,11 @@ const EditPatient = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   const [form, setForm] = useState({
     nombre: '', apellido: '', lada: '52', telefono: '', email: '',
     fechaNacimiento: '', sexo: 'F' as 'M' | 'F',
-    objetivo: '', gymOrigen: '', disciplina: '', frecuencia: '', tiempo: '',
+    objetivo: '', gymOrigen: '',
     nivelActividad: 'Sedentario',
     porcentajeSedentario: '', porcentajeLeve: '', porcentajeModerado: '', porcentajeIntenso: '',
     historialProductos: '', recomSuplementos: '',
@@ -125,14 +126,14 @@ const EditPatient = () => {
           const ej = p.ejercicio || p.datosEjercicio || {};
           const ant = p.antecedentes || {};
           const hab = p.habitos || p.consumoCalorico || {};
-          
+
           setForm({
             nombre: p.nombre || '',
             apellido: p.apellido || '',
             // parse lada from stored number (e.g. "529993670065" -> lada="52", telefono="9993670065")
             ...(() => {
               const raw = (p.telefono || '').replace(/\D/g, '');
-              const knownLadas = ['52','1','34','54','57','56','51'];
+              const knownLadas = ['52', '1', '34', '54', '57', '56', '51'];
               const matched = knownLadas.find(l => raw.startsWith(l));
               return matched
                 ? { lada: matched, telefono: raw.slice(matched.length) }
@@ -154,12 +155,9 @@ const EditPatient = () => {
               if (p.peso != null && p.peso !== '') return p.peso.toString();
               return '';
             })(),
-            
+
             objetivo: ej.objetivo || '',
             gymOrigen: ej.gymOrigen || '',
-            disciplina: ej.disciplina || '',
-            frecuencia: ej.frecuencia || '',
-            tiempo: ej.tiempo || '',
             nivelActividad: ej.nivelActividad || 'Sedentario',
             porcentajeSedentario: ej.porcentajeSedentario?.toString() || '',
             porcentajeLeve: ej.porcentajeLeve?.toString() || '',
@@ -187,6 +185,7 @@ const EditPatient = () => {
               return '';
             })(),
           });
+          setDisciplinas(decodeDisciplinas(ej.disciplina, { frecuencia: ej.frecuencia, tiempo: ej.tiempo }));
         }
       } catch (err) {
         toast({ title: 'Error', description: 'No se pudo cargar la información del paciente', variant: 'destructive' });
@@ -198,7 +197,13 @@ const EditPatient = () => {
   }, [id, toast]);
 
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
-  
+
+  const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
+  const addDisciplina = () => setDisciplinas([...disciplinas, { disciplina: '', frecuencia: '', tiempo: '' }]);
+  const removeDisciplina = (idx: number) => setDisciplinas(disciplinas.length > 1 ? disciplinas.filter((_, i) => i !== idx) : disciplinas);
+  const updateDisciplina = (idx: number, field: keyof DisciplinaItem, val: string) =>
+    setDisciplinas(disciplinas.map((d, i) => i === idx ? { ...d, [field]: val } : d));
+
   const edad = useMemo(() => {
     if (!form.fechaNacimiento) return 0;
     const birth = new Date(form.fechaNacimiento);
@@ -226,23 +231,21 @@ const EditPatient = () => {
       edad,
       estatura: form.talla,
       peso: parseFloat(form.peso) || null,
-      complexion: form.complexion === 'Ectomorfo' ? 1 
-                  : (form.complexion === 'Mesomorfo' || form.complexion === 'Mesomorfico') ? 2 
-                  : form.complexion === 'Endomorfo' ? 3 : null,
-      
+      complexion: form.complexion === 'Ectomorfo' ? 1
+        : (form.complexion === 'Mesomorfo' || form.complexion === 'Mesomorfico') ? 2
+          : form.complexion === 'Endomorfo' ? 3 : null,
+
       ejercicio: {
         objetivo: form.objetivo,
         gymOrigen: form.gymOrigen,
-        disciplina: form.disciplina,
-        frecuencia: form.frecuencia,
-        tiempo: form.tiempo,
+        ...encodeDisciplinas(disciplinas),
         nivelActividad: form.nivelActividad,
         porcentajeSedentario: parseFloat(form.porcentajeSedentario) || 0,
         porcentajeLeve: parseFloat(form.porcentajeLeve) || 0,
         porcentajeModerado: parseFloat(form.porcentajeModerado) || 0,
         porcentajeIntenso: parseFloat(form.porcentajeIntenso) || 0,
       },
-      
+
       antecedentes: {
         patologia: form.patologia,
         cirugias: form.cirugias,
@@ -257,7 +260,7 @@ const EditPatient = () => {
         historialProductos: form.historialProductos,
         recomendacionSuplementos: form.recomSuplementos
       },
-      
+
 
     };
 
@@ -321,9 +324,39 @@ const EditPatient = () => {
         <FormSection title="Dinámica Deportiva" icon={Activity}>
           <Input label="Objetivo" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
-          <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
-          <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />
-          <Input label="Duración Sesión" value={form.tiempo} onChange={(v: string) => update('tiempo', v)} placeholder="EJ: 60-90 Minutos" />
+          <div className="col-span-full space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1">Disciplinas</label>
+              <button
+                type="button"
+                onClick={addDisciplina}
+                className="flex items-center gap-1 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Agregar disciplina
+              </button>
+            </div>
+            {disciplinas.map((d, idx) => (
+              <div key={idx} className="grid sm:grid-cols-3 gap-3 items-end p-3 bg-bg-elevated/40 border border-border-subtle rounded-[8px] relative">
+                <Input label={`Disciplina ${disciplinas.length > 1 ? idx + 1 : ''}`} value={d.disciplina} onChange={(v: string) => updateDisciplina(idx, 'disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
+                <Input label="Frecuencia" value={d.frecuencia} onChange={(v: string) => updateDisciplina(idx, 'frecuencia', v)} placeholder="EJ: 5 días a la semana" />
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Input label="Duración" value={d.tiempo} onChange={(v: string) => updateDisciplina(idx, 'tiempo', v)} placeholder="EJ: 60-90 min" />
+                  </div>
+                  {disciplinas.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeDisciplina(idx)}
+                      className="p-3 text-text-muted hover:text-accent-red rounded-[8px] hover:bg-bg-elevated transition-colors"
+                      title="Eliminar disciplina"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
           <Select label="Nivel de Actividad" value={form.nivelActividad} onChange={(v: string) => update('nivelActividad', v)} options={['Sedentario', 'Leve', 'Moderado', 'Intenso']} />
         </FormSection>
 

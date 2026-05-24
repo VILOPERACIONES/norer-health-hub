@@ -15,7 +15,7 @@ export const formatDate = (dateStr: string | null | undefined): string => {
   if (isDateOnly) {
     return `${d.getUTCDate()} de ${MONTHS[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
   }
-  
+
   // Si trae hora real, extraemos en formato local
   return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
 };
@@ -44,33 +44,33 @@ export const formatDecimal = (n: number | string | null | undefined, decimals = 
 
 export const getBadgeForValuation = (val: any) => {
   if (!val) return { text: 'Sin Registro', cls: 'bg-gray-500/10 text-gray-500 border-gray-500/20' };
-  
+
   if (val.estadoFlujo) {
     if (val.estadoFlujo === 'Pendiente de plan') return { text: 'Pendiente de menú', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
-    if (val.estadoFlujo === 'Plan en Proceso')   return { text: 'Menú en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
-    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Menú en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' }; // fusionado
-    if (val.estadoFlujo === 'Enviado')           return { text: 'Enviado',           cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+    if (val.estadoFlujo === 'Plan en Proceso') return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Menú Listo', cls: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
+    if (val.estadoFlujo === 'Enviado') return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
   }
-  
+
   const plan = val.plan;
   const planId = val.planId || plan?.id;
   const estadoEnvio = val.estadoEnvio || plan?.estadoEnvio || 'pendiente';
   const hasBarrido = val.hasBarrido;
-  
+
   if (!hasBarrido && !planId) {
     return { text: 'Pendiente de menú', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
   }
-  
+
+  // Plan asignado pero sin menús completos → aún en proceso
   if (!planId || (plan && (!plan.menus || plan.menus.length === 0) && estadoEnvio !== 'enviado')) {
     return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
   }
-  
+
   if (estadoEnvio === 'pendiente') {
-    // Plan completo pero aún no enviado → sigue siendo "en proceso"
-    return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    // Plan terminado y guardado, falta enviar
+    return { text: 'Menú Listo', cls: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
   }
-  
-  // Verde únicamente cuando el plan ya fue enviado al paciente.
+
   return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
 };
 

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
@@ -86,6 +86,8 @@ export const CreateEditPlanForm = ({
   const [valData, setValData] = useState<any>(null);
   const [suplementosDetalle, setSuplementosDetalle] = useState<any[]>([]); // 💊 State independiente para persistencia
   const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
+  // Borradores locales del nombre de platillo mientras se edita — evita que el grupo desaparezca al vaciar el input
+  const [platilloDrafts, setPlatilloDrafts] = useState<Record<string, string>>({});
 
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
   const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
@@ -102,6 +104,10 @@ export const CreateEditPlanForm = ({
   // ─── Presupuesto de equivalencias ─ siempre abierto por defecto ─────────────────
   // Budget panels are ALWAYS visible for Eyder to track progress in real-time
   const [showBudgetMap, setShowBudgetMap] = useState<Record<string, boolean>>({});
+
+  // ─── Toggle agua natural en comidas principales ──────────────────────────────
+  const [aguaNaturalDefault, setAguaNaturalDefault] = useState(true);
+  const aguaAutofillDone = useRef(false);
 
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
@@ -172,7 +178,7 @@ export const CreateEditPlanForm = ({
             : `/api/pacientes/${pacienteId}/planes/${planId}`;
           planPromise = api.get(url).catch(() => null);
         }
-        
+
         // Siempre cargar la valoración si está disponible para tener el conteo de equivalencias activo
         if (pacienteId && valoracionId) {
           valPromise = api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`).catch(() => null);
@@ -335,6 +341,28 @@ export const CreateEditPlanForm = ({
       setCalorias(String(valData.barrido.kcalTotal));
     }
   }, [valData]);
+
+  // Autofill agua natural en comidas principales una vez por carga
+  useEffect(() => {
+    if (!aguaNaturalDefault || aguaAutofillDone.current) return;
+    if (!menus.length) return;
+    const mainMeals = ['desayuno', 'comida', 'almuerzo', 'cena'];
+    let touched = false;
+    const next = menus.map(menu => ({
+      ...menu,
+      tiempos: menu.tiempos.map(t => {
+        const nameL = (t.nombre || '').toLowerCase().trim();
+        const isMain = mainMeals.some(m => nameL.includes(m));
+        if (isMain && (!t.bebida || t.bebida.trim() === '')) {
+          touched = true;
+          return { ...t, bebida: 'Agua natural' };
+        }
+        return t;
+      })
+    }));
+    if (touched) setMenus(next);
+    aguaAutofillDone.current = true;
+  }, [menus, aguaNaturalDefault]);
 
   // Kcal por equivalente SMAE — acepta tanto el label de UI como la clave interna del backend
   const KCAL_EQ: Record<string, number> = {
@@ -627,19 +655,19 @@ export const CreateEditPlanForm = ({
             bebida: t.bebida || '',
             suplTiempo: t.suplTiempo || '',
             suplNotas: t.suplNotas || '',
-          ingredientes: t.ingredientes.map(i => ({
-            ...i,
-            cantidad: String(i.cantidad),
-            eqCantidad: String(i.eqCantidad || ''),
-            smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
-            // Serializar explícitamente para no perder el array
-            equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
-          }))
-        };
-      })
-    })),
-    notasGenerales: notas,
-    suplementosDetalle,
+            ingredientes: t.ingredientes.map(i => ({
+              ...i,
+              cantidad: String(i.cantidad),
+              eqCantidad: String(i.eqCantidad || ''),
+              smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
+              // Serializar explícitamente para no perder el array
+              equivalencias: Array.isArray(i.equivalencias) ? i.equivalencias : []
+            }))
+          };
+        })
+      })),
+      notasGenerales: notas,
+      suplementosDetalle,
     };
 
     if (!isBasePlan) {
@@ -720,7 +748,7 @@ export const CreateEditPlanForm = ({
   return (
     <>
       <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 -mt-8 mb-4">
+        <div className="sticky top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 pt-3 -mt-8 mb-4 pb-3 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a] flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-2">
             {(!onSaved || onCancel) && (
               <button onClick={() => onCancel ? onCancel() : navigate(isBasePlan ? '/planes' : `/pacientes/${pacienteId}`)} className="flex items-center gap-2 text-[14px] font-medium text-[#c0c0c0] hover:text-white transition-colors w-fit group mb-4">
@@ -902,6 +930,39 @@ export const CreateEditPlanForm = ({
                       <span className="text-[10px] font-black uppercase tracking-widest">Suma {macroSum}% (Ajuste a 100%)</span>
                     </div>
                   )}
+
+                  {/* Toggle agua natural en comidas principales */}
+                  <div className="mt-6 flex items-center justify-between px-4 py-3 bg-[#0e1a2a] rounded-[10px] border border-[#1a3050] transition-all">
+                    <div className="flex items-center gap-2">
+                      <Droplets className="w-4 h-4 text-[#3a9eff]" />
+                      <span className="text-[12px] font-bold text-[#c0c0c0] uppercase tracking-wider">Agua natural en comidas principales</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const newVal = !aguaNaturalDefault;
+                        setAguaNaturalDefault(newVal);
+                        if (newVal) {
+                          // Auto-fill bebida for main meals (Desayuno, Comida, Cena)
+                          const mainMeals = ['desayuno', 'comida', 'almuerzo', 'cena'];
+                          setMenus(prev => prev.map(menu => ({
+                            ...menu,
+                            tiempos: menu.tiempos.map(t => {
+                              const nameL = (t.nombre || '').toLowerCase().trim();
+                              const isMain = mainMeals.some(m => nameL.includes(m));
+                              if (isMain && (!t.bebida || t.bebida.trim() === '')) {
+                                return { ...t, bebida: 'Agua natural' };
+                              }
+                              return t;
+                            })
+                          })));
+                        }
+                      }}
+                      className={`relative w-11 h-6 rounded-full transition-colors duration-300 ease-in-out ${aguaNaturalDefault ? 'bg-[#3a9eff]' : 'bg-[#333]'}`}
+                    >
+                      <div className={`absolute top-[2px] left-[2px] w-[20px] h-[20px] bg-white rounded-full transition-transform duration-300 ${aguaNaturalDefault ? 'translate-x-[20px]' : 'translate-x-0'}`} />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -997,7 +1058,7 @@ export const CreateEditPlanForm = ({
                             placeholder="Bebida (ej: 500ml agua con limón)"
                             value={tiempo.bebida || ''}
                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
-                            className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                            className="flex-1 bg-transparent text-[13px] font-bold text-white placeholder:text-[#999] placeholder:font-medium outline-none border-b border-transparent focus:border-[#3a9eff]/40 transition-colors py-0.5"
                           />
                         </div>
                         <div className="flex items-center gap-2">
@@ -1007,7 +1068,7 @@ export const CreateEditPlanForm = ({
                             placeholder="Suplemento del tiempo (ej: 1 scoop Whey)"
                             value={tiempo.suplTiempo || ''}
                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, suplTiempo: e.target.value }))}
-                            className="flex-1 bg-transparent text-[11px] text-[#8a8a8a] placeholder:text-[#444] outline-none border-b border-transparent focus:border-[#333] transition-colors py-0.5"
+                            className="flex-1 bg-transparent text-[13px] font-bold text-white placeholder:text-[#999] placeholder:font-medium outline-none border-b border-transparent focus:border-[#a97fff]/40 transition-colors py-0.5"
                           />
                         </div>
                       </div>
@@ -1038,7 +1099,7 @@ export const CreateEditPlanForm = ({
                                   return (
                                     <div key={label}>
                                       <div className="flex items-center justify-between mb-0.5">
-                                        <span className="text-[10px] text-[#777]">{label}</span>
+                                        <span className="text-[11px] font-semibold text-white">{label}</span>
                                         <span className={`text-[10px] font-bold tabular-nums ${textColor}`}>
                                           {used} / {bdgt} eq {over ? '⚠' : done ? '✓' : ''}
                                         </span>
@@ -1059,19 +1120,47 @@ export const CreateEditPlanForm = ({
                         {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
                           <div key={`${mi}-${ti}-${pIndex}`} className={pName ? 'p-3 bg-[#111111] border border-[#333] rounded-[8px]' : ''}>
                             {pName ? (<div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
-                              <span className="text-[#8a8a8a] text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
-                              <input
-                                className="bg-transparent border-none outline-none font-semibold text-white placeholder:text-[#8a8a8a] text-[13px] w-full min-w-0"
-                                value={pName}
-                                onChange={(e) => {
-                                  const newName = e.target.value;
-                                  updateTiempo(mi, ti, t => ({
-                                    ...t,
-                                    ingredientes: t.ingredientes.map(ing => (ing.platillo || '') === pName ? { ...ing, platillo: newName } : ing)
-                                  }))
-                                }}
-                                placeholder="Ej: Sándwich de Pollo (Opcional)"
-                              />
+                              <span className="text-white text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
+                              {(() => {
+                                const draftKey = `${mi}-${ti}-${pIndex}`;
+                                const displayValue = platilloDrafts[draftKey] ?? pName;
+                                return (
+                                  <input
+                                    className="bg-transparent border-none outline-none font-bold text-white placeholder:text-[#999] text-[14px] w-full min-w-0"
+                                    value={displayValue}
+                                    onChange={(e) => {
+                                      setPlatilloDrafts(prev => ({ ...prev, [draftKey]: e.target.value }));
+                                    }}
+                                    onBlur={(e) => {
+                                      const finalName = e.target.value.trim();
+                                      setPlatilloDrafts(prev => {
+                                        const next = { ...prev };
+                                        delete next[draftKey];
+                                        return next;
+                                      });
+                                      // Si quedó vacío, conservar nombre anterior — no permitimos colapsar el grupo
+                                      if (!finalName) return;
+                                      if (finalName === pName) return;
+                                      updateTiempo(mi, ti, t => ({
+                                        ...t,
+                                        ingredientes: t.ingredientes.map(ing => (ing.platillo || '') === pName ? { ...ing, platillo: finalName } : ing)
+                                      }));
+                                    }}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                      if (e.key === 'Escape') {
+                                        setPlatilloDrafts(prev => {
+                                          const next = { ...prev };
+                                          delete next[draftKey];
+                                          return next;
+                                        });
+                                        (e.target as HTMLInputElement).blur();
+                                      }
+                                    }}
+                                    placeholder="Ej: Sándwich de Pollo (Opcional)"
+                                  />
+                                );
+                              })()}
 
                               <div className="flex items-center gap-1 ml-auto shrink-0">
                                 <button onClick={() => movePlatillo(mi, ti, pName, -1)} disabled={pIndex === 0} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
@@ -1198,121 +1287,121 @@ export const CreateEditPlanForm = ({
                                 {(() => {
                                   // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
                                   const LABEL_TO_KEY: Record<string, string> = {
-                                        'Verduras': 'verduras', 'Verdura': 'verduras',
-                                        'Frutas': 'frutas', 'Fruta': 'frutas',
-                                        'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
-                                        'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
-                                        'Leguminosas': 'leguminosas',
-                                        'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
-                                        'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
-                                        'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
-                                        'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
-                                        'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
-                                        'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
-                                        'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
-                                        'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
-                                        'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
-                                        'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
-                                        'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
-                                        'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
-                                      };
+                                    'Verduras': 'verduras', 'Verdura': 'verduras',
+                                    'Frutas': 'frutas', 'Fruta': 'frutas',
+                                    'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
+                                    'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
+                                    'Leguminosas': 'leguminosas',
+                                    'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
+                                    'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
+                                    'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
+                                    'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
+                                    'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
+                                    'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
+                                    'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
+                                    'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
+                                    'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
+                                    'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
+                                    'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
+                                    'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
+                                  };
 
-                                      const results = platilloLibrary.filter(p => {
-                                        if (platilloSearch) {
-                                          return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
-                                            p.categoria.toLowerCase().includes(platilloSearch.toLowerCase());
-                                        }
-                                        return !platilloCatFilter || p.categoria === platilloCatFilter;
-                                      });
+                                  const results = platilloLibrary.filter(p => {
+                                    if (platilloSearch) {
+                                      return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
+                                        p.categoria.toLowerCase().includes(platilloSearch.toLowerCase());
+                                    }
+                                    return !platilloCatFilter || p.categoria === platilloCatFilter;
+                                  });
 
-                                      if (results.length === 0) return <p className="text-center py-4 text-[10px] text-[#555]">Sin resultados.</p>;
+                                  if (results.length === 0) return <p className="text-center py-4 text-[10px] text-[#555]">Sin resultados.</p>;
 
-                                      return results.map(p => (
-                                        <button
-                                          key={p.id}
-                                          onClick={() => {
-                                            const d = valData?.barridoEquivalencias?.distribucion;
-                                            // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                            const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
-                                              (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
-                                            );
-                                            const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
+                                  return results.map(p => (
+                                    <button
+                                      key={p.id}
+                                      onClick={() => {
+                                        const d = valData?.barridoEquivalencias?.distribucion;
+                                        // Encontrar el tiempo del barrido que coincide con este tiempo de comida
+                                        const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
+                                          (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
+                                        );
+                                        const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
 
-                                            const ings = p.ingredientes.map((i: any, idx: number) => {
-                                              let scaledCant = Number(i.cantidad);
-                                              let scaledEq = Number(i.eqCantidad);
+                                        const ings = p.ingredientes.map((i: any, idx: number) => {
+                                          let scaledCant = Number(i.cantidad);
+                                          let scaledEq = Number(i.eqCantidad);
 
-                                              // Unidades discretas (procesados, empaquetados): NO escalar cantidad
-                                              const UNIDADES_DISCRETAS = ['PZ', 'PAQUETE', 'BOTELLA', 'PIEZA', 'LATA', 'BOLSA', 'BARRA', 'SOBRE', 'TARRO', 'FRASCO'];
-                                              const esDiscreta = UNIDADES_DISCRETAS.includes((i.unidad || '').toUpperCase().trim());
+                                          // Unidades discretas (procesados, empaquetados): NO escalar cantidad
+                                          const UNIDADES_DISCRETAS = ['PZ', 'PAQUETE', 'BOTELLA', 'PIEZA', 'LATA', 'BOLSA', 'BARRA', 'SOBRE', 'TARRO', 'FRASCO'];
+                                          const esDiscreta = UNIDADES_DISCRETAS.includes((i.unidad || '').toUpperCase().trim());
 
-                                              // Parsear equivalencias si vienen como string
-                                              let eqArray = [];
-                                              if (Array.isArray(i.equivalencias)) {
-                                                eqArray = i.equivalencias;
-                                              } else if (typeof i.equivalencias === 'string' && i.equivalencias.trim() !== '') {
-                                                try { eqArray = JSON.parse(i.equivalencias); } catch (e) { }
-                                              }
+                                          // Parsear equivalencias si vienen como string
+                                          let eqArray = [];
+                                          if (Array.isArray(i.equivalencias)) {
+                                            eqArray = i.equivalencias;
+                                          } else if (typeof i.equivalencias === 'string' && i.equivalencias.trim() !== '') {
+                                            try { eqArray = JSON.parse(i.equivalencias); } catch (e) { }
+                                          }
 
-                                              // Sanitizar equivalencias heredadas: eliminar entradas fantasma con grupo vacío
-                                              const rawEquivs = eqArray.filter(
-                                                (e: any) => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null
-                                              );
+                                          // Sanitizar equivalencias heredadas: eliminar entradas fantasma con grupo vacío
+                                          const rawEquivs = eqArray.filter(
+                                            (e: any) => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null
+                                          );
 
-                                              // Si tiene más de una equivalencia o fue ingresado sin gramos, se considera complejo y no se escala
-                                              const esComplejo = rawEquivs.length > 1 || (Number(i.cantidad) === 0);
+                                          // Si tiene más de una equivalencia o fue ingresado sin gramos, se considera complejo y no se escala
+                                          const esComplejo = rawEquivs.length > 1 || (Number(i.cantidad) === 0);
 
-                                              if (!esDiscreta && !esComplejo && i.eqGrupo && distTiempo) {
-                                                // Traduce el label del platillo al key del barrido
-                                                const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
-                                                const assigned = distTiempo[barridoKey];
-                                                if (assigned != null && assigned > 0) {
-                                                  const baseEq = Number(i.eqCantidad) || 1;
-                                                  // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
-                                                  scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
-                                                  scaledEq = assigned;
-                                                }
-                                              }
+                                          if (!esDiscreta && !esComplejo && i.eqGrupo && distTiempo) {
+                                            // Traduce el label del platillo al key del barrido
+                                            const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
+                                            const assigned = distTiempo[barridoKey];
+                                            if (assigned != null && assigned > 0) {
+                                              const baseEq = Number(i.eqCantidad) || 1;
+                                              // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
+                                              scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
+                                              scaledEq = assigned;
+                                            }
+                                          }
 
-                                              // Calcular factor de escala para equivalencias
-                                              const origCant = Number(i.cantidad) || 0;
-                                              const scaleFactor = (scaledCant !== origCant && origCant > 0) ? (scaledCant / origCant) : 1;
+                                          // Calcular factor de escala para equivalencias
+                                          const origCant = Number(i.cantidad) || 0;
+                                          const scaleFactor = (scaledCant !== origCant && origCant > 0) ? (scaledCant / origCant) : 1;
 
-                                              const cleanEquivencias = rawEquivs.length > 0
-                                                ? rawEquivs.map((e: any) => ({
-                                                  grupo: e.grupo,
-                                                  // Escalar cada grupo proporcionalmente al mismo factor que la cantidad física
-                                                  cantidad: scaleFactor !== 1 ? smartRound(Number(e.cantidad) * scaleFactor) : Number(e.cantidad),
-                                                }))
-                                                : i.eqGrupo ? [{ cantidad: scaledEq, grupo: i.eqGrupo }] : [];
+                                          const cleanEquivencias = rawEquivs.length > 0
+                                            ? rawEquivs.map((e: any) => ({
+                                              grupo: e.grupo,
+                                              // Escalar cada grupo proporcionalmente al mismo factor que la cantidad física
+                                              cantidad: scaleFactor !== 1 ? smartRound(Number(e.cantidad) * scaleFactor) : Number(e.cantidad),
+                                            }))
+                                            : i.eqGrupo ? [{ cantidad: scaledEq, grupo: i.eqGrupo }] : [];
 
-                                              return {
-                                                ...i,
-                                                cantidad: scaledCant,
-                                                eqCantidad: scaledEq,
-                                                smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
-                                                equivalencias: cleanEquivencias,
-                                                platillo: p.nombre,
-                                                orden: (tiempo.ingredientes.length || 0) + idx + 1
-                                              };
-                                            });
+                                          return {
+                                            ...i,
+                                            cantidad: scaledCant,
+                                            eqCantidad: scaledEq,
+                                            smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
+                                            equivalencias: cleanEquivencias,
+                                            platillo: p.nombre,
+                                            orden: (tiempo.ingredientes.length || 0) + idx + 1
+                                          };
+                                        });
 
-                                            updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
-                                            setShowPlatilloSelector(null);
-                                            setPlatilloSearch('');
-                                            setPlatilloCatFilter(null);
-                                          }}
-                                          className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
-                                        >
-                                          <div>
-                                            <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
-                                            <p className="text-[10px] text-[#555]">{p.categoria}</p>
-                                          </div>
-                                          <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
-                                        </button>
-                                      ));
-                                  })()}
-                                </div>
+                                        updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, ...ings] }));
+                                        setShowPlatilloSelector(null);
+                                        setPlatilloSearch('');
+                                        setPlatilloCatFilter(null);
+                                      }}
+                                      className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
+                                    >
+                                      <div>
+                                        <p className="text-[12px] font-bold text-white group-hover:text-[#90c2ff]">{p.nombre}</p>
+                                        <p className="text-[10px] text-[#555]">{p.categoria}</p>
+                                      </div>
+                                      <Plus className="w-3 h-3 text-[#555] group-hover:text-[#90c2ff]" />
+                                    </button>
+                                  ));
+                                })()}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -1321,6 +1410,39 @@ export const CreateEditPlanForm = ({
                   ))}
 
                   <div className="flex-1" />
+
+                  {/* Importar tiempos desde el barrido (los que aún no están en este menú) */}
+                  {(() => {
+                    const barridoTiempos: string[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
+                    if (!barridoTiempos.length) return null;
+                    const existing = new Set(menu.tiempos.map(t => (t.nombre || '').trim().toLowerCase()));
+                    const faltantes = barridoTiempos.filter(bt => !existing.has((bt || '').trim().toLowerCase()));
+                    if (!faltantes.length) return null;
+                    return (
+                      <div className="mt-4 p-3 rounded-[8px] border border-[#2a2a2a] bg-[#0f1620]">
+                        <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 mb-2">
+                          Importar de barrido
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                          {faltantes.map((nombre) => (
+                            <button
+                              key={nombre}
+                              type="button"
+                              onClick={() => updateMenu(mi, (m) => ({
+                                ...m,
+                                tiempos: [...m.tiempos, { nombre: nombre.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' }]
+                              }))}
+                              className="flex items-center gap-1 text-[11px] font-bold text-[#90c2ff] bg-[#1a2640] hover:bg-[#22324f] border border-[#3a5680] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
+                              title={`Agregar "${nombre}" desde el barrido`}
+                            >
+                              <Plus className="w-3 h-3" /> {nombre}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
                   <button
                     onClick={() => updateMenu(mi, (m) => ({
                       ...m, tiempos: [...m.tiempos, { nombre: 'Nuevo Tiempo', ingredientes: [], nota: '' }]
@@ -1334,7 +1456,38 @@ export const CreateEditPlanForm = ({
             ))}
           </div>
         </div>
+
+        {/* ─── Botón Sticky Inferior: Generar Menú / Guardar Cambios ─── */}
+        <div className="sticky bottom-0 z-30 pt-4 pb-2 -mx-4 md:-mx-8 px-4 md:px-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/95 to-transparent">
+          <button
+            onClick={handleSave}
+            disabled={saving || macroSum !== 100}
+            className="w-full py-[12px] bg-brand-primary text-bg-base rounded-[10px] text-[15px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-[0_-4px_24px_rgba(144,194,255,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? (
+              <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Save className="h-[18px] w-[18px]" />
+            )}
+            {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
+          </button>
+        </div>
       </div>
+
+      {/* ─── FAB: Generar Menú siempre visible (fallback robusto a sticky) ─── */}
+      <button
+        onClick={handleSave}
+        disabled={saving || macroSum !== 100}
+        title={macroSum !== 100 ? 'Ajusta macros a 100% para generar' : (isEdit ? 'Guardar cambios' : 'Generar menú')}
+        className="fixed bottom-6 right-6 z-[60] px-5 py-3 bg-brand-primary text-bg-base rounded-full text-[14px] font-bold shadow-[0_8px_28px_rgba(144,194,255,0.45)] hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {saving ? (
+          <div className="w-[18px] h-[18px] border-2 border-black/20 border-t-black rounded-full animate-spin" />
+        ) : (
+          <Save className="h-[18px] w-[18px]" />
+        )}
+        <span className="hidden sm:inline">{isEdit ? 'Guardar Cambios' : 'Generar Menú'}</span>
+      </button>
       {/* ─── Save-as-Platillo Modal ─── */}
       {savePlatilloModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
