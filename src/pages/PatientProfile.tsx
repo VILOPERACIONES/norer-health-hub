@@ -5,6 +5,7 @@ import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield,
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal, getBadgeForValuation } from '@/lib/format';
+import { formatDisciplinasForDisplay } from '@/lib/disciplinas';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { 
@@ -430,9 +431,13 @@ const PatientProfile = () => {
               <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
                 'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
                 'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
-                'Disciplina': (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina || 'N/A',
-                'Frecuencia': (paciente.ejercicio || (paciente as any).datosEjercicio)?.frecuencia || 'N/A',
-                'Duración': (paciente.ejercicio || (paciente as any).datosEjercicio)?.tiempo || 'N/A',
+                'Disciplinas': formatDisciplinasForDisplay(
+                  (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina,
+                  {
+                    frecuencia: (paciente.ejercicio || (paciente as any).datosEjercicio)?.frecuencia,
+                    tiempo: (paciente.ejercicio || (paciente as any).datosEjercicio)?.tiempo,
+                  }
+                ),
                 'Nivel Actividad': (paciente.ejercicio || (paciente as any).datosEjercicio)?.nivelActividad || 'N/A',
                 'Distribución Actividad': `${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeSedentario || 0}% S / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeLeve || 0}% L / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeModerado || 0}% M / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeIntenso || 0}% I`,
               }} />

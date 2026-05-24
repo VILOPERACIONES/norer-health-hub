@@ -107,6 +107,7 @@ const Dashboard = () => {
   // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
   const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de menú').length;
   const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú en Proceso').length;
+  const planesListos     = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú Listo').length;
   const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
@@ -166,7 +167,7 @@ const Dashboard = () => {
         text: `${pctPendientes}%`,
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
       },
-      sub: `${planesSinAsignar} Pendiente de menú · ${planesEnProceso} Menú en proceso`,
+      sub: `${planesSinAsignar} Pendiente · ${planesEnProceso} En proceso · ${planesListos} Listo`,
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
     },
     {

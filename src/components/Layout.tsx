@@ -179,8 +179,8 @@ const Layout = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pt-6 pb-6 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
-          <div className={`w-full ${location.pathname === '/dashboard' ? 'h-full overflow-hidden' : 'min-h-full'}`}>
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-6 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
+          <div className={`w-full ${location.pathname === '/dashboard' ? 'h-full overflow-hidden' : 'min-h-full pt-6'}`}>
             <Outlet />
           </div>
         </main>

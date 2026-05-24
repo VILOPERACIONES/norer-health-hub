@@ -588,6 +588,63 @@ const EquivalenciasSMAE = () => {
         </div>
       )}
 
+      {/* ─── Referencia de Abreviaciones (mismo formato que la tabla de alimentos) ─── */}
+      <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden">
+        <div className="px-6 py-3 border-b border-border-subtle bg-bg-elevated flex items-center justify-between">
+          <p className="text-[12px] font-medium text-text-muted">
+            Referencia de Abreviaciones — {GRUPOS_KEYS.length} grupos SMAE
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th className="px-6 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Clave</th>
+                <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Grupo</th>
+                <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Descripción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {GRUPOS_KEYS.map((key) => {
+                const g = GRUPOS_CONFIG[key];
+                const descriptions: Record<string, string> = {
+                  verduras: 'Todas las verduras y hortalizas',
+                  frutas: 'Frutas frescas y secas',
+                  cerealSinGr: 'Cereales y tubérculos sin grasa añadida',
+                  cerealConGr: 'Cereales y tubérculos con grasa añadida',
+                  leguminosas: 'Frijol, lenteja, garbanzo, habas, etc.',
+                  aoaMuyBajo: 'Alimentos de origen animal con muy bajo contenido graso',
+                  aoaBajo: 'Alimentos de origen animal con bajo contenido graso',
+                  aoaModerado: 'Alimentos de origen animal con moderado contenido graso',
+                  aoaAlto: 'Alimentos de origen animal con alto contenido graso',
+                  lecheDesc: 'Leche y yogurt descremados',
+                  lecheSemi: 'Leche y yogurt semidescremados',
+                  lecheEntera: 'Leche y yogurt enteros',
+                  lecheAz: 'Leche y yogurt con azúcar añadida',
+                  grasaSinProt: 'Aceites, mantequilla, aguacate sin proteína',
+                  grasaConProt: 'Oleaginosas, semillas con proteína',
+                  azSinGr: 'Azúcares, mermeladas, miel sin grasa',
+                  azConGr: 'Chocolates, pasteles con grasa añadida',
+                };
+                return (
+                  <tr key={key} className="hover:bg-bg-elevated/40 transition-colors group">
+                    <td className="px-6 py-3">
+                      <span className="text-[14px] font-mono font-medium text-text-primary">{key}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <GrupoBadge grupo={key} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[13px] text-text-secondary">{descriptions[key] || g.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       {/* Modal crear/editar */}
       {showModal && (
         <ModalAlimento

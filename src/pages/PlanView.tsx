@@ -119,15 +119,34 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
 
     const handlePdf = async () => {
         try {
+            // TODO[backend norder-crm-api]: reemplazar encabezado hardcoded por:
+            //   L.N. Eyder Méndez Gamboa
+            //   Certificación ISAK Nivel 2
+            //   Cédula: 11181890
+            //   999 453 7182 / nordermx@gmail.com
+            //   VIA "Vida Integral y Asesoría Profesional"
+            //   Calle 40 #278 G, Campestre C.P. 97120. Mérida, Yucatán.
+            // Fuente: src/lib/pdfHeader.ts
             toast({ title: 'Generando Reporte', description: 'Componiendo estructura maestra en PDF...' });
+            // Asegurar nombre paciente antes de armar filename
+            let nombreFinal = pacienteNombre;
+            if (!nombreFinal && pacienteId) {
+                try {
+                    const pacRes = await api.get(`/api/pacientes/${pacienteId}`);
+                    const p = pacRes.data?.data || pacRes.data;
+                    if (p) nombreFinal = `${p.nombre || ''} ${p.apellido || ''}`.trim();
+                } catch { /* fallback abajo */ }
+            }
             const res = await api.get(`/api/planes/${planId}/pdf`, { responseType: 'blob' });
-            const url = window.URL.createObjectURL(new Blob([res.data]));
+            const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `Plan_${plan?.pacienteId}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
+            const safeName = (nombreFinal || 'Paciente').replace(/\s+/g, '_');
+            link.setAttribute('download', `Menu_${safeName}_${format(new Date(), 'dd-MM-yyyy')}.pdf`);
             document.body.appendChild(link);
             link.click();
             link.remove();
+            window.URL.revokeObjectURL(url);
 
             toast({ title: 'PDF DESCARGADO', description: 'El reporte se ha generado correctamente.' });
         } catch (err) {

@@ -408,24 +408,57 @@ const AssessmentDetail = () => {
           </div>
         )}
 
-        {val.temarioConsulta?.length > 0 && (
-          <div className="p-6 md:p-8 border-b border-border-subtle">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
-                <Brain className="h-4 w-4" />
-              </div>
-              <h3 className="text-[14px] font-semibold text-text-primary m-0">Acuerdos y Temario</h3>
-            </div>
-            <div className="space-y-4">
-              {val.temarioConsulta.map((tema: any, i: number) => (
-                <div key={tema.id || i} className="border-l-2 border-brand-primary pl-4 py-1">
-                  <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1">{tema.tema}</h4>
-                  <p className="text-[14px] text-text-secondary leading-relaxed m-0">{tema.detalle}</p>
+        {val.temarioConsulta?.length > 0 && (() => {
+          const COMP_MARKER = '__COMPETENCIA_NOTES__';
+          const compItem = val.temarioConsulta.find((t: any) => t.tema === COMP_MARKER);
+          const restItems = val.temarioConsulta.filter((t: any) => t.tema !== COMP_MARKER);
+          let comp: { antes?: string; durante?: string; despues?: string } | null = null;
+          if (compItem) {
+            try { comp = JSON.parse(compItem.detalle || '{}'); } catch { comp = null; }
+          }
+          return (
+            <>
+              {restItems.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-border-subtle">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                      <Brain className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Notas en Consulta</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {restItems.map((tema: any, i: number) => (
+                      <div key={tema.id || i} className="border-l-2 border-brand-primary pl-4 py-1">
+                        <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1">{tema.tema}</h4>
+                        <p className="text-[14px] text-text-secondary leading-relaxed m-0">{tema.detalle}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
+              )}
+              {comp && (comp.antes || comp.durante || comp.despues) && (
+                <div className="p-6 md:p-8 border-b border-border-subtle">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                      <Brain className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Notas de Competencia</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {(['antes', 'durante', 'despues'] as const).map(fase => comp![fase] ? (
+                      <div key={fase} className="border-l-2 border-brand-primary pl-4 py-1">
+                        <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1 uppercase tracking-wider">
+                          {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'}
+                        </h4>
+                        <p className="text-[14px] text-text-secondary leading-relaxed m-0 whitespace-pre-wrap">{comp![fase]}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* ESQUEMA DE SUPLEMENTACIÓN */}
