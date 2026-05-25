@@ -14,6 +14,7 @@ interface AlimentoSMAE {
   id: string;
   nombre: string;
   grupo: string;
+  equivalentesBase?: number;   // cuántos eq del grupo base vale la porción (default 1)
   pesoGramos: number;
   unidadBase: string;          // unidad del valor ancla: g, ml, oz, pz, etc.
   porcionCasera: string | null;
@@ -29,13 +30,19 @@ const UNIDADES_BASE = [
   { value: 'ml',        label: 'ml — mililitros' },
   { value: 'oz',        label: 'oz — onzas' },
   { value: 'pz',        label: 'pz — pieza' },
+  { value: 'serv',      label: 'serv — servicio/scoop' },
+  { value: 'medida',    label: 'medida — medida/scoop' },
   { value: 'paquete',   label: 'paquete' },
   { value: 'botellita', label: 'botellita' },
   { value: 'lata',      label: 'lata' },
   { value: 'tz',        label: 'tz — taza' },
   { value: 'cdas',      label: 'cdas — cucharadas' },
+  { value: 'cdta',      label: 'cdta — cucharadita' },
   { value: 'sobre',     label: 'sobre' },
 ];
+
+const PRESET_UNIDADES = UNIDADES_BASE.map(u => u.value);
+const CUSTOM_UNIT = '__custom__';
 
 // Grupos SMAE con colores
 const GRUPOS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -63,6 +70,7 @@ const GRUPOS_KEYS = Object.keys(GRUPOS_CONFIG);
 const EMPTY_FORM: Omit<AlimentoSMAE, 'id'> = {
   nombre: '',
   grupo: 'verduras',
+  equivalentesBase: 1,
   pesoGramos: 0,
   unidadBase: 'g',
   porcionCasera: '',
@@ -74,12 +82,13 @@ const EMPTY_FORM: Omit<AlimentoSMAE, 'id'> = {
 };
 
 // ─── Badge de grupo ──────────────────────────────────────────────────────────
-const GrupoBadge = ({ grupo }: { grupo: string }) => {
+const GrupoBadge = ({ grupo, cantidad }: { grupo: string; cantidad?: number }) => {
   const g = GRUPOS_CONFIG[grupo];
-  if (!g) return <span className="text-text-muted text-[12px]">{grupo}</span>;
+  const prefix = cantidad != null && cantidad !== 1 ? `${cantidad} ` : '';
+  if (!g) return <span className="text-text-muted text-[12px]">{prefix}{grupo}</span>;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-medium border ${g.bg} ${g.color}`}>
-      {g.label}
+      {prefix}{g.label}
     </span>
   );
 };
@@ -109,6 +118,11 @@ const ModalAlimento = ({
   );
   const [saving, setSaving] = useState(false);
 
+  // ─── Unidad personalizada (libertad para crear unidades propias) ────
+  const [unitMode, setUnitMode] = useState<'preset' | 'custom'>(
+    inicial?.unidadBase && !PRESET_UNIDADES.includes(inicial.unidadBase) ? 'custom' : 'preset'
+  );
+
   // ─── Equivalencias adicionales (multi-grupo) ────────────────────────
 
   const [extraEquivs, setExtraEquivs] = useState<EquivalenciaExtra[]>(
@@ -125,6 +139,7 @@ const ModalAlimento = ({
   const handleSubmit = async () => {
     if (!form.nombre.trim()) return;
     if (!form.pesoGramos || form.pesoGramos <= 0) return;
+    if (!form.unidadBase.trim()) return;
     setSaving(true);
     try {
       const validEquivs = extraEquivs.filter(e => e.grupo.trim());
@@ -165,18 +180,34 @@ const ModalAlimento = ({
             />
           </div>
 
-          {/* Grupo */}
+          {/* Grupo base + cantidad de equivalentes */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-text-secondary m-0">Grupo SMAE *</label>
-            <select
-              value={form.grupo}
-              onChange={(e) => set('grupo', e.target.value)}
-              className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
-            >
-              {GRUPOS_KEYS.map(k => (
-                <option key={k} value={k}>{GRUPOS_CONFIG[k].label}</option>
-              ))}
-            </select>
+            <label className="text-[12px] font-medium text-text-secondary m-0">Grupo SMAE base *</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={form.equivalentesBase ?? 1}
+                onChange={(e) => set('equivalentesBase', parseFloat(e.target.value) || 0)}
+                placeholder="1"
+                min="0"
+                step="0.5"
+                title="Cuántos equivalentes de este grupo vale la porción"
+                className="w-20 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="self-center text-[11px] text-text-muted flex-shrink-0">eq de</span>
+              <select
+                value={form.grupo}
+                onChange={(e) => set('grupo', e.target.value)}
+                className="flex-1 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              >
+                {GRUPOS_KEYS.map(k => (
+                  <option key={k} value={k}>{GRUPOS_CONFIG[k].label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-text-muted m-0">
+              Cuántos equivalentes del grupo base aporta la porción. Default 1. Ej. 1 serv de proteína = 2 eq AOA.
+            </p>
           </div>
 
           {/* Cantidad ancla por 1 equivalente */}
@@ -193,19 +224,38 @@ const ModalAlimento = ({
                 className="flex-1 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
               />
               <select
-                value={form.unidadBase || 'g'}
-                onChange={(e) => set('unidadBase', e.target.value)}
+                value={unitMode === 'custom' ? CUSTOM_UNIT : (form.unidadBase || 'g')}
+                onChange={(e) => {
+                  if (e.target.value === CUSTOM_UNIT) {
+                    setUnitMode('custom');
+                    set('unidadBase', '');
+                  } else {
+                    setUnitMode('preset');
+                    set('unidadBase', e.target.value);
+                  }
+                }}
                 className="bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
               >
                 {UNIDADES_BASE.map(u => (
                   <option key={u.value} value={u.value}>{u.label}</option>
                 ))}
+                <option value={CUSTOM_UNIT}>Otra unidad…</option>
               </select>
             </div>
+            {unitMode === 'custom' && (
+              <input
+                autoFocus
+                type="text"
+                value={form.unidadBase}
+                onChange={(e) => set('unidadBase', e.target.value)}
+                placeholder="Escribe tu unidad. Ej. serv, scoop, barra, cápsula"
+                className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              />
+            )}
             <p className="text-[11px] text-text-muted m-0">
               {form.unidadBase === 'g' || form.unidadBase === 'ml'
                 ? `Cuántos ${form.unidadBase} equivalen a 1 porción del grupo seleccionado`
-                : `Cuántas unidades (${form.unidadBase}) equivalen a 1 porción del grupo seleccionado`}
+                : `Cuántas unidades (${form.unidadBase || 'unidad'}) equivalen a 1 porción del grupo seleccionado`}
             </p>
           </div>
 
@@ -309,7 +359,7 @@ const ModalAlimento = ({
           <div className="flex items-center gap-2 flex-1">
             {form.pesoGramos > 0 && (
               <div className="flex flex-wrap items-center gap-2 text-[12px] text-text-muted">
-                → <strong className="text-text-primary">{form.pesoGramos}{form.unidadBase || 'g'}</strong> = 1 eq · <GrupoBadge grupo={form.grupo} />
+                → <strong className="text-text-primary">{form.pesoGramos}{form.unidadBase || 'g'}</strong> = {form.equivalentesBase ?? 1} eq · <GrupoBadge grupo={form.grupo} />
                 {extraEquivs.filter(e => e.grupo && e.cantidad).map((eq, i) => (
                   <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
                     <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>
@@ -325,7 +375,7 @@ const ModalAlimento = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={saving || !form.nombre.trim() || !form.pesoGramos}
+              disabled={saving || !form.nombre.trim() || !form.pesoGramos || !form.unidadBase.trim()}
               className="flex items-center gap-2 px-5 py-2 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50"
             >
               {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
@@ -533,7 +583,7 @@ const EquivalenciasSMAE = () => {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <GrupoBadge grupo={a.grupo} />
+                        <GrupoBadge grupo={a.grupo} cantidad={a.equivalentesBase} />
                         {parseEquivs(a.equivalencias).map((eq, i) => (
                           <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
                             <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>

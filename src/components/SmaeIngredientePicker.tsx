@@ -39,6 +39,7 @@ interface SmaeAlimento {
   id: string;
   nombre: string;
   grupo: string;
+  equivalentesBase?: number; // cuántos eq del grupo base vale la porción (default 1)
   pesoGramos: number;       // valor ancla (gramos o cualquier unidad base)
   unidadBase?: string;      // ej. 'g', 'botellita', 'paquete'
   porcionCasera?: string;
@@ -228,15 +229,18 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     const baseCant = alimento.cantidadPorcion ?? grPorEq;
     const uFinal = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
 
-    let eqVal = 1;
+    // eq que aporta 1 porción del grupo base (editable en catálogo, default 1)
+    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
+    let eqVal = baseEq;
     let finalCant = baseCant;
 
-    // Auto-escalado a la carta (Eliminamos el bloqueo de "unidades discretas" porque al 
+    // Auto-escalado a la carta (Eliminamos el bloqueo de "unidades discretas" porque al
     // agregar alimentos individuales sí queremos que multiplique la porción, ej: 1 eq = 17 fresas -> 2 eq = 34 fresas)
     if (gapByGroup && gapByGroup[grupoKey] !== undefined && gapByGroup[grupoKey] > 0) {
       const missing = gapByGroup[grupoKey];
+      const portions = missing / baseEq;   // cuántas porciones llenan el faltante
       eqVal = missing;
-      finalCant = parseFloat((baseCant * missing).toFixed(2));
+      finalCant = parseFloat((baseCant * portions).toFixed(2));
     }
 
     const newEquivs: EquivalenciaItem[] = [{ cantidad: eqVal, grupo: eqLabel }];
