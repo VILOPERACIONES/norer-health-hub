@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
@@ -244,49 +244,47 @@ const PatientProfile = () => {
   const location = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [paciente, setPaciente] = useState<Paciente | null>(null);
-  const [valoraciones, setValoraciones] = useState<Valoracion[]>([]);
-  const [loading, setLoading] = useState(true);
+  // ── Datos del paciente (con cache React Query) ────────────────────────────
+  const { data: paciente, isLoading: loadingPaciente } = useQuery({
+    queryKey: ['paciente', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/pacientes/${id}`);
+      return res.data?.data || res.data;
+    },
+    enabled: !!id,
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
+
+  const { data: valoraciones = [], isLoading: loadingValoraciones } = useQuery({
+    queryKey: ['valoraciones', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/pacientes/${id}/valoraciones`);
+      const vals = res.data?.data || res.data || [];
+      if (!Array.isArray(vals)) return [];
+      return vals
+        .filter((v: any) => v && v.fecha)
+        .map((v: any) => ({
+          ...v,
+          pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
+          grasaEvolucion: parseFloat((v.pctGrasa || v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
+          masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.')),
+          kgGrasaEvolucion: parseFloat((v.masaGrasaReal || v.kgGrasa2comp || 0).toString().replace(',', '.'))
+        }))
+        .sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+    },
+    enabled: !!id,
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
+
+  const loading = loadingPaciente || loadingValoraciones;
+
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
   const [fullChartModal, setFullChartModal] = useState<{ 
     isOpen: boolean, title: string, baseDataKey: string, baseName: string, isFatModal?: boolean
   }>({ isOpen: false, title: '', baseDataKey: '', baseName: '' });
-
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [pacRes, valRes] = await Promise.all([
-          api.get(`/api/pacientes/${id}`),
-          api.get(`/api/pacientes/${id}/valoraciones`)
-        ]);
-        
-        const pData = pacRes.data?.data || pacRes.data;
-        setPaciente(pData);
-
-        const vals = valRes.data?.data || valRes.data || [];
-        if (Array.isArray(vals)) {
-          const processed = vals
-            .filter(v => v && v.fecha)
-            .map(v => ({
-              ...v,
-              pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
-              grasaEvolucion: parseFloat((v.pctGrasa || v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
-              masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.')),
-              kgGrasaEvolucion: parseFloat((v.masaGrasaReal || v.kgGrasa2comp || 0).toString().replace(',', '.'))
-            }))
-            .sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-          setValoraciones(processed);
-        }
-      } catch (err) {
-        toast({ title: 'Error', description: 'Error al sincronizar nodo maestro.', variant: 'destructive' });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, [id, toast]);
 
   useEffect(() => {
     if (location.hash === '#historial' && !loading) {

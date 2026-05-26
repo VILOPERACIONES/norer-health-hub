@@ -29,7 +29,9 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/metricas');
       return res.data?.data || res.data;
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000, // Tiempo real: refresca cada 30s
+    placeholderData: (prev) => prev,
   });
 
   const { data: alertas = [] } = useQuery({
@@ -38,7 +40,9 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/alertas');
       return res.data?.data || res.data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30 * 1000,
+    refetchInterval: 30 * 1000,
+    placeholderData: (prev) => prev,
   });
 
   const { data: topClientesRaw } = useQuery({
@@ -47,7 +51,9 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/top-clientes');
       return res.data?.data || res.data || [];
     },
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
+    refetchInterval: 60 * 1000,
+    placeholderData: (prev) => prev,
   });
 
   // Determinar top-clientes (usando el endpoint si tiene datos, o un fallback de pacientesData)
@@ -338,8 +344,10 @@ const Dashboard = () => {
               <tbody className="divide-y divide-[#2a2a2a]">
                 {ultimosPendientes.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center">
-                      <p className="text-[13px] text-[#8a8a8a]">Sin pacientes pendientes. Todo al día ✨</p>
+                    <td colSpan={5} className="py-16">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-[13px] text-[#8a8a8a] text-center">Sin pacientes pendientes. Todo al día ✨</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
