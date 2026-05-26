@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Trash2, Edit3 } from 'lucide-react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
@@ -9,29 +10,20 @@ import type { Plan } from '@/types';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Plans = () => {
-  const [planesBase, setPlanesBase] = useState<Plan[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  
   const navigate = useNavigate();
   const { toast } = useToast();
   const { confirm, ConfirmDialogComponent } = useConfirm();
+  const queryClient = useQueryClient();
 
-  const fetchData = async () => {
-    setLoading(true);
-    try {
+  const { data: planesBase = [], isLoading: loading } = useQuery({
+    queryKey: ['planes-base'],
+    queryFn: async () => {
       const { data } = await api.get('/api/planes?tipo=base');
-      setPlanesBase(data?.data || data || []);
-    } catch (err) {
-      toast({ title: 'Error', description: 'No se pudieron cargar los planes', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, [toast]);
+      return data?.data || data || [];
+    },
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -46,11 +38,13 @@ const Plans = () => {
     try {
       await api.delete(`/api/planes/${id}`);
       toast({ title: 'MENÚ ELIMINADO' });
-      fetchData();
+      queryClient.invalidateQueries({ queryKey: ['planes-base'] });
     } catch (err) {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
     }
   };
+
+  const [search, setSearch] = useState('');
 
   const filteredPlanes = planesBase.filter(p => 
     p.nombre?.toLowerCase().includes(search.toLowerCase())

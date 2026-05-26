@@ -805,9 +805,9 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                             height: '28px',
                             fontWeight: 700,
                             fontSize: '12px',
-                            color: manualPct ? '#ff85a2' : '#a0a0a0',
-                            backgroundColor: manualPct ? '#2a151b' : 'transparent',
-                            borderBottom: manualPct ? '1px solid #ff85a2' : 'none',
+                            color: manualPct ? '#90c2ff' : '#a0a0a0',
+                            backgroundColor: manualPct ? '#0f1e30' : 'transparent',
+                            borderBottom: manualPct ? '1px solid #3b5bdb' : 'none',
                           }}
                           title={manualPct ? "Porcentaje objetivo manual (sobrescribe calculado)" : "Cálculo automático"}
                         />

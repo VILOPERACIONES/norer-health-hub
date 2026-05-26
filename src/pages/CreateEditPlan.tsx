@@ -107,7 +107,7 @@ export const CreateEditPlanForm = ({
 
   // ─── Toggle agua natural en comidas principales ──────────────────────────────
   const [aguaNaturalDefault, setAguaNaturalDefault] = useState(true);
-  const aguaAutofillDone = useRef(false);
+
 
   const mapMenusFromBackend = (backendMenus: any[]) => {
     return backendMenus?.map((m: any) => ({
@@ -219,9 +219,9 @@ export const CreateEditPlanForm = ({
             setNombrePlan(p.nombre || '');
             setTipo(p.tipoPlan || p.tipo || 'Balanceada');
             setCalorias(p.calorias.toString());
-            setProteinas((p.proteinasPct || p.macros?.proteinas || 30).toString());
-            setCarbohidratos((p.carbohidratosPct || p.macros?.carbohidratos || 40).toString());
-            setGrasas((p.grasasPct || p.macros?.grasas || 30).toString());
+            setProteinas((Number(p.proteinasPct ?? p.macros?.proteinas ?? 30)).toString());
+            setCarbohidratos((Number(p.carbohidratosPct ?? p.macros?.carbohidratos ?? 40)).toString());
+            setGrasas((Number(p.grasasPct ?? p.macros?.grasas ?? 30)).toString());
 
             if (p.proximaSesion) {
               const d = new Date(p.proximaSesion);
@@ -342,18 +342,15 @@ export const CreateEditPlanForm = ({
     }
   }, [valData]);
 
-  // Autofill agua natural en comidas principales una vez por carga
+  // Autofill agua natural en todos los tiempos mientras el toggle esté activo
   useEffect(() => {
-    if (!aguaNaturalDefault || aguaAutofillDone.current) return;
+    if (!aguaNaturalDefault) return;
     if (!menus.length) return;
-    const mainMeals = ['desayuno', 'comida', 'almuerzo', 'cena'];
     let touched = false;
     const next = menus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map(t => {
-        const nameL = (t.nombre || '').toLowerCase().trim();
-        const isMain = mainMeals.some(m => nameL.includes(m));
-        if (isMain && (!t.bebida || t.bebida.trim() === '')) {
+        if (!t.bebida || t.bebida.trim() === '') {
           touched = true;
           return { ...t, bebida: 'Agua natural' };
         }
@@ -361,7 +358,6 @@ export const CreateEditPlanForm = ({
       })
     }));
     if (touched) setMenus(next);
-    aguaAutofillDone.current = true;
   }, [menus, aguaNaturalDefault]);
 
   // Kcal por equivalente SMAE — acepta tanto el label de UI como la clave interna del backend
@@ -777,7 +773,7 @@ export const CreateEditPlanForm = ({
               ) : (
                 <Save className="h-[18px] w-[18px]" />
               )}
-              {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
+              {isEdit ? 'Guardar Cambios' : 'Guardar Menú'}
             </button>
 
           </div>
@@ -935,7 +931,7 @@ export const CreateEditPlanForm = ({
                   <div className="mt-6 flex items-center justify-between px-4 py-3 bg-[#0e1a2a] rounded-[10px] border border-[#1a3050] transition-all">
                     <div className="flex items-center gap-2">
                       <Droplets className="w-4 h-4 text-[#3a9eff]" />
-                      <span className="text-[12px] font-bold text-[#c0c0c0] uppercase tracking-wider">Agua natural en comidas principales</span>
+                      <span className="text-[12px] font-bold text-[#c0c0c0] uppercase tracking-wider">Agua natural en todos los tiempos</span>
                     </div>
                     <button
                       type="button"
@@ -943,14 +939,11 @@ export const CreateEditPlanForm = ({
                         const newVal = !aguaNaturalDefault;
                         setAguaNaturalDefault(newVal);
                         if (newVal) {
-                          // Auto-fill bebida for main meals (Desayuno, Comida, Cena)
-                          const mainMeals = ['desayuno', 'comida', 'almuerzo', 'cena'];
+                          // Auto-fill bebida for ALL tiempos
                           setMenus(prev => prev.map(menu => ({
                             ...menu,
                             tiempos: menu.tiempos.map(t => {
-                              const nameL = (t.nombre || '').toLowerCase().trim();
-                              const isMain = mainMeals.some(m => nameL.includes(m));
-                              if (isMain && (!t.bebida || t.bebida.trim() === '')) {
+                              if (!t.bebida || t.bebida.trim() === '') {
                                 return { ...t, bebida: 'Agua natural' };
                               }
                               return t;
@@ -1457,37 +1450,7 @@ export const CreateEditPlanForm = ({
           </div>
         </div>
 
-        {/* ─── Botón Sticky Inferior: Generar Menú / Guardar Cambios ─── */}
-        <div className="sticky bottom-0 z-30 pt-4 pb-2 -mx-4 md:-mx-8 px-4 md:px-8 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/95 to-transparent">
-          <button
-            onClick={handleSave}
-            disabled={saving || macroSum !== 100}
-            className="w-full py-[12px] bg-brand-primary text-bg-base rounded-[10px] text-[15px] font-bold transition-all hover:bg-white flex items-center justify-center gap-2 shadow-[0_-4px_24px_rgba(144,194,255,0.15)] disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {saving ? (
-              <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white rounded-full animate-spin" />
-            ) : (
-              <Save className="h-[18px] w-[18px]" />
-            )}
-            {isEdit ? 'Guardar Cambios' : 'Generar Menú'}
-          </button>
-        </div>
       </div>
-
-      {/* ─── FAB: Generar Menú siempre visible (fallback robusto a sticky) ─── */}
-      <button
-        onClick={handleSave}
-        disabled={saving || macroSum !== 100}
-        title={macroSum !== 100 ? 'Ajusta macros a 100% para generar' : (isEdit ? 'Guardar cambios' : 'Generar menú')}
-        className="fixed bottom-6 right-6 z-[60] px-5 py-3 bg-brand-primary text-bg-base rounded-full text-[14px] font-bold shadow-[0_8px_28px_rgba(144,194,255,0.45)] hover:bg-white transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        {saving ? (
-          <div className="w-[18px] h-[18px] border-2 border-black/20 border-t-black rounded-full animate-spin" />
-        ) : (
-          <Save className="h-[18px] w-[18px]" />
-        )}
-        <span className="hidden sm:inline">{isEdit ? 'Guardar Cambios' : 'Generar Menú'}</span>
-      </button>
       {/* ─── Save-as-Platillo Modal ─── */}
       {savePlatilloModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
