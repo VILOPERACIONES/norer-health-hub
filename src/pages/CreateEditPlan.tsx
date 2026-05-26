@@ -352,7 +352,7 @@ export const CreateEditPlanForm = ({
       tiempos: menu.tiempos.map(t => {
         if (!t.bebida || t.bebida.trim() === '') {
           touched = true;
-          return { ...t, bebida: 'Agua natural' };
+          return { ...t, bebida: 'Agua natural 500ml' };
         }
         return t;
       })
@@ -944,7 +944,7 @@ export const CreateEditPlanForm = ({
                             ...menu,
                             tiempos: menu.tiempos.map(t => {
                               if (!t.bebida || t.bebida.trim() === '') {
-                                return { ...t, bebida: 'Agua natural' };
+                                return { ...t, bebida: 'Agua natural 500ml' };
                               }
                               return t;
                             })
@@ -1050,7 +1050,17 @@ export const CreateEditPlanForm = ({
                             type="text"
                             placeholder="Bebida (ej: 500ml agua con limón)"
                             value={tiempo.bebida || ''}
+                            onFocus={(e) => {
+                              if (e.target.value === 'Agua natural 500ml') {
+                                updateTiempo(mi, ti, t => ({ ...t, bebida: '' }));
+                              }
+                            }}
                             onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
+                            onBlur={(e) => {
+                              if (!e.target.value.trim()) {
+                                updateTiempo(mi, ti, t => ({ ...t, bebida: 'Agua natural 500ml' }));
+                              }
+                            }}
                             className="flex-1 bg-transparent text-[13px] font-bold text-white placeholder:text-[#999] placeholder:font-medium outline-none border-b border-transparent focus:border-[#3a9eff]/40 transition-colors py-0.5"
                           />
                         </div>
