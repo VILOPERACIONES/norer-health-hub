@@ -83,6 +83,7 @@ export interface Antecedentes {
   signosYSintomas?: string | null;
   historialProductos?: string;
   recomendacionSuplementos?: string;
+  suplementosDetalle?: Suplemento[];
 }
 
 export interface ConsumoCalorico {

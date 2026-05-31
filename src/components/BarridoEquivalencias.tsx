@@ -255,8 +255,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   const { tiempos, porciones, distribucion, kcalManuales = {}, energiaTotalManual } = state;
 
-  // ─── Kcal automática por tiempo ─────────────────────────────────────────────
-  // ─── Kcal automática por tiempo ─────────────────────────────────────────────
+  // ─── Kcal automática por tiempo (desde distribución) ───────────────────────
   const colKcalAuto = (tiempo: string) =>
     GRUPOS.reduce(
       (s, { key }) => s + toNum(distribucion[tiempo]?.[key]) * KCAL_POR_EQ[key],
@@ -268,18 +267,35 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     return manual != null && manual > 0 ? manual : colKcalAuto(tiempo);
   };
 
-  // kcalTotalAuto: suma pura de porciones × kcal_base por tiempo (sin overrides manuales)
-  const kcalTotalAuto = useMemo(
+  // kcalFromPorciones: energía desde la columna Porciones — fuente primaria, tiempo real
+  const kcalFromPorciones = useMemo(
+    () => GRUPOS.reduce((s, { key }) => s + toNum(porciones[key]) * KCAL_POR_EQ[key], 0),
+    [porciones]
+  );
+
+  // kcalFromDistribucion: fallback si porciones están vacías
+  const kcalFromDistribucion = useMemo(
     () => tiempos.reduce((s, t) => s + colKcalAuto(t), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tiempos, distribucion]
   );
+
+  // kcalTotalAuto: porciones tienen prioridad, distribución como fallback
+  const kcalTotalAuto = kcalFromPorciones > 0 ? kcalFromPorciones : kcalFromDistribucion;
+
+  // Sincronizar energiaInputStr con kcalFromPorciones en tiempo real (si no hay override manual)
+  useEffect(() => {
+    if (energiaTotalManual == null || energiaTotalManual === 0) {
+      setEnergiaInputStr(kcalFromPorciones > 0 ? String(Math.round(kcalFromPorciones)) : '');
+    }
+  }, [kcalFromPorciones]);
 
   // Energía total: manual tiene prioridad sobre auto
   const kcalTotal =
     energiaTotalManual != null && energiaTotalManual > 0
       ? energiaTotalManual
       : kcalTotalAuto;
+
 
   const getCell = (tiempo: string, grupo: string) =>
     distribucion[tiempo]?.[grupo] ?? 0;
@@ -289,22 +305,28 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   // ─── Commit ──────────────────────────────────────────────────────────────────
   const commit = (next: BarridoData) => {
-    // kcalManuales por tiempo fue eliminado de la UI → siempre limpiar para evitar datos residuales
     const cleanManuales = {};
-    // En el modo captura manual total solicitado por el usuario, el sistema NO recalcula nada.
-    // Retiene el valor cargado de kcalTotal a menos que se ingrese uno nuevo en el input manual.
-    const autoTotal = next.tiempos.reduce((s, t) => {
-      const auto = GRUPOS.reduce(
+
+    // Energía desde porciones (fuente primaria, tiempo real)
+    const porcionesTotal = GRUPOS.reduce(
+      (s, { key }) => s + toNum(next.porciones[key]) * KCAL_POR_EQ[key],
+      0
+    );
+
+    // Fallback: energía desde distribución si porciones están vacías
+    const distTotal = next.tiempos.reduce((s, t) => {
+      return s + GRUPOS.reduce(
         (gs, { key }) => gs + toNum(next.distribucion[t]?.[key]) * KCAL_POR_EQ[key],
         0
       );
-      return s + auto;
     }, 0);
+
+    const autoTotal = porcionesTotal > 0 ? porcionesTotal : distTotal;
 
     const totalFinal =
       next.energiaTotalManual != null && next.energiaTotalManual > 0
         ? next.energiaTotalManual
-        : (next.kcalTotal || Math.round(autoTotal));
+        : Math.round(autoTotal);
 
     // Validar si la distribución suma exactamente la porción para TODOS los grupos
     const isValid = GRUPOS.every(({ key }) => {

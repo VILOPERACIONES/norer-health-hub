@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill } from 'lucide-react';
+import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill, FileText, X } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
@@ -10,6 +10,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -86,6 +87,8 @@ export const CreateEditPlanForm = ({
   const [valData, setValData] = useState<any>(null);
   const [suplementosDetalle, setSuplementosDetalle] = useState<any[]>([]); // 💊 State independiente para persistencia
   const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
+  const [pacienteInfo, setPacienteInfo] = useState<any>(null); // antecedentes + datos clínicos del paciente
+  const [showResumenPaciente, setShowResumenPaciente] = useState(false);
   // Borradores locales del nombre de platillo mientras se edita — evita que el grupo desaparezca al vaciar el input
   const [platilloDrafts, setPlatilloDrafts] = useState<Record<string, string>>({});
 
@@ -202,6 +205,7 @@ export const CreateEditPlanForm = ({
           if (p) {
             const fullName = `${p.nombre} ${p.apellido || ''}`.trim();
             setPacienteNombre(fullName);
+            setPacienteInfo(p);
             if (!isEdit) {
               const hoy = new Date();
               const dd = String(hoy.getDate()).padStart(2, '0');
@@ -280,7 +284,14 @@ export const CreateEditPlanForm = ({
 
           // Logica especifica para crear uno nuevo (inicializar vacios, auto calcular macro iniciales)
           if (!isEdit) {
-            setSuplementosDetalle(v.suplementosDetalle || []);
+            // Merge: preservar suplementos ya en el plan + añadir los de la valoración que no estén duplicados
+            setSuplementosDetalle(prev => {
+              const valSups: any[] = v.suplementosDetalle || [];
+              if (prev.length === 0) return valSups;
+              const existingIds = new Set(prev.map((s: any) => s.id));
+              const nuevos = valSups.filter((s: any) => !existingIds.has(s.id));
+              return [...prev, ...nuevos];
+            });
             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
             if (barrido?.tiempos?.length > 0) {
@@ -585,7 +596,7 @@ export const CreateEditPlanForm = ({
   };
 
   // ─── Presupuesto de equivalencias por tiempo (del barrido) ──────────────────
-  const getBudgetForTiempo = (tiempo: TiempoComida): { label: string; groupKey: string; used: number; budget: number; missing: number }[] => {
+  const getBudgetForTiempo = (tiempo: TiempoComida): { label: string; groupKey: string; used: number; budget: number; missing: number; isExtra?: boolean }[] => {
     const barridoData = valData?.barridoEquivalencias;
     if (!barridoData?.tiempos || !barridoData?.distribucion) return [];
 
@@ -595,27 +606,59 @@ export const CreateEditPlanForm = ({
     if (!barridoTiempoKey) return [];
     const dist = barridoData.distribucion[barridoTiempoKey] || {};
 
-    return Object.entries(dist)
-      .filter(([, val]) => Number(val) > 0)
-      .map(([barridoKey, val]) => {
-        const budget = Number(val);
-        // Sumar equivalencias usadas en ingredientes de este tiempo
-        let used = 0;
-        tiempo.ingredientes.forEach(ing => {
-          const eqs = ing.equivalencias && ing.equivalencias.length > 0
-            ? ing.equivalencias
-            : (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
-          eqs.forEach((eq: any) => {
-            if (groupToBarridoKey(normalizeGroup(String(eq.grupo))) === barridoKey) {
-              used += Number(eq.cantidad) || 0;
-            }
-          });
+    const budgetedKeys = new Set(Object.keys(dist).filter(k => Number(dist[k]) > 0));
+
+    const helper = (barridoKey: string) => {
+      let used = 0;
+      tiempo.ingredientes.forEach(ing => {
+        const eqs = ing.equivalencias && ing.equivalencias.length > 0
+          ? ing.equivalencias
+          : (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+        eqs.forEach((eq: any) => {
+          if (groupToBarridoKey(normalizeGroup(String(eq.grupo))) === barridoKey) {
+            used += Number(eq.cantidad) || 0;
+          }
         });
-        // Encontrar etiqueta canónica para mostrar
-        const canonEntry = Object.entries(CANONICAL_TO_BARRIDO_KEY).find(([, v]) => v === barridoKey);
-        const label = canonEntry ? canonEntry[0] : barridoKey;
-        return { label, groupKey: barridoKey, used: parseFloat(used.toFixed(2)), budget, missing: parseFloat((budget - used).toFixed(2)) };
       });
+      return parseFloat(used.toFixed(2));
+    };
+
+    const canonLabel = (barridoKey: string) => {
+      const entry = Object.entries(CANONICAL_TO_BARRIDO_KEY).find(([, v]) => v === barridoKey);
+      return entry ? entry[0] : barridoKey;
+    };
+
+    const budgetedItems = Array.from(budgetedKeys).map(barridoKey => {
+      const budget = Number(dist[barridoKey]);
+      const used = helper(barridoKey);
+      return { label: canonLabel(barridoKey), groupKey: barridoKey, used, budget, missing: parseFloat((budget - used).toFixed(2)) };
+    });
+
+    // Grupos extra: en ingredientes pero SIN presupuesto en este tiempo
+    const extraTotals: Record<string, number> = {};
+    tiempo.ingredientes.forEach(ing => {
+      const eqs = ing.equivalencias && ing.equivalencias.length > 0
+        ? ing.equivalencias
+        : (ing.eqGrupo ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+      eqs.forEach((eq: any) => {
+        if (!eq.grupo) return;
+        const key = groupToBarridoKey(normalizeGroup(String(eq.grupo)));
+        if (!budgetedKeys.has(key) && Number(eq.cantidad) > 0) {
+          extraTotals[key] = (extraTotals[key] || 0) + (Number(eq.cantidad) || 0);
+        }
+      });
+    });
+
+    const extraItems = Object.entries(extraTotals).map(([barridoKey, used]) => ({
+      label: canonLabel(barridoKey),
+      groupKey: barridoKey,
+      used: parseFloat(used.toFixed(2)),
+      budget: 0,
+      missing: parseFloat((-used).toFixed(2)),
+      isExtra: true,
+    }));
+
+    return [...budgetedItems, ...extraItems];
   };
 
   const handleSave = async () => {
@@ -762,6 +805,16 @@ export const CreateEditPlanForm = ({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+            {!isBasePlan && pacienteInfo && (
+              <button
+                onClick={() => setShowResumenPaciente(true)}
+                className="w-full sm:w-auto px-[14px] py-[10px] bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#444] text-[#c0c0c0] hover:text-white rounded-[8px] text-[13px] font-medium transition-all flex items-center justify-center gap-2"
+                title="Ver resumen clínico del paciente"
+              >
+                <FileText className="h-[15px] w-[15px]" />
+                Resumen
+              </button>
+            )}
             {/* Botón Guardar Cambios / Generar Menú arriba - Ahora siempre visible */}
             <button
               onClick={handleSave}
@@ -1093,7 +1146,20 @@ export const CreateEditPlanForm = ({
                             </button>
                             {isOpen && (
                               <div className="px-3 pb-3 space-y-2 bg-[#111]">
-                                {budgetItems.map(({ label, used, budget: bdgt }) => {
+                                {budgetItems.map(({ label, used, budget: bdgt, isExtra }) => {
+                                  if (isExtra) {
+                                    return (
+                                      <div key={`extra-${label}`}>
+                                        <div className="flex items-center justify-between mb-0.5">
+                                          <span className="text-[11px] font-semibold text-red-400">{label}</span>
+                                          <span className="text-[10px] font-bold tabular-nums text-red-400">+{used} eq · No presupuestado</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-[#2e1a1a] rounded-full overflow-hidden">
+                                          <div className="h-full rounded-full bg-red-500 transition-all duration-300" style={{ width: '100%' }} />
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                   const pct = Math.min((used / bdgt) * 100, 100);
                                   const over = used > bdgt;
                                   const done = !over && pct >= 85;
@@ -1104,7 +1170,7 @@ export const CreateEditPlanForm = ({
                                       <div className="flex items-center justify-between mb-0.5">
                                         <span className="text-[11px] font-semibold text-white">{label}</span>
                                         <span className={`text-[10px] font-bold tabular-nums ${textColor}`}>
-                                          {used} / {bdgt} eq {over ? '⚠' : done ? '✓' : ''}
+                                          {used} / {bdgt} eq {over ? `⚠ +${parseFloat((used - bdgt).toFixed(2))} extra` : done ? '✓' : ''}
                                         </span>
                                       </div>
                                       <div className="w-full h-1.5 bg-[#222] rounded-full overflow-hidden">
@@ -1516,9 +1582,103 @@ export const CreateEditPlanForm = ({
       )}
 
       {ConfirmDialogComponent}
+
+      {/* ─── Resumen clínico del paciente ─── */}
+      <Sheet open={showResumenPaciente} onOpenChange={setShowResumenPaciente}>
+        <SheetContent side="right" className="w-[360px] sm:w-[400px] bg-[#111] border-l border-[#2a2a2a] overflow-y-auto">
+          <SheetHeader className="mb-5">
+            <SheetTitle className="text-white text-[16px] font-bold">
+              {pacienteNombre}
+            </SheetTitle>
+            <p className="text-[11px] text-[#555] uppercase tracking-widest font-bold">Resumen clínico · Solo lectura</p>
+          </SheetHeader>
+
+          <div className="space-y-5">
+            {/* Número de comidas */}
+            {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
+              <ResumenSeccion titulo="Número de comidas">
+                <p className="text-[14px] font-bold text-white">
+                  {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.join(', ')}
+                </p>
+              </ResumenSeccion>
+            )}
+
+            {/* Suplementos activos */}
+            {suplementosDetalle.filter((s: any) => s.activo && s.nombre).length > 0 && (
+              <ResumenSeccion titulo="Suplementos activos">
+                <ul className="space-y-1">
+                  {suplementosDetalle.filter((s: any) => s.activo && s.nombre).map((s: any, i: number) => (
+                    <li key={i} className="text-[13px] text-[#e0e0e0]">
+                      <span className="font-semibold text-white">{s.nombre}</span>
+                      {s.indicaciones && <span className="text-[#8a8a8a]"> — {s.indicaciones}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </ResumenSeccion>
+            )}
+
+            {/* Notas clínicas */}
+            {valData?.comentarios && (
+              <ResumenSeccion titulo="Notas clínicas">
+                <p className="text-[13px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.comentarios}</p>
+              </ResumenSeccion>
+            )}
+
+            {/* Alimentos a evitar (del plan) */}
+            {Array.isArray(valData?.evitar) && valData.evitar.filter((e: any) => e?.valor?.trim()).length > 0 && (
+              <ResumenSeccion titulo="Alimentos a evitar">
+                <ul className="space-y-1">
+                  {valData.evitar.filter((e: any) => e?.valor?.trim()).map((e: any, i: number) => (
+                    <li key={i} className="text-[13px] text-red-300 flex items-start gap-1.5">
+                      <span className="mt-0.5 shrink-0 text-red-500">✕</span> {e.valor}
+                    </li>
+                  ))}
+                </ul>
+              </ResumenSeccion>
+            )}
+
+            {/* Patología */}
+            {pacienteInfo?.antecedentes?.patologia && (
+              <ResumenSeccion titulo="Patología / Enfermedades">
+                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p>
+              </ResumenSeccion>
+            )}
+
+            {/* Alergias */}
+            {pacienteInfo?.antecedentes?.alergias && (
+              <ResumenSeccion titulo="Alergias">
+                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p>
+              </ResumenSeccion>
+            )}
+
+            {/* Alimentos que no le gustan */}
+            {pacienteInfo?.antecedentes?.alimentosNoGustan && (
+              <ResumenSeccion titulo="No consume / No le gustan">
+                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosNoGustan}</p>
+              </ResumenSeccion>
+            )}
+
+            {/* Historial de suplementos (del perfil) */}
+            {pacienteInfo?.antecedentes?.historialProductos && (
+              <ResumenSeccion titulo="Historial de suplementos">
+                <p className="text-[13px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p>
+              </ResumenSeccion>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 };
+
+function ResumenSeccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+  return (
+    <div className="border border-[#2a2a2a] rounded-[8px] p-3 bg-[#0f0f0f]">
+      <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-2">{titulo}</p>
+      {children}
+    </div>
+  );
+}
 
 export default function CreateEditPlan() {
   const { id, planId } = useParams<{ id: string, planId: string }>();

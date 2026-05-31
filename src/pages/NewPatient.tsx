@@ -124,6 +124,8 @@ const NewPatient = () => {
 
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
 
+  const [suplementosIniciales, setSuplementosIniciales] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
+
   const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
   const addDisciplina = () => setDisciplinas([...disciplinas, { disciplina: '', frecuencia: '', tiempo: '' }]);
   const removeDisciplina = (idx: number) => setDisciplinas(disciplinas.length > 1 ? disciplinas.filter((_, i) => i !== idx) : disciplinas);
@@ -187,8 +189,7 @@ const NewPatient = () => {
         consumoAlcohol: form.alcohol,
         tabaco: form.tabaco,
         agua: form.agua,
-        historialProductos: form.historialProductos,
-        recomendacionSuplementos: form.recomSuplementos
+        suplementosDetalle: suplementosIniciales.filter(s => s.nombre.trim()),
       },
 
 
@@ -293,8 +294,67 @@ const NewPatient = () => {
         </FormSection>
 
         <FormSection title="Anamnesis y Suplementación" icon={Shield} defaultOpen={false}>
-          <TextArea label="Historial de Suplementos (Fase Actual)" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} placeholder="Describa los productos que consume el paciente actualmente..." />
-          <TextArea label="Propuesta Inicial de Suplementación" value={form.recomSuplementos} onChange={(v: string) => update('recomSuplementos', v)} placeholder="Recomendaciones basadas en el objetivo..." />
+          <div className="col-span-full space-y-3">
+            <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none block">
+              Suplementos Actuales del Paciente
+            </label>
+            <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] p-4 space-y-2">
+              {suplementosIniciales.length > 0 && (
+                <div className="grid grid-cols-[1.5fr_2fr_40px] gap-3 items-center px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest border-b border-[#2a2a2a] mb-2">
+                  <div>Suplemento</div>
+                  <div>Indicaciones / Dosis</div>
+                  <div></div>
+                </div>
+              )}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {suplementosIniciales.map((sup, idx) => (
+                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a]">
+                    <input
+                      type="text"
+                      value={sup.nombre}
+                      onChange={(e) => {
+                        const arr = [...suplementosIniciales];
+                        arr[idx] = { ...arr[idx], nombre: e.target.value };
+                        setSuplementosIniciales(arr);
+                      }}
+                      placeholder="Ej. Creatina"
+                      className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                    />
+                    <input
+                      type="text"
+                      value={sup.indicaciones}
+                      onChange={(e) => {
+                        const arr = [...suplementosIniciales];
+                        arr[idx] = { ...arr[idx], indicaciones: e.target.value };
+                        setSuplementosIniciales(arr);
+                      }}
+                      placeholder="Ej. 5g pre-entreno"
+                      className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setSuplementosIniciales(suplementosIniciales.filter((_, i) => i !== idx))}
+                      className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {suplementosIniciales.length === 0 && (
+                  <p className="text-[12px] text-[#8a8a8a] text-center py-4">Sin suplementos registrados.</p>
+                )}
+              </div>
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setSuplementosIniciales([...suplementosIniciales, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }])}
+                  className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
+                >
+                  <Plus className="w-4 h-4" /> Agregar Suplemento
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 col-span-full">
             <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
             <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />

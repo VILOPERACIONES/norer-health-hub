@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -87,6 +87,39 @@ const NewAssessment = () => {
   const [tieneSuplementos, setTieneSuplementos] = useState(false);
   const [suplementos, setSuplementos] = useState<{ id: string; nombre: string; indicaciones: string; fechaInicio: string; activo: boolean }[]>([]);
 
+  const [notasLibres, setNotasLibres] = useState('');
+  const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; tipo: string; dataUrl: string }[]>([]);
+
+  const [expediente, setExpediente] = useState({
+    objetivo: '', nivelActividad: '', disciplina: '', frecuencia: '',
+    patologia: '', alergias: '', alimentosNoGustan: '', alimentosGustan: '',
+    agua: '', estrenimiento: '', signosYSintomas: '', consumoAlcohol: '', tabaco: '',
+  });
+  const [expedienteModified, setExpedienteModified] = useState(false);
+  const [showExpediente, setShowExpediente] = useState(false);
+
+  const handleAdjuntoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      if (file.size > 1.5 * 1024 * 1024) {
+        toast({ title: 'Archivo muy grande', description: `${file.name} supera 1.5MB. Comprime la imagen.`, variant: 'destructive' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setAdjuntos(prev => [...prev, { id: Date.now().toString() + Math.random(), nombre: file.name, tipo: file.type, dataUrl }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const updateExpediente = (field: string, value: string) => {
+    setExpediente(e => ({ ...e, [field]: value }));
+    setExpedienteModified(true);
+  };
+
   const totalSteps = 4;
   const STEPS = [
     { id: 1, label: 'Valoración' },
@@ -132,6 +165,8 @@ const NewAssessment = () => {
     if (d.suplementosDetalle) setSuplementosDetalle(d.suplementosDetalle);
     if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
     if (d.suplementos) setSuplementos(d.suplementos);
+    if (d.notasLibres) setNotasLibres(d.notasLibres);
+    if (d.adjuntos) setAdjuntos(d.adjuntos);
     setIsGrasaModified(true);
     setShowDraftPrompt(false);
     toast({ title: 'Progreso restaurado', description: 'Has vuelto a donde te quedaste.' });
@@ -167,6 +202,25 @@ const NewAssessment = () => {
 
     // Grasa (siempre limpio)
     setPctGrasa('');
+
+    // Re-llenar expediente desde datos del paciente
+    const ej = p.ejercicio || p.datosEjercicio;
+    setExpediente({
+      objetivo: ej?.objetivo || '',
+      nivelActividad: ej?.nivelActividad || '',
+      disciplina: ej?.disciplina || '',
+      frecuencia: ej?.frecuencia || '',
+      patologia: p.antecedentes?.patologia || '',
+      alergias: p.antecedentes?.alergias || '',
+      alimentosNoGustan: p.antecedentes?.alimentosNoGustan || '',
+      alimentosGustan: p.antecedentes?.alimentosGustan || '',
+      agua: p.antecedentes?.agua || '',
+      estrenimiento: p.antecedentes?.estrenimiento || '',
+      signosYSintomas: p.antecedentes?.signosYSintomas || '',
+      consumoAlcohol: p.antecedentes?.consumoAlcohol || '',
+      tabaco: p.antecedentes?.tabaco || '',
+    });
+    setExpedienteModified(false);
   };
 
   // Save drafts (only if not editing)
@@ -178,9 +232,10 @@ const NewAssessment = () => {
     const temarioParaDraft = hasComp
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle };
+    // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, isEdit]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -188,6 +243,23 @@ const NewAssessment = () => {
         const { data } = await api.get(`/api/pacientes/${pacienteId}`);
         const p = data?.data || data;
         setPaciente(p);
+
+        const ej = p.ejercicio || p.datosEjercicio;
+        setExpediente({
+          objetivo: ej?.objetivo || '',
+          nivelActividad: ej?.nivelActividad || '',
+          disciplina: ej?.disciplina || '',
+          frecuencia: ej?.frecuencia || '',
+          patologia: p.antecedentes?.patologia || '',
+          alergias: p.antecedentes?.alergias || '',
+          alimentosNoGustan: p.antecedentes?.alimentosNoGustan || '',
+          alimentosGustan: p.antecedentes?.alimentosGustan || '',
+          agua: p.antecedentes?.agua || '',
+          estrenimiento: p.antecedentes?.estrenimiento || '',
+          signosYSintomas: p.antecedentes?.signosYSintomas || '',
+          consumoAlcohol: p.antecedentes?.consumoAlcohol || '',
+          tabaco: p.antecedentes?.tabaco || '',
+        });
 
         if (isEdit) {
           try {
@@ -220,6 +292,9 @@ const NewAssessment = () => {
                 const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
                 setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
               }
+
+              if (val.notasLibres) setNotasLibres(val.notasLibres);
+              if (val.adjuntosJson && Array.isArray(val.adjuntosJson)) setAdjuntos(val.adjuntosJson);
 
               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
                 setTieneSuplementos(true);
@@ -270,9 +345,18 @@ const NewAssessment = () => {
           setPctGrasa('');
           setKgGrasa('');
 
-          // Suplementación (arrastrada de la valoración pasada si existe)
+          // Suplementación (arrastrada de la valoración pasada; si es primera consulta, desde antecedentes del registro)
           if (lastVal?.suplementosDetalle && Array.isArray(lastVal.suplementosDetalle) && lastVal.suplementosDetalle.length > 0) {
             setSuplementosDetalle(lastVal.suplementosDetalle);
+            setSuplementacionActiva(true);
+          } else if (p?.antecedentes?.suplementosDetalle && Array.isArray(p.antecedentes.suplementosDetalle) && p.antecedentes.suplementosDetalle.length > 0) {
+            // Primera consulta: heredar suplementos del registro del paciente
+            setSuplementosDetalle(p.antecedentes.suplementosDetalle.map((s: any) => ({
+              ...s,
+              id: s.id || Date.now().toString() + Math.random(),
+              activo: s.activo !== false,
+              fechaInicio: s.fechaInicio || new Date().toISOString(),
+            })));
             setSuplementacionActiva(true);
           } else {
             setSuplementosDetalle([]);
@@ -392,6 +476,8 @@ const NewAssessment = () => {
         return base;
       })(),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
+      notasLibres: notasLibres || null,
+      adjuntosJson: adjuntos.length > 0 ? adjuntos : null,
       suplementosDetalle: suplementosParaGuardar,
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
@@ -430,6 +516,31 @@ const NewAssessment = () => {
             setSaving(false);
             return;
           }
+        }
+      }
+
+      if (expedienteModified) {
+        try {
+          await api.put(`/api/pacientes/${pacienteId}`, {
+            ejercicio: {
+              objetivo: expediente.objetivo,
+              nivelActividad: expediente.nivelActividad,
+            },
+            antecedentes: {
+              patologia: expediente.patologia,
+              alergias: expediente.alergias,
+              alimentosNoGustan: expediente.alimentosNoGustan,
+              alimentosGustan: expediente.alimentosGustan,
+              agua: expediente.agua,
+              estrenimiento: expediente.estrenimiento,
+              signosYSintomas: expediente.signosYSintomas,
+              consumoAlcohol: expediente.consumoAlcohol,
+              tabaco: expediente.tabaco,
+            }
+          });
+          setExpedienteModified(false);
+        } catch (e) {
+          console.warn('No se pudo actualizar expediente:', e);
         }
       }
 
@@ -588,27 +699,77 @@ const NewAssessment = () => {
                 </p>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
-                {/* COLUMNA 1: ANTROPOMETRÍA Y SUPLEMENTACIÓN */}
-                <div className="flex flex-col gap-4 shrink-0 h-fit">
-                  <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
-                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
-                    <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
-                      <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
-                      <Field label="Hora" value={hora} onChange={setHora} type="time" />
-
-                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
-                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
-
-                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
-                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
-                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+              {/* PANEL EXPEDIENTE DEL PACIENTE */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowExpediente(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Expediente del Paciente</span>
+                    {expedienteModified && <span className="text-[10px] font-bold text-brand-primary uppercase tracking-wider ml-2">• Modificado</span>}
+                  </div>
+                  <span className={`text-[#8a8a8a] transition-transform duration-200 ${showExpediente ? 'rotate-180' : ''}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </span>
+                </button>
+                {showExpediente && (
+                  <div className="px-5 pb-5 space-y-5 animate-fade-in border-t border-[#2a2a2a]">
+                    <div className="pt-4">
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Ejercicio</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        {[
+                          { label: 'Objetivo', field: 'objetivo' },
+                          { label: 'Nivel Actividad', field: 'nivelActividad' },
+                          { label: 'Disciplina', field: 'disciplina' },
+                          { label: 'Frecuencia', field: 'frecuencia' },
+                        ].map(({ label, field }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                            <input
+                              type="text"
+                              value={(expediente as any)[field]}
+                              onChange={(e) => updateExpediente(field, e.target.value)}
+                              className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Antecedentes</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {[
+                          { label: 'Patología', field: 'patologia' },
+                          { label: 'Alergias', field: 'alergias' },
+                          { label: 'Agua al día', field: 'agua' },
+                          { label: 'Alimentos que gusta', field: 'alimentosGustan' },
+                          { label: 'Alimentos que no gusta', field: 'alimentosNoGustan' },
+                          { label: 'Estreñimiento', field: 'estrenimiento' },
+                          { label: 'Alcohol', field: 'consumoAlcohol' },
+                          { label: 'Tabaco', field: 'tabaco' },
+                          { label: 'Signos y Síntomas', field: 'signosYSintomas' },
+                        ].map(({ label, field }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                            <input
+                              type="text"
+                              value={(expediente as any)[field]}
+                              onChange={(e) => updateExpediente(field, e.target.value)}
+                              className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
+                )}
+              </div>
 
-                </div>
-
-                {/* COLUMNA 2: TEMARIO Y NOTAS */}
+              <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
+                {/* COLUMNA 1: NOTAS EN CONSULTA (primero — se llena durante la entrevista) */}
                 <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
                   <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas en Consulta</h4>
                   <div className="shrink-0">
@@ -716,6 +877,22 @@ const NewAssessment = () => {
                         ))}
                       </div>
                     )}
+                  </div>
+                </div>
+
+                {/* COLUMNA 2: MEDIDAS ANTROPOMÉTRICAS (se llenan después de la entrevista) */}
+                <div className="flex flex-col gap-4 shrink-0 h-fit">
+                  <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
+                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
+                    <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
+                      <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
+                      <Field label="Hora" value={hora} onChange={setHora} type="time" />
+                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
+                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
+                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
+                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
+                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -849,6 +1026,56 @@ const NewAssessment = () => {
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* NOTAS LIBRES / LINEAMIENTOS */}
+              <div className="mt-4 bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 shrink-0">
+                <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-1 flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-brand-primary" /> Notas Libres / Lineamientos
+                </h4>
+                <p className="text-[12px] text-[#8a8a8a] m-0 mb-4">
+                  Rutinas de entrenamiento, notas extensas, instrucciones especiales.
+                </p>
+                <textarea
+                  value={notasLibres}
+                  onChange={(e) => setNotasLibres(e.target.value)}
+                  className="w-full bg-[#181818] rounded-[10px] px-4 py-3 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] resize-y transition-colors placeholder-[#555] leading-relaxed"
+                  placeholder={"Ej. Rutina de entrenamiento semana 1:\n\nLun — Pecho / Tríceps\n  Press banca 4x8\n  Fondos 3x12\n  ...\n\nMar — Espalda / Bíceps\n  ..."}
+                  rows={10}
+                />
+
+                {/* Adjuntos */}
+                <div className="mt-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Adjuntos / Imágenes</label>
+                    <label className="flex items-center gap-2 text-[11px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-3 py-1.5 rounded-[6px] cursor-pointer transition-colors uppercase tracking-wider">
+                      <Plus className="w-3 h-3" /> Subir imagen
+                      <input type="file" accept="image/*" multiple className="hidden" onChange={handleAdjuntoUpload} />
+                    </label>
+                  </div>
+
+                  {adjuntos.length > 0 ? (
+                    <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                      {adjuntos.map((adj) => (
+                        <div key={adj.id} className="relative group rounded-[8px] overflow-hidden border border-[#2a2a2a] aspect-square">
+                          <img src={adj.dataUrl} alt={adj.nombre} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              type="button"
+                              onClick={() => setAdjuntos(prev => prev.filter(a => a.id !== adj.id))}
+                              className="p-1.5 bg-[#ff4444] rounded-full text-white"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <p className="absolute bottom-0 left-0 right-0 text-[9px] text-white bg-black/70 px-1 py-0.5 truncate">{adj.nombre}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-[#555] italic">Sin adjuntos. Max 1.5MB por imagen.</p>
+                  )}
+                </div>
               </div>
 
               {/* BLOQUE AGENDAR PRÓXIMA CITA — OPCIONAL, COLAPSABLE */}
