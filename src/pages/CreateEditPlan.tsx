@@ -1604,9 +1604,88 @@ export const CreateEditPlanForm = ({
                   <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
                 )}
 
+                {/* Alimentos que sí le gustan */}
+                {pacienteInfo?.antecedentes?.alimentosGustan && (
+                  <SidebarSeccion titulo="Le gustan / Consume">
+                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Tránsito intestinal */}
+                {pacienteInfo?.antecedentes?.estrenimiento && (
+                  <SidebarSeccion titulo="Tránsito Intestinal">
+                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.estrenimiento}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Agua */}
+                {pacienteInfo?.antecedentes?.agua && (
+                  <SidebarSeccion titulo="Agua al día">
+                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.agua}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Signos y síntomas */}
+                {pacienteInfo?.antecedentes?.signosYSintomas && (
+                  <SidebarSeccion titulo="Signos y Síntomas">
+                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.signosYSintomas}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Hora y duración entrenamiento */}
+                {(pacienteInfo?.ejercicio?.horaEntrenamiento || pacienteInfo?.ejercicio?.tiempo) && (
+                  <SidebarSeccion titulo="Entrenamiento">
+                    <div className="space-y-0.5">
+                      {pacienteInfo.ejercicio?.horaEntrenamiento && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Hora:</span> {pacienteInfo.ejercicio.horaEntrenamiento}</p>}
+                      {pacienteInfo.ejercicio?.tiempo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Duración:</span> {pacienteInfo.ejercicio.tiempo}</p>}
+                    </div>
+                  </SidebarSeccion>
+                )}
+
+                {/* Recomendación suplementos */}
+                {pacienteInfo?.antecedentes?.recomendacionSuplementos && (
+                  <SidebarSeccion titulo="Recomendación Suplementos">
+                    <p className="text-[12px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.recomendacionSuplementos}</p>
+                  </SidebarSeccion>
+                )}
+
                 {/* Historial suplementos */}
                 {pacienteInfo?.antecedentes?.historialProductos && (
-                  <SidebarSeccion titulo="Historial suplementos"><p className="text-[12px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p></SidebarSeccion>
+                  <SidebarSeccion titulo="Historial suplementos">
+                    <p className="text-[12px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Notas libres / lineamientos */}
+                {valData?.notasLibres && (
+                  <SidebarSeccion titulo="Notas Libres / Lineamientos">
+                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.notasLibres}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Recordatorio 24 horas */}
+                {pacienteInfo?.habitos && Object.values(pacienteInfo.habitos).some((v: any) => v?.hora || v?.ayer || v?.usualmente) && (
+                  <SidebarSeccion titulo="Recordatorio 24 Horas">
+                    <div className="space-y-1.5 mt-1">
+                      {([
+                        { key: 'desayuno',  label: 'Desayuno' },
+                        { key: 'colacion1', label: 'Colación 1' },
+                        { key: 'almuerzo',  label: 'Comida' },
+                        { key: 'colacion2', label: 'Colación 2' },
+                        { key: 'cena',      label: 'Cena' },
+                      ] as { key: string; label: string }[]).map(({ key, label }) => {
+                        const row = pacienteInfo.habitos[key];
+                        if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
+                        return (
+                          <div key={key} className="border-l-2 border-[#2a2a2a] pl-2">
+                            <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider">{label}{row?.hora ? ` · ${row.hora}` : ''}</p>
+                            {row?.usualmente && <p className="text-[12px] text-[#e0e0e0]">{row.usualmente}</p>}
+                            {row?.ayer && !row?.usualmente && <p className="text-[12px] text-[#c0c0c0]">{row.ayer}</p>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </SidebarSeccion>
                 )}
               </div>
             </aside>
