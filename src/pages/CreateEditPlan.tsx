@@ -837,7 +837,7 @@ export const CreateEditPlanForm = ({
               {/* CABECERA DE REQUERIMIENTOS: Unificada y Simplificada */}
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center border-b border-[#2a2a2a] pb-8">
                 {/* Parte 1: Perfil Energético */}
-                <div className="lg:col-span-5 border-r border-[#2a2a2a] pr-10">
+                <div className="lg:col-span-5 lg:border-r border-[#2a2a2a] lg:pr-10">
                   {isBasePlan ? (
                     <div className="space-y-4">
                       <div className="space-y-2">

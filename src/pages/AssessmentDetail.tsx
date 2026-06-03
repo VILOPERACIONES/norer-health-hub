@@ -486,8 +486,8 @@ const AssessmentDetail = () => {
             </div>
             <h3 className="text-[15px] font-bold text-text-primary m-0 uppercase tracking-wide">Esquema de Suplementación</h3>
           </div>
-          <div className="overflow-hidden">
-            <table className="w-full border-collapse text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left min-w-[500px]">
               <thead>
                 <tr className="bg-bg-elevated border-b border-border-subtle">
                   <th className="px-6 py-3 text-[11px] font-black text-text-muted uppercase tracking-widest w-[30%]">Suplemento</th>
