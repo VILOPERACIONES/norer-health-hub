@@ -29,8 +29,8 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/metricas');
       return res.data?.data || res.data;
     },
-    staleTime: 30 * 1000,
-    refetchInterval: 30 * 1000, // Tiempo real: refresca cada 30s
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     placeholderData: (prev) => prev,
   });
 
@@ -40,8 +40,8 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/alertas');
       return res.data?.data || res.data || [];
     },
-    staleTime: 30 * 1000,
-    refetchInterval: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     placeholderData: (prev) => prev,
   });
 
@@ -51,8 +51,8 @@ const Dashboard = () => {
       const res = await api.get('/api/dashboard/top-clientes');
       return res.data?.data || res.data || [];
     },
-    staleTime: 60 * 1000,
-    refetchInterval: 60 * 1000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     placeholderData: (prev) => prev,
   });
 

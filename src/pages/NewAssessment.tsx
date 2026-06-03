@@ -283,7 +283,14 @@ const NewAssessment = () => {
   useEffect(() => {
     const fetchPatientAndData = async () => {
       try {
-        const { data } = await api.get(`/api/pacientes/${pacienteId}`);
+        // Parallelizar: paciente + valoracion(edición) + barrido(edición) en un solo round-trip
+        const [pacienteRes, valRes, barridoRes] = await Promise.all([
+          api.get(`/api/pacientes/${pacienteId}`),
+          isEdit && valoracionId ? api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`).catch(() => null) : Promise.resolve(null),
+          isEdit && valoracionId ? api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`).catch(() => null) : Promise.resolve(null),
+        ]);
+
+        const { data } = pacienteRes;
         const p = data?.data || data;
         setPaciente(p);
 
@@ -326,8 +333,7 @@ const NewAssessment = () => {
 
         if (isEdit) {
           try {
-            const { data: valDataRes } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-            const val = valDataRes?.data || valDataRes;
+            const val = valRes ? (valRes.data?.data || valRes.data) : null;
 
             if (val) {
               setFecha(val.fecha ? val.fecha.split('T')[0] : '');
@@ -366,12 +372,11 @@ const NewAssessment = () => {
                 setSuplementosDetalle(val.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
               }
 
-              // Load barrido if exists
-              try {
-                const br = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`);
-                const bd = br.data?.data || br.data;
+              // Use pre-fetched barrido
+              if (barridoRes) {
+                const bd = barridoRes.data?.data || barridoRes.data;
                 if (bd && (bd.tiempos || bd.kcalTotal)) setBarridoData(bd);
-              } catch { }
+              }
             }
           } catch {
             toast({ title: 'Error', description: 'No se pudo cargar la valoración a editar.', variant: 'destructive' });
