@@ -408,6 +408,22 @@ const AssessmentDetail = () => {
           </div>
         )}
 
+        {val.notasLibres && (
+          <div className="p-6 md:p-8 border-b border-border-subtle">
+            <p className="text-[12px] font-medium text-text-muted m-0 mb-2">Notas Libres / Lineamientos</p>
+            <pre className="text-[13px] leading-relaxed text-text-secondary font-mono bg-bg-elevated/30 rounded-[8px] p-4 m-0 whitespace-pre-wrap overflow-x-auto">{val.notasLibres}</pre>
+            {val.adjuntosJson && Array.isArray(val.adjuntosJson) && val.adjuntosJson.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {val.adjuntosJson.map((adj: any, i: number) => (
+                  <div key={adj.id || i} className="rounded-[8px] overflow-hidden border border-border-subtle aspect-square">
+                    <img src={adj.dataUrl} alt={adj.nombre} className="w-full h-full object-cover" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {val.temarioConsulta?.length > 0 && (() => {
           const COMP_MARKER = '__COMPETENCIA_NOTES__';
           const compItem = val.temarioConsulta.find((t: any) => t.tema === COMP_MARKER);

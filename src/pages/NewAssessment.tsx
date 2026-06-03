@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -87,6 +87,59 @@ const NewAssessment = () => {
   const [tieneSuplementos, setTieneSuplementos] = useState(false);
   const [suplementos, setSuplementos] = useState<{ id: string; nombre: string; indicaciones: string; fechaInicio: string; activo: boolean }[]>([]);
 
+  const [notasLibres, setNotasLibres] = useState('');
+  const [notasLibresOpen, setNotasLibresOpen] = useState(false);
+  const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; tipo: string; dataUrl: string }[]>([]);
+
+  const [expediente, setExpediente] = useState({
+    objetivo: '', nivelActividad: '', gymOrigen: '', horaEntrenamiento: '', disciplina: '', frecuencia: '', tiempo: '',
+    porcentajeSedentario: '10', porcentajeLeve: '20', porcentajeModerado: '30', porcentajeIntenso: '40',
+    patologia: '', cirugias: '', farmacos: '', alergias: '', alimentosNoGustan: '', alimentosGustan: '',
+    agua: '', estrenimiento: '', signosYSintomas: '', consumoAlcohol: '', tabaco: '',
+    cicloMenstrual: '', historialProductos: '', recomendacionSuplementos: '',
+  });
+  const [expedienteModified, setExpedienteModified] = useState(false);
+  const [showExpediente, setShowExpediente] = useState(false);
+  const [habitos, setHabitos] = useState({
+    desayuno:  { hora: '', ayer: '', usualmente: '' },
+    colacion1: { hora: '', ayer: '', usualmente: '' },
+    almuerzo:  { hora: '', ayer: '', usualmente: '' },
+    colacion2: { hora: '', ayer: '', usualmente: '' },
+    cena:      { hora: '', ayer: '', usualmente: '' },
+  });
+  const [habitosModified, setHabitosModified] = useState(false);
+  const [showNotasConsulta, setShowNotasConsulta] = useState(true);
+  const [showSuplemantacion, setShowSuplemantacion] = useState(false);
+  const [showMedidas, setShowMedidas] = useState(true);
+  const [showAgendarCita, setShowAgendarCita] = useState(false);
+
+  const handleAdjuntoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      if (file.size > 1.5 * 1024 * 1024) {
+        toast({ title: 'Archivo muy grande', description: `${file.name} supera 1.5MB. Comprime la imagen.`, variant: 'destructive' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const dataUrl = ev.target?.result as string;
+        setAdjuntos(prev => [...prev, { id: Date.now().toString() + Math.random(), nombre: file.name, tipo: file.type, dataUrl }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = '';
+  };
+
+  const updateExpediente = (field: string, value: string) => {
+    setExpediente(e => ({ ...e, [field]: value }));
+    setExpedienteModified(true);
+  };
+
+  const updateHabitos = (meal: keyof typeof habitos, field: 'hora' | 'ayer' | 'usualmente', value: string) => {
+    setHabitos(h => ({ ...h, [meal]: { ...h[meal], [field]: value } }));
+    setHabitosModified(true);
+  };
+
   const totalSteps = 4;
   const STEPS = [
     { id: 1, label: 'Valoración' },
@@ -132,6 +185,8 @@ const NewAssessment = () => {
     if (d.suplementosDetalle) setSuplementosDetalle(d.suplementosDetalle);
     if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
     if (d.suplementos) setSuplementos(d.suplementos);
+    if (d.notasLibres) setNotasLibres(d.notasLibres);
+    if (d.adjuntos) setAdjuntos(d.adjuntos);
     setIsGrasaModified(true);
     setShowDraftPrompt(false);
     toast({ title: 'Progreso restaurado', description: 'Has vuelto a donde te quedaste.' });
@@ -167,6 +222,47 @@ const NewAssessment = () => {
 
     // Grasa (siempre limpio)
     setPctGrasa('');
+
+    // Re-llenar expediente desde datos del paciente
+    const ej = p.ejercicio || p.datosEjercicio;
+    const ant = p.antecedentes || {};
+    setExpediente({
+      objetivo: ej?.objetivo || '',
+      nivelActividad: ej?.nivelActividad || '',
+      gymOrigen: ej?.gymOrigen || '',
+      horaEntrenamiento: ej?.horaEntrenamiento || '',
+      disciplina: ej?.disciplina || '',
+      frecuencia: ej?.frecuencia || '',
+      tiempo: ej?.tiempo || '',
+      porcentajeSedentario: String(ej?.porcentajeSedentario ?? 10),
+      porcentajeLeve: String(ej?.porcentajeLeve ?? 20),
+      porcentajeModerado: String(ej?.porcentajeModerado ?? 30),
+      porcentajeIntenso: String(ej?.porcentajeIntenso ?? 40),
+      patologia: ant.patologia || '',
+      cirugias: ant.cirugias || '',
+      farmacos: ant.farmacos || '',
+      alergias: ant.alergias || '',
+      alimentosNoGustan: ant.alimentosNoGustan || '',
+      alimentosGustan: ant.alimentosGustan || '',
+      agua: ant.agua || '',
+      estrenimiento: ant.estrenimiento || '',
+      signosYSintomas: ant.signosYSintomas || '',
+      consumoAlcohol: ant.consumoAlcohol || '',
+      tabaco: ant.tabaco || '',
+      cicloMenstrual: ant.cicloMenstrual || '',
+      historialProductos: ant.historialProductos || '',
+      recomendacionSuplementos: ant.recomendacionSuplementos || '',
+    });
+    const h = p.habitos || {};
+    setHabitos({
+      desayuno:  { hora: h.desayuno?.hora || '',  ayer: h.desayuno?.ayer || '',  usualmente: h.desayuno?.usualmente || '' },
+      colacion1: { hora: h.colacion1?.hora || '', ayer: h.colacion1?.ayer || '', usualmente: h.colacion1?.usualmente || '' },
+      almuerzo:  { hora: h.almuerzo?.hora || '',  ayer: h.almuerzo?.ayer || '',  usualmente: h.almuerzo?.usualmente || '' },
+      colacion2: { hora: h.colacion2?.hora || '', ayer: h.colacion2?.ayer || '', usualmente: h.colacion2?.usualmente || '' },
+      cena:      { hora: h.cena?.hora || '',      ayer: h.cena?.ayer || '',      usualmente: h.cena?.usualmente || '' },
+    });
+    setExpedienteModified(false);
+    setHabitosModified(false);
   };
 
   // Save drafts (only if not editing)
@@ -178,9 +274,10 @@ const NewAssessment = () => {
     const temarioParaDraft = hasComp
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle };
+    // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
+    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, isEdit]);
+  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -188,6 +285,43 @@ const NewAssessment = () => {
         const { data } = await api.get(`/api/pacientes/${pacienteId}`);
         const p = data?.data || data;
         setPaciente(p);
+
+        const ej = p.ejercicio || p.datosEjercicio;
+        const ant2 = p.antecedentes || {};
+        setExpediente({
+          objetivo: ej?.objetivo || '',
+          nivelActividad: ej?.nivelActividad || '',
+          gymOrigen: ej?.gymOrigen || '',
+          horaEntrenamiento: ej?.horaEntrenamiento || '',
+          disciplina: ej?.disciplina || '',
+          frecuencia: ej?.frecuencia || '',
+          tiempo: ej?.tiempo || '',
+          porcentajeSedentario: String(ej?.porcentajeSedentario ?? 10),
+          porcentajeLeve: String(ej?.porcentajeLeve ?? 20),
+          porcentajeModerado: String(ej?.porcentajeModerado ?? 30),
+          porcentajeIntenso: String(ej?.porcentajeIntenso ?? 40),
+          patologia: ant2.patologia || '',
+          cirugias: ant2.cirugias || '',
+          alergias: ant2.alergias || '',
+          alimentosNoGustan: ant2.alimentosNoGustan || '',
+          alimentosGustan: ant2.alimentosGustan || '',
+          agua: ant2.agua || '',
+          estrenimiento: ant2.estrenimiento || '',
+          signosYSintomas: ant2.signosYSintomas || '',
+          consumoAlcohol: ant2.consumoAlcohol || '',
+          tabaco: ant2.tabaco || '',
+          cicloMenstrual: ant2.cicloMenstrual || '',
+          historialProductos: ant2.historialProductos || '',
+          recomendacionSuplementos: ant2.recomendacionSuplementos || '',
+        });
+        const h2 = p.habitos || {};
+        setHabitos({
+          desayuno:  { hora: h2.desayuno?.hora || '',  ayer: h2.desayuno?.ayer || '',  usualmente: h2.desayuno?.usualmente || '' },
+          colacion1: { hora: h2.colacion1?.hora || '', ayer: h2.colacion1?.ayer || '', usualmente: h2.colacion1?.usualmente || '' },
+          almuerzo:  { hora: h2.almuerzo?.hora || '',  ayer: h2.almuerzo?.ayer || '',  usualmente: h2.almuerzo?.usualmente || '' },
+          colacion2: { hora: h2.colacion2?.hora || '', ayer: h2.colacion2?.ayer || '', usualmente: h2.colacion2?.usualmente || '' },
+          cena:      { hora: h2.cena?.hora || '',      ayer: h2.cena?.ayer || '',      usualmente: h2.cena?.usualmente || '' },
+        });
 
         if (isEdit) {
           try {
@@ -220,6 +354,9 @@ const NewAssessment = () => {
                 const avoidArray = typeof val.evitar === 'string' ? val.evitar.split('\n').map((v: string) => v.trim()).filter(Boolean) : [];
                 setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
               }
+
+              if (val.notasLibres) setNotasLibres(val.notasLibres);
+              if (val.adjuntosJson && Array.isArray(val.adjuntosJson)) setAdjuntos(val.adjuntosJson);
 
               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
                 setTieneSuplementos(true);
@@ -270,9 +407,18 @@ const NewAssessment = () => {
           setPctGrasa('');
           setKgGrasa('');
 
-          // Suplementación (arrastrada de la valoración pasada si existe)
+          // Suplementación (arrastrada de la valoración pasada; si es primera consulta, desde antecedentes del registro)
           if (lastVal?.suplementosDetalle && Array.isArray(lastVal.suplementosDetalle) && lastVal.suplementosDetalle.length > 0) {
             setSuplementosDetalle(lastVal.suplementosDetalle);
+            setSuplementacionActiva(true);
+          } else if (p?.antecedentes?.suplementosDetalle && Array.isArray(p.antecedentes.suplementosDetalle) && p.antecedentes.suplementosDetalle.length > 0) {
+            // Primera consulta: heredar suplementos del registro del paciente
+            setSuplementosDetalle(p.antecedentes.suplementosDetalle.map((s: any) => ({
+              ...s,
+              id: s.id || Date.now().toString() + Math.random(),
+              activo: s.activo !== false,
+              fechaInicio: s.fechaInicio || new Date().toISOString(),
+            })));
             setSuplementacionActiva(true);
           } else {
             setSuplementosDetalle([]);
@@ -392,6 +538,8 @@ const NewAssessment = () => {
         return base;
       })(),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
+      notasLibres: notasLibres || null,
+      adjuntosJson: adjuntos.length > 0 ? adjuntos : null,
       suplementosDetalle: suplementosParaGuardar,
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
@@ -430,6 +578,47 @@ const NewAssessment = () => {
             setSaving(false);
             return;
           }
+        }
+      }
+
+      if (expedienteModified || habitosModified) {
+        try {
+          await api.put(`/api/pacientes/${pacienteId}`, {
+            ejercicio: {
+              objetivo: expediente.objetivo,
+              nivelActividad: expediente.nivelActividad,
+              gymOrigen: expediente.gymOrigen,
+              horaEntrenamiento: expediente.horaEntrenamiento,
+              disciplina: expediente.disciplina,
+              frecuencia: expediente.frecuencia,
+              tiempo: expediente.tiempo,
+              porcentajeSedentario: parseInt(expediente.porcentajeSedentario) || 10,
+              porcentajeLeve: parseInt(expediente.porcentajeLeve) || 20,
+              porcentajeModerado: parseInt(expediente.porcentajeModerado) || 30,
+              porcentajeIntenso: parseInt(expediente.porcentajeIntenso) || 40,
+            },
+            antecedentes: {
+              patologia: expediente.patologia,
+              cirugias: expediente.cirugias,
+              farmacos: expediente.farmacos,
+              alergias: expediente.alergias,
+              alimentosNoGustan: expediente.alimentosNoGustan,
+              alimentosGustan: expediente.alimentosGustan,
+              agua: expediente.agua,
+              estrenimiento: expediente.estrenimiento,
+              signosYSintomas: expediente.signosYSintomas,
+              consumoAlcohol: expediente.consumoAlcohol,
+              tabaco: expediente.tabaco,
+              cicloMenstrual: expediente.cicloMenstrual,
+              historialProductos: expediente.historialProductos,
+              recomendacionSuplementos: expediente.recomendacionSuplementos,
+            },
+            habitos,
+          });
+          setExpedienteModified(false);
+          setHabitosModified(false);
+        } catch (e) {
+          console.warn('No se pudo actualizar expediente:', e);
         }
       }
 
@@ -577,7 +766,7 @@ const NewAssessment = () => {
         <div className="w-full flex-1 flex flex-col overflow-y-auto custom-scrollbar">
           {/* FASE 1: MÉTRICAS Y TEMARIO */}
           {step === 1 && (
-            <div className="flex flex-col flex-1 min-h-0 animate-slide-up gap-4">
+            <div className="flex flex-col flex-1 min-h-0 animate-slide-up gap-3">
               <div className="shrink-0 mb-1">
                 <p className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-[0.15em] mb-1">Paso 1 de {totalSteps}</p>
                 <h3 className="text-[22px] font-bold text-white m-0 tracking-tight">
@@ -588,313 +777,485 @@ const NewAssessment = () => {
                 </p>
               </div>
 
-              <div className="grid lg:grid-cols-2 gap-4 flex-1 min-h-0">
-                {/* COLUMNA 1: ANTROPOMETRÍA Y SUPLEMENTACIÓN */}
-                <div className="flex flex-col gap-4 shrink-0 h-fit">
-                  <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col">
-                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase mb-4">Medidas Antropométricas</h4>
-                    <div className="grid sm:grid-cols-2 gap-x-6 gap-y-6">
-                      <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
-                      <Field label="Hora" value={hora} onChange={setHora} type="time" />
-
-                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
-                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
-
-                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
-                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
-                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
-                    </div>
+              {/* PANEL EXPEDIENTE DEL PACIENTE */}
+              {/* ── 1. EXPEDIENTE DEL PACIENTE ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowExpediente(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Expediente del Paciente</span>
+                    {(expedienteModified || habitosModified) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
-
-                </div>
-
-                {/* COLUMNA 2: TEMARIO Y NOTAS */}
-                <div className="bg-[#111111] p-5 rounded-[16px] border border-[#2a2a2a] flex flex-col h-full overflow-hidden">
-                  <h4 className="text-[12px] font-bold text-white tracking-widest uppercase mb-3 shrink-0">Notas en Consulta</h4>
-                  <div className="shrink-0">
-                    <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
-                    <textarea
-                      value={comentarios}
-                      onChange={(e) => setComentarios(e.target.value)}
-                      className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
-                      placeholder="Observaciones relevantes de la consulta..."
-                    />
-                  </div>
-
-                  <div className="shrink-0 mt-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
-                      <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
-                      <button onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
-                        <Plus className="h-2.5 w-2.5" /> Agregar
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {evitar.map((e, idx) => (
-                        <div key={e.id} className="flex gap-2 items-center">
-                          <input
-                            type="text"
-                            value={e.valor}
-                            onChange={(el) => updateEvitar(idx, el.target.value)}
-                            className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
-                            placeholder="Ej. Lácteos, Azúcares..."
-                          />
-                          <button onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      ))}
-                      {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
-                    </div>
-                  </div>
-
-                  <div className="flex-1 flex flex-col min-h-0 mt-4">
-                    <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] shrink-0 mb-3">
-                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Notas en Consulta</label>
-                      <button onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
-                        <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
-                      </button>
-                    </div>
-
-                    {temario.length === 0 && (
-                      <div className="flex flex-col items-center justify-center py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] shrink-0">
-                        <p className="text-[12px] text-[#8a8a8a] text-center max-w-sm px-4">
-                          Sin notas asignadas. Haz clic en "Agregar" para registrar notas de la consulta.
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3">
-                      {temario.map((t, idx) => (
-                        <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
-                          <button onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <input
-                            type="text"
-                            placeholder="Título del tema..."
-                            value={t.tema}
-                            onChange={(e) => updateTema(idx, 'tema', e.target.value)}
-                            className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
-                          />
-                          <textarea
-                            placeholder="Detalles y comentarios de lo conversado..."
-                            value={t.detalle}
-                            onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
-                            className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Notas de Competencia (deportistas) */}
-                  <div className="shrink-0 mt-4">
-                    <button
-                      type="button"
-                      onClick={() => setShowCompetencia(s => !s)}
-                      className="w-full flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3 hover:opacity-80 transition-opacity"
-                    >
-                      <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest cursor-pointer">
-                        Notas de Competencia <span className="text-[#555] normal-case tracking-normal">(deportistas — opcional)</span>
-                      </label>
-                      <span className="text-[14px] font-bold text-[#8a8a8a]">{showCompetencia ? '−' : '+'}</span>
-                    </button>
-                    {showCompetencia && (
-                      <div className="space-y-3">
-                        {(['antes', 'durante', 'despues'] as const).map((fase) => (
-                          <div key={fase}>
-                            <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1 uppercase tracking-widest">
-                              {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'} de competencia
-                            </label>
-                            <textarea
-                              value={competencia[fase]}
-                              onChange={(e) => setCompetencia(c => ({ ...c, [fase]: e.target.value }))}
-                              placeholder={fase === 'antes' ? 'Ej. 3h antes: 1 taza avena + plátano + 1 cda crema cacahuate...' : fase === 'durante' ? 'Ej. Cada 30 min: 200ml bebida isotónica + 1 gel cada 45 min...' : 'Ej. 30 min post: 30g whey + 50g carbo simple; 2h post: comida completa...'}
-                              className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-white outline-none min-h-[60px] resize-y placeholder-[#444] transition-colors"
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showExpediente ? 'rotate-180' : ''}`} />
+                </button>
+                {showExpediente && (
+                  <div className="px-5 pb-5 space-y-6 border-t border-[#2a2a2a]">
+                    {/* Ejercicio */}
+                    <div className="pt-4">
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Ejercicio</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {([
+                          { label: 'Objetivo', field: 'objetivo' },
+                          { label: 'Nivel Actividad', field: 'nivelActividad' },
+                          { label: 'Gym / Lugar', field: 'gymOrigen' },
+                          { label: 'Hora Entrenamiento', field: 'horaEntrenamiento' },
+                          { label: 'Disciplina', field: 'disciplina' },
+                          { label: 'Frecuencia', field: 'frecuencia' },
+                          { label: 'Tiempo / Duración', field: 'tiempo' },
+                        ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                            <input
+                              type="text"
+                              value={expediente[field]}
+                              onChange={(e) => updateExpediente(field, e.target.value)}
+                              className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
                             />
                           </div>
                         ))}
                       </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* SUPLEMENTACION BLOCK */}
-              <div className="mt-4 bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 animate-slide-up shrink-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                  <div>
-                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-brand-primary" /> Esquema de Suplementación
-                    </h4>
-                    <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
-                      Configura los suplementos que el paciente tomará en esta fase.
-                    </p>
-                  </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={suplementacionActiva}
-                      onChange={(e) => setSuplementacionActiva(e.target.checked)}
-                    />
-                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
-                    <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{suplementacionActiva ? 'Habilitado' : 'Deshabilitado'}</span>
-                  </label>
-                </div>
-
-                {suplementacionActiva && (
-                  <div className="space-y-4 animate-fade-in mt-6">
-                    <div className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
-                      <div>Suplemento</div>
-                      <div>Indicaciones / Dosis</div>
-                      <div>Tiempo</div>
-                      <div className="text-center">Estado</div>
-                      <div></div>
                     </div>
 
-                    <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
-                      {suplementosDetalle.map((sup, idx) => (
-                        <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a] group hover:border-[#444] transition-colors">
-                          <input
-                            type="text"
-                            value={sup.nombre}
-                            onChange={(e) => {
-                              const newArr = [...suplementosDetalle];
-                              newArr[idx].nombre = e.target.value;
-                              setSuplementosDetalle(newArr);
-                            }}
-                            placeholder="Ej. Creatina"
-                            className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
-                          />
-                          <input
-                            type="text"
-                            value={sup.indicaciones}
-                            onChange={(e) => {
-                              const newArr = [...suplementosDetalle];
-                              newArr[idx].indicaciones = e.target.value;
-                              setSuplementosDetalle(newArr);
-                            }}
-                            placeholder="Ej. 1 scoop post-entreno"
-                            className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
-                          />
-                          <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
-                            {(() => {
-                              if (!sup.fechaInicio) return '0 días';
-                              
-                              let end = new Date();
-                              let suffix = '';
-
-                              if (sup.activo) {
-                                // Si está encendido pero ya tenía una fechaFin de antes, significa que lo están "Reactivando" ahora mismo.
-                                if (sup.fechaFin) return '0 días';
-                                suffix = ' (En curso)';
-                              } else {
-                                // Si está apagado, calculamos los días congelados (o hasta hoy si recién se apaga en la UI)
-                                end = sup.fechaFin ? new Date(sup.fechaFin) : new Date();
-                                suffix = ' (Pausado)';
-                              }
-
-                              const start = new Date(sup.fechaInicio);
-                              if (isNaN(start.getTime()) || isNaN(end.getTime())) return '0 días';
-                              
-                              const diffTime = Math.max(0, end.getTime() - start.getTime());
-                              const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
-                              const meses = Math.floor(diffDays / 30);
-                              
-                              if (meses > 0) return `${meses} mes${meses > 1 ? 'es' : ''}${suffix}`;
-                              return `${diffDays} día${diffDays !== 1 ? 's' : ''}${suffix}`;
-                            })()}
-                          </div>
-                          <div className="flex items-center justify-center w-[80px]">
-                            <label className="relative inline-flex items-center cursor-pointer">
+                    {/* Consumo Calórico */}
+                    <div>
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Distribución Actividad (%)</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {([
+                          { label: 'Sedentario', field: 'porcentajeSedentario' },
+                          { label: 'Leve', field: 'porcentajeLeve' },
+                          { label: 'Moderado', field: 'porcentajeModerado' },
+                          { label: 'Intenso', field: 'porcentajeIntenso' },
+                        ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                            <div className="relative">
                               <input
-                                type="checkbox"
-                                className="sr-only peer"
-                                checked={sup.activo}
-                                onChange={(e) => {
-                                  const newArr = [...suplementosDetalle];
-                                  newArr[idx].activo = e.target.checked;
-                                  // Las fechas se asignan o limpian de verdad al hacer submit (handleSave).
-                                  // Aquí el toggle es puramente visual para que el nutriólogo no pierda los días si lo activa por error.
-                                  setSuplementosDetalle(newArr);
-                                }}
+                                type="number"
+                                min="0" max="100"
+                                value={expediente[field]}
+                                onChange={(e) => updateExpediente(field, e.target.value)}
+                                className="w-full bg-[#181818] rounded-[6px] px-3 py-2 pr-8 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
                               />
-                              <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
-                            </label>
+                              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-[#8a8a8a]">%</span>
+                            </div>
                           </div>
-                          <button
-                            onClick={() => setSuplementosDetalle(suplementosDetalle.filter((_, i) => i !== idx))}
-                            className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center ml-auto"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      ))}
-
-                      {suplementosDetalle.length === 0 && (
-                        <div className="py-8 text-center border border-dashed border-[#333] rounded-[8px] bg-[#141414]">
-                          <p className="text-[12px] text-[#8a8a8a] m-0">No hay suplementos agregados.</p>
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </div>
 
-                    <div className="flex justify-end pt-2">
-                      <button
-                        onClick={() => setSuplementosDetalle([...suplementosDetalle, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }])}
-                        className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
-                      >
-                        <Plus className="w-4 h-4" /> Agregar Suplemento
-                      </button>
+                    {/* Recordatorio 24 horas */}
+                    <div>
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Recordatorio 24 Horas</p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-[12px]">
+                          <thead>
+                            <tr className="border-b border-[#2a2a2a]">
+                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3 w-28">Tiempo</th>
+                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Hora</th>
+                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Ayer</th>
+                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2">Usualmente</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#1e1e1e]">
+                            {([
+                              { key: 'desayuno',  label: 'Desayuno' },
+                              { key: 'colacion1', label: 'Colación 1' },
+                              { key: 'almuerzo',  label: 'Comida' },
+                              { key: 'colacion2', label: 'Colación 2' },
+                              { key: 'cena',      label: 'Cena' },
+                            ] as { key: keyof typeof habitos; label: string }[]).map(({ key, label }) => (
+                              <tr key={key}>
+                                <td className="py-2 pr-3 text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider">{label}</td>
+                                {(['hora', 'ayer', 'usualmente'] as const).map((field) => (
+                                  <td key={field} className="py-2 pr-3">
+                                    <input
+                                      type="text"
+                                      value={habitos[key][field]}
+                                      onChange={(e) => updateHabitos(key, field, e.target.value)}
+                                      className="w-full bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#2a2a2a] focus:border-[#555] transition-colors placeholder-[#444]"
+                                      placeholder={field === 'hora' ? '7:00 am' : 'Descripción...'}
+                                    />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Antecedentes */}
+                    <div>
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Antecedentes</p>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {([
+                          { label: 'Patología / Enfermedades', field: 'patologia' },
+                          { label: 'Cirugías / Traumas', field: 'cirugias' },
+                          { label: 'Fármacos', field: 'farmacos' },
+                          { label: 'Alergias', field: 'alergias' },
+                          { label: 'Alimentos que gusta', field: 'alimentosGustan' },
+                          { label: 'Alimentos que no gusta', field: 'alimentosNoGustan' },
+                          { label: 'Agua al día', field: 'agua' },
+                          { label: 'Tránsito Intestinal', field: 'estrenimiento' },
+                          { label: 'Alcohol', field: 'consumoAlcohol' },
+                          { label: 'Tabaco', field: 'tabaco' },
+                          { label: 'Ciclo Menstrual', field: 'cicloMenstrual' },
+                          { label: 'Signos y Síntomas', field: 'signosYSintomas' },
+                          { label: 'Historial Suplementos', field: 'historialProductos' },
+                          { label: 'Recomendación Suplementos', field: 'recomendacionSuplementos' },
+                        ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
+                          <div key={field} className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                            <input
+                              type="text"
+                              value={expediente[field]}
+                              onChange={(e) => updateExpediente(field, e.target.value)}
+                              className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {/* BLOQUE AGENDAR PRÓXIMA CITA — OPCIONAL, COLAPSABLE */}
-              <div className="mt-4 bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 shrink-0">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div>
-                    <h4 className="text-[13px] font-bold text-white tracking-widest uppercase flex items-center gap-2">
-                      <CalendarIcon className="w-4 h-4 text-brand-primary" /> Agendar Próxima Cita
-                    </h4>
-                    <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
-                      Opcional — agenda la siguiente consulta directamente desde aquí.
-                    </p>
+              {/* ── 2. NOTAS DE CONSULTA ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowNotasConsulta(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas de Consulta</span>
+                    {(comentarios || temario.length > 0 || evitar.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                    <input
-                      type="checkbox"
-                      className="sr-only peer"
-                      checked={showScheduling}
-                      onChange={(e) => {
-                        setShowScheduling(e.target.checked);
-                        if (!e.target.checked) {
-                          setCalcomData(null);
-                          setProximaSesion('');
-                        }
-                      }}
-                    />
-                    <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
-                    <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">
-                      {showScheduling ? 'Habilitado' : 'Deshabilitado'}
-                    </span>
-                  </label>
-                </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showNotasConsulta ? 'rotate-180' : ''}`} />
+                </button>
+                {showNotasConsulta && (
+                  <div className="px-5 pb-5 space-y-4 border-t border-[#2a2a2a] pt-4">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
+                      <textarea
+                        value={comentarios}
+                        onChange={(e) => setComentarios(e.target.value)}
+                        className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
+                        placeholder="Observaciones relevantes de la consulta..."
+                      />
+                    </div>
 
-                {showScheduling && (
-                  <div className="mt-4 animate-fade-in">
-                    <CalcomScheduling
-                      pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
-                      onSelection={(data) => {
-                        setCalcomData(data);
-                        if (data?.fecha) {
-                          setProximaSesion(data.fecha);
-                        } else {
-                          setProximaSesion('');
-                        }
-                      }}
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
+                        <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
+                        <button type="button" onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
+                          <Plus className="h-2.5 w-2.5" /> Agregar
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {evitar.map((e, idx) => (
+                          <div key={e.id} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={e.valor}
+                              onChange={(el) => updateEvitar(idx, el.target.value)}
+                              className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                              placeholder="Ej. Lácteos, Azúcares..."
+                            />
+                            <button type="button" onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3">
+                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temas de Consulta</label>
+                        <button type="button" onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
+                          <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
+                        </button>
+                      </div>
+                      {temario.length === 0 && (
+                        <div className="py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] text-center">
+                          <p className="text-[12px] text-[#8a8a8a] px-4">Sin notas asignadas. Haz clic en "Agregar" para registrar notas de la consulta.</p>
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {temario.map((t, idx) => (
+                          <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
+                            <button type="button" onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <input
+                              type="text"
+                              placeholder="Título del tema..."
+                              value={t.tema}
+                              onChange={(e) => updateTema(idx, 'tema', e.target.value)}
+                              className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
+                            />
+                            <textarea
+                              placeholder="Detalles y comentarios de lo conversado..."
+                              value={t.detalle}
+                              onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
+                              className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Notas de Competencia */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCompetencia(s => !s)}
+                        className="w-full flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3 hover:opacity-80 transition-opacity"
+                      >
+                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest cursor-pointer">
+                          Notas de Competencia <span className="text-[#555] normal-case tracking-normal">(deportistas — opcional)</span>
+                        </label>
+                        <span className="text-[14px] font-bold text-[#8a8a8a]">{showCompetencia ? '−' : '+'}</span>
+                      </button>
+                      {showCompetencia && (
+                        <div className="space-y-3">
+                          {(['antes', 'durante', 'despues'] as const).map((fase) => (
+                            <div key={fase}>
+                              <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1 uppercase tracking-widest">
+                                {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'} de competencia
+                              </label>
+                              <textarea
+                                value={competencia[fase]}
+                                onChange={(e) => setCompetencia(c => ({ ...c, [fase]: e.target.value }))}
+                                placeholder={fase === 'antes' ? 'Ej. 3h antes: 1 taza avena + plátano...' : fase === 'durante' ? 'Ej. Cada 30 min: 200ml bebida isotónica...' : 'Ej. 30 min post: 30g whey + 50g carbo simple...'}
+                                className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-white outline-none min-h-[60px] resize-y placeholder-[#444] transition-colors"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── 3. ESQUEMA DE SUPLEMENTACIÓN ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowSuplemantacion(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Esquema de Suplementación</span>
+                    {suplementacionActiva && suplementosDetalle.length > 0 && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showSuplemantacion ? 'rotate-180' : ''}`} />
+                </button>
+                {showSuplemantacion && (
+                  <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[12px] text-[#8a8a8a] m-0">Configura los suplementos que el paciente tomará en esta fase.</p>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={suplementacionActiva}
+                          onChange={(e) => setSuplementacionActiva(e.target.checked)}
+                        />
+                        <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                        <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{suplementacionActiva ? 'Habilitado' : 'Deshabilitado'}</span>
+                      </label>
+                    </div>
+                    {suplementacionActiva && (
+                      <div className="space-y-4 animate-fade-in">
+                        <div className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                          <div>Suplemento</div>
+                          <div>Indicaciones / Dosis</div>
+                          <div>Tiempo</div>
+                          <div className="text-center">Estado</div>
+                          <div></div>
+                        </div>
+                        <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
+                          {suplementosDetalle.map((sup, idx) => (
+                            <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a] group hover:border-[#444] transition-colors">
+                              <input type="text" value={sup.nombre} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].nombre = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. Creatina" className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
+                              <input type="text" value={sup.indicaciones} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].indicaciones = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. 1 scoop post-entreno" className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
+                              <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
+                                {(() => {
+                                  if (!sup.fechaInicio) return '0 días';
+                                  let end = new Date(); let suffix = '';
+                                  if (sup.activo) { if (sup.fechaFin) return '0 días'; suffix = ' (En curso)'; }
+                                  else { end = sup.fechaFin ? new Date(sup.fechaFin) : new Date(); suffix = ' (Pausado)'; }
+                                  const start = new Date(sup.fechaInicio);
+                                  if (isNaN(start.getTime()) || isNaN(end.getTime())) return '0 días';
+                                  const diffDays = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 86400000));
+                                  const meses = Math.floor(diffDays / 30);
+                                  return meses > 0 ? `${meses} mes${meses > 1 ? 'es' : ''}${suffix}` : `${diffDays} día${diffDays !== 1 ? 's' : ''}${suffix}`;
+                                })()}
+                              </div>
+                              <div className="flex items-center justify-center w-[80px]">
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                  <input type="checkbox" className="sr-only peer" checked={sup.activo} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].activo = e.target.checked; setSuplementosDetalle(a); }} />
+                                  <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                              </div>
+                              <button type="button" onClick={() => setSuplementosDetalle(suplementosDetalle.filter((_, i) => i !== idx))} className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center ml-auto">
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          ))}
+                          {suplementosDetalle.length === 0 && (
+                            <div className="py-8 text-center border border-dashed border-[#333] rounded-[8px] bg-[#141414]">
+                              <p className="text-[12px] text-[#8a8a8a] m-0">No hay suplementos agregados.</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex justify-end pt-2">
+                          <button type="button" onClick={() => setSuplementosDetalle([...suplementosDetalle, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }])} className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider">
+                            <Plus className="w-4 h-4" /> Agregar Suplemento
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* ── 4. NOTAS LIBRES / LINEAMIENTOS ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setNotasLibresOpen(prev => !prev)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas Libres / Lineamientos</span>
+                    {(notasLibres || adjuntos.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${notasLibresOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {notasLibresOpen && (
+                  <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    <p className="text-[12px] text-[#8a8a8a] m-0 mb-4">Rutinas de entrenamiento, notas extensas, instrucciones especiales.</p>
+                    <textarea
+                      value={notasLibres}
+                      onChange={(e) => setNotasLibres(e.target.value)}
+                      className="w-full bg-[#181818] rounded-[10px] px-4 py-3 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] resize-y transition-colors placeholder-[#555] leading-relaxed"
+                      placeholder={"Ej. Rutina de entrenamiento semana 1:\n\nLun — Pecho / Tríceps\n  Press banca 4x8\n  Fondos 3x12\n  ...\n\nMar — Espalda / Bíceps\n  ..."}
+                      rows={10}
                     />
+                    <div className="mt-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Adjuntos / Imágenes</label>
+                        <label className="flex items-center gap-2 text-[11px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-3 py-1.5 rounded-[6px] cursor-pointer transition-colors uppercase tracking-wider">
+                          <Plus className="w-3 h-3" /> Subir imagen
+                          <input type="file" accept="image/*" multiple className="hidden" onChange={handleAdjuntoUpload} />
+                        </label>
+                      </div>
+                      {adjuntos.length > 0 ? (
+                        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                          {adjuntos.map((adj) => (
+                            <div key={adj.id} className="relative group rounded-[8px] overflow-hidden border border-[#2a2a2a] aspect-square">
+                              <img src={adj.dataUrl} alt={adj.nombre} className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button type="button" onClick={() => setAdjuntos(prev => prev.filter(a => a.id !== adj.id))} className="p-1.5 bg-[#ff4444] rounded-full text-white">
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                              <p className="absolute bottom-0 left-0 right-0 text-[9px] text-white bg-black/70 px-1 py-0.5 truncate">{adj.nombre}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[11px] text-[#555] italic">Sin adjuntos. Max 1.5MB por imagen.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── 5. MEDIDAS ANTROPOMÉTRICAS ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowMedidas(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Medidas Antropométricas</span>
+                    {(peso || pctGrasa) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showMedidas ? 'rotate-180' : ''}`} />
+                </button>
+                {showMedidas && (
+                  <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-5">
+                      <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
+                      <Field label="Hora" value={hora} onChange={setHora} type="time" />
+                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
+                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
+                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
+                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
+                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── 6. AGENDAR PRÓXIMA CITA ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowAgendarCita(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Agendar Próxima Cita</span>
+                    {showScheduling && proximaSesion && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showAgendarCita ? 'rotate-180' : ''}`} />
+                </button>
+                {showAgendarCita && (
+                  <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="text-[12px] text-[#8a8a8a] m-0">Opcional — agenda la siguiente consulta directamente desde aquí.</p>
+                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                        <input
+                          type="checkbox"
+                          className="sr-only peer"
+                          checked={showScheduling}
+                          onChange={(e) => {
+                            setShowScheduling(e.target.checked);
+                            if (!e.target.checked) { setCalcomData(null); setProximaSesion(''); }
+                          }}
+                        />
+                        <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
+                        <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{showScheduling ? 'Habilitado' : 'Deshabilitado'}</span>
+                      </label>
+                    </div>
+                    {showScheduling && (
+                      <div className="animate-fade-in">
+                        <CalcomScheduling
+                          pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
+                          onSelection={(data) => {
+                            setCalcomData(data);
+                            setProximaSesion(data?.fecha || '');
+                          }}
+                        />
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

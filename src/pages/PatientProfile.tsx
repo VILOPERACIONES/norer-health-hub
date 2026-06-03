@@ -8,7 +8,7 @@ import { formatDate, formatDateShort, formatDecimal, getBadgeForValuation } from
 import { formatDisciplinasForDisplay } from '@/lib/disciplinas';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
-import { 
+import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
@@ -38,7 +38,7 @@ const KpiCardCompact = ({ label, value, active, icon: Icon }: { label: string, v
 );
 
 const ChartBox = ({ title, children, extra, onExpand }: { title: string, children: React.ReactNode, extra?: React.ReactNode, onExpand?: () => void }) => (
-  <div 
+  <div
     onClick={onExpand}
     className={`border border-border-subtle p-6 bg-bg-surface flex flex-col rounded-[12px] min-h-[300px] transition-all ${onExpand ? 'cursor-pointer hover:border-[#555]' : ''}`}
   >
@@ -64,11 +64,11 @@ const ChartBox = ({ title, children, extra, onExpand }: { title: string, childre
   </div>
 );
 
-const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onEditPlan }: { 
-  val: Valoracion, 
-  index: number, 
-  onVerDetalles: (id: string) => void, 
-  onVerPlan: (id: string) => void, 
+const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onEditPlan }: {
+  val: Valoracion,
+  index: number,
+  onVerDetalles: (id: string) => void,
+  onVerPlan: (id: string) => void,
   onAsignarPlan: (id: string) => void,
   onEditPlan: (id: string) => void
 }) => {
@@ -78,29 +78,29 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
 
   return (
     <div className="bg-bg-elevated/30 border border-border-subtle rounded-[12px] overflow-hidden group">
-      <button 
+      <button
         onClick={() => setIsOpen(!isOpen)}
         className="w-full text-left p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-bg-elevated/50 transition-colors"
       >
         <div className="flex items-center gap-4">
-           <div className="w-10 h-10 rounded-full bg-bg-surface border border-border-subtle flex items-center justify-center font-bold text-[14px] text-text-primary">
-             #{(val as any).numeroValoracion || '—'}
-           </div>
-           <div>
-             <h3 className="text-[16px] font-bold text-text-primary m-0 tracking-tight">{formatDate(val.fecha)}</h3>
-             <p className="text-[12px] font-medium text-text-muted mt-0.5 uppercase tracking-wider">{val.id.slice(-8).toUpperCase()}</p>
-           </div>
+          <div className="w-10 h-10 rounded-full bg-bg-surface border border-border-subtle flex items-center justify-center font-bold text-[14px] text-text-primary">
+            #{(val as any).numeroValoracion || '—'}
+          </div>
+          <div>
+            <h3 className="text-[16px] font-bold text-text-primary m-0 tracking-tight">{formatDate(val.fecha)}</h3>
+            <p className="text-[12px] font-medium text-text-muted mt-0.5 uppercase tracking-wider">{val.id.slice(-8).toUpperCase()}</p>
+          </div>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-8">
           <div className="flex gap-6">
             <div className="space-y-1">
-               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Peso</p>
-               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.pesoActual || val.peso)} <span className="text-[11px] font-normal text-text-secondary">kg</span></p>
+              <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Peso</p>
+              <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal(val.pesoActual || val.peso)} <span className="text-[11px] font-normal text-text-secondary">kg</span></p>
             </div>
             <div className="space-y-1">
-               <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">% Grasa</p>
-               <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal((val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || 0)} <span className="text-[11px] font-normal text-text-secondary">%</span></p>
+              <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">% Grasa</p>
+              <p className="text-[14px] font-bold text-text-primary m-0">{formatDecimal((val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || 0)} <span className="text-[11px] font-normal text-text-secondary">%</span></p>
             </div>
           </div>
 
@@ -121,7 +121,7 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
           </div>
         </div>
       </button>
-      
+
       {isOpen && (
         <div className="p-6 bg-bg-surface text-text-primary animate-slide-down">
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
@@ -134,9 +134,9 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
             <MetricItem label="% GRASA" value={`${(val as any).pctGrasaCorp || (val as any).pctGrasaCorporal4comp || (val as any).pctGrasa2comp || (val as any).pctGrasa || '—'}%`} />
             <MetricItem label="MASA MAGRA" value={`${(val as any).masaMagra || '—'} kg`} />
           </div>
-          
+
           <div className="flex flex-wrap items-center gap-4 pt-6 border-t border-border-subtle">
-            <button 
+            <button
               onClick={() => onVerDetalles(val.id)}
               className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-[#222] transition-colors"
             >
@@ -144,11 +144,11 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
             </button>
             {(() => {
               const bg = getBadgeForValuation(val);
-              
+
               if (!planId) {
                 if (bg.text === 'Pendiente de menú') {
                   return (
-                    <button  
+                    <button
                       onClick={() => onVerDetalles(val.id + '#barrido')}
                       className="flex items-center gap-2 px-[18px] py-[10px] bg-rose-500 text-white text-[12px] font-bold border border-rose-600 rounded-[8px] hover:bg-rose-600 transition-all shadow-lg shadow-rose-500/10"
                     >
@@ -157,7 +157,7 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
                   );
                 }
                 return (
-                  <button  
+                  <button
                     onClick={() => onAsignarPlan(val.id)}
                     className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a0f00] text-accent-orange text-[12px] font-medium border border-accent-orange/30 rounded-[8px] hover:bg-[#2a1a00] transition-colors"
                   >
@@ -168,14 +168,14 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
 
               return (
                 <div className="flex flex-wrap gap-2">
-                  <button 
+                  <button
                     onClick={() => onVerPlan(planId)}
                     className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-surface text-text-primary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-bg-elevated"
                   >
                     <FileText className="h-[18px] w-[18px]" /> {estadoEnvio === 'enviado' ? 'Ver plan' : 'Ver y preparar envío'}
                   </button>
                   {estadoEnvio === 'pendiente' && (
-                    <button 
+                    <button
                       onClick={() => onEditPlan(planId)}
                       className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-secondary border border-border-subtle rounded-[8px] text-[12px] font-medium transition-colors hover:bg-[#222] hover:text-text-primary"
                     >
@@ -282,7 +282,7 @@ const PatientProfile = () => {
 
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
-  const [fullChartModal, setFullChartModal] = useState<{ 
+  const [fullChartModal, setFullChartModal] = useState<{
     isOpen: boolean, title: string, baseDataKey: string, baseName: string, isFatModal?: boolean
   }>({ isOpen: false, title: '', baseDataKey: '', baseName: '' });
 
@@ -343,364 +343,437 @@ const PatientProfile = () => {
 
   return (
     <>
-    <div className="min-h-screen bg-bg-base text-text-primary font-sans pb-24 animate-fade-in selection:bg-brand-primary selection:text-bg-base">
-      {/* HEADER */}
-      <header className="w-full border-b border-border-subtle pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
-        <div className="flex items-start gap-4">
-          <button 
-            onClick={() => navigate('/pacientes')} 
-            className="mt-1 p-2 rounded-[8px] border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
-            title="Volver a la Lista"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-3">
-              <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
-                {paciente.nombre} {paciente.apellido}
-              </h1>
-              {currentVal && (
-                <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium border ${getBadgeForValuation(currentVal).cls}`}>
-                  {getBadgeForValuation(currentVal).text}
-                </span>
-              )}
-            </div>
-            <p className="text-[14px] font-medium text-text-secondary mt-1 m-0">
-               Expediente Clínico · ID {id?.slice(-8).toUpperCase()}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2 md:mt-0">
-          <button
-            onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] bg-white text-black text-[14px] font-bold rounded-[8px] hover:bg-[#e0e0e0] transition-colors shadow-sm"
-          >
-            <Plus className="h-[18px] w-[18px]" strokeWidth={3} /> Nueva Consulta
-          </button>
-          <button
-            onClick={() => setShowFullExpediente(!showFullExpediente)}
-            className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] text-[14px] font-medium transition-colors rounded-[8px] border ${showFullExpediente ? 'bg-bg-elevated border-border-subtle text-text-primary' : 'bg-transparent border-border-default text-text-primary hover:bg-bg-elevated'}`}
-          >
-            {showFullExpediente ? <X className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
-            {showFullExpediente ? 'Cerrar Detalles' : 'Ver Detalles del Expediente'}
-          </button>
-          <button
-            onClick={() => navigate(`/pacientes/${id}/editar`)}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#222]"
-          >
-            <Edit className="h-4 w-4" /> Editar Perfil
-          </button>
-          <button
-            onClick={handleDelete}
-            className="flex items-center justify-center p-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#3d1a1a]"
-            title="Borrar Expediente"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </header>
-
-      <div className="max-w-full py-6 space-y-10">
-        {/* INFO BAR */}
-        <section className="grid grid-cols-2 lg:grid-cols-5 bg-bg-surface border border-border-subtle rounded-[14px] overflow-hidden shadow-sm">
-          <InfoItem label="Edad" value={`${calcAge(paciente.fechaNacimiento)} Años`} icon={Clock} />
-          <InfoItem label="Sexo" value={paciente.sexo === 'F' ? 'Femenino' : 'Masculino'} icon={User} />
-          <InfoItem label="Teléfono" value={paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-10) : '—'} icon={Phone} />
-          <InfoItem label="Email" value={paciente.email || '—'} icon={Mail} />
-          <InfoItem label="Registro" value={formatDate(paciente.fechaRegistro)} icon={Calendar} />
-        </section>
-
-        {showFullExpediente && (
-          <div className="animate-slide-down space-y-8 bg-bg-surface p-8 rounded-[12px] border border-border-subtle">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border-subtle pb-6">
-              <div>
-                <h3 className="text-[20px] font-bold text-text-primary m-0 tracking-tight">Detalles Completos del Expediente</h3>
-                <p className="text-[14px] text-text-secondary m-0">Información clínica y hábitos registrados</p>
+      <div className="min-h-screen bg-bg-base text-text-primary font-sans pb-24 animate-fade-in selection:bg-brand-primary selection:text-bg-base">
+        {/* HEADER */}
+        <header className="w-full border-b border-border-subtle pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
+          <div className="flex items-start gap-4">
+            <button
+              onClick={() => navigate('/pacientes')}
+              className="mt-1 p-2 rounded-[8px] border border-border-subtle text-text-secondary hover:text-text-primary hover:bg-bg-elevated transition-colors"
+              title="Volver a la Lista"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-3">
+                <h1 className="text-[26px] font-bold text-text-primary m-0 tracking-tight">
+                  {paciente.nombre} {paciente.apellido}
+                </h1>
+                {currentVal && (
+                  <span className={`px-2.5 py-1 rounded-full text-[12px] font-medium border ${getBadgeForValuation(currentVal).cls}`}>
+                    {getBadgeForValuation(currentVal).text}
+                  </span>
+                )}
               </div>
-              <button
-                onClick={() => navigate(`/pacientes/${id}/editar`)}
-                className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#222]"
-              >
-                <Edit className="h-4 w-4" /> Editar Expediente Completo
-              </button>
-            </div>
-
-            <div className="grid lg:grid-cols-2 gap-8 mt-6">
-              <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
-                'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
-                'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
-                'Disciplinas': formatDisciplinasForDisplay(
-                  (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina,
-                  {
-                    frecuencia: (paciente.ejercicio || (paciente as any).datosEjercicio)?.frecuencia,
-                    tiempo: (paciente.ejercicio || (paciente as any).datosEjercicio)?.tiempo,
-                  }
-                ),
-                'Nivel Actividad': (paciente.ejercicio || (paciente as any).datosEjercicio)?.nivelActividad || 'N/A',
-                'Distribución Actividad': `${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeSedentario || 0}% S / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeLeve || 0}% L / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeModerado || 0}% M / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeIntenso || 0}% I`,
-              }} />
-              
-              <ClinicalSection title="Perfil Clínico y Patologías" icon={Heart} data={{
-                'Patología': paciente.antecedentes?.patologia || 'N/A',
-                'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
-                'Alergias': paciente.antecedentes?.alergias || 'N/A',
-                'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
-                'Agua al día': paciente.antecedentes?.agua || 'N/A',
-                'Alcohol': paciente.antecedentes?.consumoAlcohol || 'N/A',
-                'Tabaco': paciente.antecedentes?.tabaco || 'N/A',
-              }} />
-
-               <ClinicalSection 
-                title="Suplementación y Notas" 
-                icon={Shield} 
-                className="lg:col-span-2"
-                data={{
-                  'Historial Suplementos': paciente.antecedentes?.historialProductos || 'N/A',
-                  'Propuesta Nutriólogo': paciente.antecedentes?.recomendacionSuplementos || 'N/A',
-                  'Preferencias (Gusta)': paciente.antecedentes?.alimentosGustan || 'N/A',
-                  'Aversiones (No gusta)': paciente.antecedentes?.alimentosNoGustan || 'N/A',
-                  'Signos y Síntomas': paciente.antecedentes?.signosYSintomas || 'N/A'
-                }} 
-              />
+              <p className="text-[14px] font-medium text-text-secondary mt-1 m-0">
+                Expediente Clínico · ID {id?.slice(-8).toUpperCase()}
+              </p>
             </div>
           </div>
-        )}
+          <div className="flex flex-wrap gap-2 w-full md:w-auto mt-2 md:mt-0">
+            <button
+              onClick={() => navigate(`/pacientes/${id}/valoracion/nueva`)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] bg-white text-black text-[14px] font-bold rounded-[8px] hover:bg-[#e0e0e0] transition-colors shadow-sm"
+            >
+              <Plus className="h-[18px] w-[18px]" strokeWidth={3} /> Nueva Consulta
+            </button>
+            <button
+              onClick={() => setShowFullExpediente(!showFullExpediente)}
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] text-[14px] font-medium transition-colors rounded-[8px] border ${showFullExpediente ? 'bg-bg-elevated border-border-subtle text-text-primary' : 'bg-transparent border-border-default text-text-primary hover:bg-bg-elevated'}`}
+            >
+              {showFullExpediente ? <X className="h-4 w-4" /> : <ClipboardList className="h-4 w-4" />}
+              {showFullExpediente ? 'Cerrar Detalles' : 'Ver Detalles del Expediente'}
+            </button>
+            <button
+              onClick={() => navigate(`/pacientes/${id}/editar`)}
+              className="flex-1 md:flex-none flex items-center justify-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#222]"
+            >
+              <Edit className="h-4 w-4" /> Editar Perfil
+            </button>
+            <button
+              onClick={handleDelete}
+              className="flex items-center justify-center p-[10px] bg-[#2e1a1a] text-accent-red border border-accent-red/20 text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#3d1a1a]"
+              title="Borrar Expediente"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        </header>
 
-        <div className="flex justify-between items-center pt-4 border-t border-border-subtle/50">
+        <div className="max-w-full py-6 space-y-10">
+          {/* INFO BAR */}
+          <section className="grid grid-cols-2 lg:grid-cols-5 bg-bg-surface border border-border-subtle rounded-[14px] overflow-hidden shadow-sm">
+            <InfoItem label="Edad" value={`${calcAge(paciente.fechaNacimiento)} Años`} icon={Clock} />
+            <InfoItem label="Sexo" value={paciente.sexo === 'F' ? 'Femenino' : 'Masculino'} icon={User} />
+            <InfoItem label="Teléfono" value={paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-10) : '—'} icon={Phone} />
+            <InfoItem label="Email" value={paciente.email || '—'} icon={Mail} />
+            <InfoItem label="Registro" value={formatDate(paciente.fechaRegistro)} icon={Calendar} />
+          </section>
+
+          {showFullExpediente && (
+            <div className="animate-slide-down space-y-8 bg-bg-surface p-8 rounded-[12px] border border-border-subtle">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border-subtle pb-6">
+                <div>
+                  <h3 className="text-[20px] font-bold text-text-primary m-0 tracking-tight">Detalles Completos del Expediente</h3>
+                  <p className="text-[14px] text-text-secondary m-0">Información clínica y hábitos registrados</p>
+                </div>
+                <button
+                  onClick={() => navigate(`/pacientes/${id}/editar`)}
+                  className="flex items-center gap-2 px-[18px] py-[10px] bg-bg-elevated text-text-primary border border-border-subtle text-[14px] font-medium transition-colors rounded-[8px] hover:bg-[#222]"
+                >
+                  <Edit className="h-4 w-4" /> Editar Expediente Completo
+                </button>
+              </div>
+
+              <div className="grid lg:grid-cols-2 gap-8 mt-6">
+                <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
+                  'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
+                  'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
+                  'Disciplinas': formatDisciplinasForDisplay(
+                    (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina,
+                    {
+                      frecuencia: (paciente.ejercicio || (paciente as any).datosEjercicio)?.frecuencia,
+                      tiempo: (paciente.ejercicio || (paciente as any).datosEjercicio)?.tiempo,
+                    }
+                  ),
+                  'Nivel Actividad': (paciente.ejercicio || (paciente as any).datosEjercicio)?.nivelActividad || 'N/A',
+                  'Distribución Actividad': `${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeSedentario || 0}% S / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeLeve || 0}% L / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeModerado || 0}% M / ${(paciente.ejercicio || (paciente as any).datosEjercicio)?.porcentajeIntenso || 0}% I`,
+                }} />
+
+                <ClinicalSection title="Perfil Clínico y Patologías" icon={Heart} data={{
+                  'Patología': paciente.antecedentes?.patologia || 'N/A',
+                  'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
+                  'Fármacos': paciente.antecedentes?.farmacos || 'N/A',
+                  'Alergias': paciente.antecedentes?.alergias || 'N/A',
+                  'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
+                  'Agua al día': paciente.antecedentes?.agua || 'N/A',
+                  'Alcohol': paciente.antecedentes?.consumoAlcohol || 'N/A',
+                  'Tabaco': paciente.antecedentes?.tabaco || 'N/A',
+                  'Ciclo Menstrual': paciente.antecedentes?.cicloMenstrual || 'N/A',
+                }} />
+
+                <div className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 hover:bg-bg-elevated/40 transition-colors lg:col-span-2">
+                  <div className="flex items-center gap-3 border-b border-border-subtle pb-4">
+                    <Shield className="h-4 w-4 text-text-secondary" />
+                    <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">Suplementación y Notas</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    <div className="space-y-2 md:col-span-2 lg:col-span-1">
+                      <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Suplementos del Registro</p>
+                      {(paciente.antecedentes?.suplementosDetalle && paciente.antecedentes.suplementosDetalle.length > 0) ? (
+                        <ul className="m-0 p-0 space-y-1">
+                          {paciente.antecedentes.suplementosDetalle.map((s, i) => (
+                            <li key={s.id || i} className="flex items-start gap-2">
+                              <span className={`mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${s.activo !== false ? 'bg-green-500' : 'bg-[#555]'}`} />
+                              <span className="text-[13px] font-medium text-text-primary leading-snug">
+                                {s.nombre}{s.indicaciones ? ` — ${s.indicaciones}` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[14px] font-medium text-text-muted tracking-tight">—</p>
+                      )}
+                    </div>
+                    {[
+                      { label: 'Preferencias (Gusta)', value: paciente.antecedentes?.alimentosGustan },
+                      { label: 'Aversiones (No gusta)', value: paciente.antecedentes?.alimentosNoGustan },
+                      { label: 'Signos y Síntomas', value: paciente.antecedentes?.signosYSintomas },
+                      { label: 'Historial Suplementos', value: paciente.antecedentes?.historialProductos },
+                      { label: 'Recomendación Suplementos', value: paciente.antecedentes?.recomendacionSuplementos },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="space-y-2">
+                        <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{label}</p>
+                        {value ? (
+                          <p className="text-[14px] font-medium text-text-primary tracking-tight">{value}</p>
+                        ) : (
+                          <p className="text-[14px] font-medium text-text-muted tracking-tight">—</p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Recordatorio 24 horas */}
+                {paciente.habitos && Object.values(paciente.habitos).some((v: any) => v?.hora || v?.ayer || v?.usualmente) && (
+                  <div className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 hover:bg-bg-elevated/40 transition-colors lg:col-span-2">
+                    <div className="flex items-center gap-3 border-b border-border-subtle pb-4 mb-4">
+                      <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">Recordatorio 24 Horas</h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[12px]">
+                        <thead>
+                          <tr className="border-b border-border-subtle">
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4 w-28">Tiempo</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Hora</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Ayer</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2">Usualmente</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-subtle/30">
+                          {([
+                            { key: 'desayuno',  label: 'Desayuno' },
+                            { key: 'colacion1', label: 'Colación 1' },
+                            { key: 'almuerzo',  label: 'Comida' },
+                            { key: 'colacion2', label: 'Colación 2' },
+                            { key: 'cena',      label: 'Cena' },
+                          ] as { key: string; label: string }[]).map(({ key, label }) => {
+                            const row = (paciente.habitos as any)[key];
+                            if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
+                            return (
+                              <tr key={key}>
+                                <td className="py-2 pr-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.hora || '—'}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.ayer || '—'}</td>
+                                <td className="py-2 text-[13px] text-text-secondary">{row?.usualmente || '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-4 border-t border-border-subtle/50">
             <div>
               <h2 className="text-[18px] font-semibold text-text-primary m-0 mb-1 tracking-tight">Indicadores Críticos</h2>
               <p className="text-[14px] text-text-secondary m-0">Métricas principales de progreso físico</p>
             </div>
-        </div>
+          </div>
 
-        {/* KPIs */}
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-          <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
-          <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
-          <KpiCardCompact label="Kilos Grasa (KG)" value={`${(currentVal as any)?.masaGrasaReal || (currentVal as any)?.kgGrasa2comp || '--'} KG`} icon={Heart} />
-          <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Activity} />
-        </section>
+          {/* KPIs */}
+          <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+            <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
+            <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
+            <KpiCardCompact label="Kilos Grasa (KG)" value={`${(currentVal as any)?.masaGrasaReal || (currentVal as any)?.kgGrasa2comp || '--'} KG`} icon={Heart} />
+            <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Activity} />
+          </section>
 
-        {/* PROGRESS CHARTS HIGH-CONTRAST */}
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <ChartBox 
-            title="Evolución de Peso (KG)" 
-            onExpand={() => setFullChartModal({ isOpen: true, title: 'Evolución de Peso Completa', baseDataKey: 'pesoEvolucion', baseName: 'Peso' })}
-          >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
-                <defs>
-                  <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f0f0f0" stopOpacity={0.15}/>
-                    <stop offset="95%" stopColor="#f0f0f0" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                <XAxis 
-                  dataKey="fecha" 
-                  tickFormatter={(val) => formatDateShort(val)}
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis 
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip 
-                  contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111111', color: '#f0f0f0', fontSize: '12px' }}
-                  itemStyle={{ color: '#f0f0f0', textTransform: 'uppercase' }}
-                  labelStyle={{ display: 'none' }}
-                />
-                <Area 
-                  type="monotone" 
-                  dataKey="pesoEvolucion" 
-                  name="Peso"
-                  stroke="#f0f0f0" 
-                  strokeWidth={2} 
-                  fillOpacity={1} 
-                  fill="url(#premiumGradient)" 
-                  dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartBox>
+          {/* PROGRESS CHARTS HIGH-CONTRAST */}
+          <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <ChartBox
+              title="Grasa Corporal"
+              onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Grasa Corporal', baseDataKey: '', baseName: '', isFatModal: true })}
 
-          <ChartBox 
-            title="Masa Magra (KG)"
-            onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Masa Magra', baseDataKey: 'masaMagraEvolucion', baseName: 'Masa Magra' })}
-          >
-               <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                <XAxis 
-                  dataKey="fecha" 
-                  tickFormatter={(val) => formatDateShort(val)}
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis 
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
-                <Area 
-                  type="monotone" 
-                  dataKey="masaMagraEvolucion" 
-                  name="Masa Magra"
-                  stroke="#f0f0f0" 
-                  strokeWidth={2} 
-                  fill="rgba(240, 240, 240, 0.05)"
-                  dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartBox>
+              extra={
+                <div className="flex bg-bg-elevated p-0.5 rounded-[6px] border border-border-subtle">
+                  <button
+                    onClick={() => setFatChartMode('pct')}
+                    className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'pct' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                  >
+                    %
+                  </button>
+                  <button
+                    onClick={() => setFatChartMode('kg')}
+                    className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'kg' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                  >
+                    KG
+                  </button>
+                </div>
+              }
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis
+                    dataKey="fecha"
+                    tickFormatter={(val) => formatDateShort(val)}
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                  <Area
+                    key={fatChartMode}
+                    type="monotone"
+                    dataKey={fatChartMode === 'pct' ? "grasaEvolucion" : "kgGrasaEvolucion"}
+                    name={fatChartMode === 'pct' ? "Porcentaje de Grasa (%)" : "Kilos Grasa (KG)"}
+                    stroke={fatChartMode === 'pct' ? "#f0f0f0" : "#f0f0f0"}
+                    strokeWidth={2}
+                    fill="rgba(240, 240, 240, 0.05)"
+                    dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartBox>
 
-          <ChartBox 
-            title="Grasa Corporal" 
-            onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Grasa Corporal', baseDataKey: '', baseName: '', isFatModal: true })}
+            <ChartBox
+              title="Evolución de Peso (KG)"
+              onExpand={() => setFullChartModal({ isOpen: true, title: 'Evolución de Peso Completa', baseDataKey: 'pesoEvolucion', baseName: 'Peso' })}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                  <defs>
+                    <linearGradient id="premiumGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#f0f0f0" stopOpacity={0.15} />
+                      <stop offset="95%" stopColor="#f0f0f0" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis
+                    dataKey="fecha"
+                    tickFormatter={(val) => formatDateShort(val)}
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111111', color: '#f0f0f0', fontSize: '12px' }}
+                    itemStyle={{ color: '#f0f0f0', textTransform: 'uppercase' }}
+                    labelStyle={{ display: 'none' }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="pesoEvolucion"
+                    name="Peso"
+                    stroke="#f0f0f0"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#premiumGradient)"
+                    dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartBox>
 
-            extra={
-              <div className="flex bg-bg-elevated p-0.5 rounded-[6px] border border-border-subtle">
-                <button 
-                  onClick={() => setFatChartMode('pct')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'pct' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
-                >
-                  %
-                </button>
-                <button 
-                  onClick={() => setFatChartMode('kg')}
-                  className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${fatChartMode === 'kg' ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
-                >
-                  KG
-                </button>
+            <ChartBox
+              title="Masa Magra (KG)"
+              onExpand={() => setFullChartModal({ isOpen: true, title: 'Historial de Masa Magra', baseDataKey: 'masaMagraEvolucion', baseName: 'Masa Magra' })}
+            >
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis
+                    dataKey="fecha"
+                    tickFormatter={(val) => formatDateShort(val)}
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                  <Area
+                    type="monotone"
+                    dataKey="masaMagraEvolucion"
+                    name="Masa Magra"
+                    stroke="#f0f0f0"
+                    strokeWidth={2}
+                    fill="rgba(240, 240, 240, 0.05)"
+                    dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartBox>
+
+          </section>
+
+          {/* LOG DE CONSULTAS */}
+          <section className="space-y-6 pt-4" id="historial">
+            <div className="flex items-center gap-4">
+              <h2 className="text-[18px] font-semibold text-text-primary m-0">Historial Clínico</h2>
+              <div className="flex-1 h-[1px] bg-border-subtle" />
+            </div>
+
+            {valoraciones.length > 0 ? (
+              <div className="space-y-3">
+                {valoraciones.map((v, i) => (
+                  <AccordionRow
+                    key={v.id}
+                    val={v}
+                    index={i}
+                    onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
+                    onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
+                    onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
+                    onEditPlan={(pId) => navigate(`/pacientes/${id}/planes/${pId}/editar?valoracionId=${v.id}`)}
+                  />
+                ))}
               </div>
-            }
-          >
-             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                <XAxis 
-                  dataKey="fecha" 
-                  tickFormatter={(val) => formatDateShort(val)}
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  dy={10}
-                />
-                <YAxis 
-                  tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                  axisLine={false}
-                  tickLine={false}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
-                <Area 
-                  key={fatChartMode}
-                  type="monotone" 
-                  dataKey={fatChartMode === 'pct' ? "grasaEvolucion" : "kgGrasaEvolucion"} 
-                  name={fatChartMode === 'pct' ? "Porcentaje de Grasa (%)" : "Kilos Grasa (KG)"}
-                  stroke={fatChartMode === 'pct' ? "#f0f0f0" : "#f0f0f0"} 
-                  strokeWidth={2} 
-                  fill="rgba(240, 240, 240, 0.05)"
-                  dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </ChartBox>
-        </section>
-
-        {/* LOG DE CONSULTAS */}
-        <section className="space-y-6 pt-4" id="historial">
-          <div className="flex items-center gap-4">
-            <h2 className="text-[18px] font-semibold text-text-primary m-0">Historial Clínico</h2>
-            <div className="flex-1 h-[1px] bg-border-subtle" />
-          </div>
-          
-          {valoraciones.length > 0 ? (
-            <div className="space-y-3">
-              {valoraciones.map((v, i) => (
-                 <AccordionRow 
-                   key={v.id} 
-                   val={v} 
-                   index={i} 
-                   onVerDetalles={(valId) => navigate(`/pacientes/${id}/valoraciones/${valId}`)}
-                   onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
-                   onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
-                   onEditPlan={(pId) => navigate(`/pacientes/${id}/planes/${pId}/editar?valoracionId=${v.id}`)}
-                 />
-              ))}
-            </div>
-          ) : (
-            <div className="py-20 text-center border border-border-default border-dashed rounded-[12px] bg-bg-surface">
-              <ClipboardList className="h-8 w-8 text-text-muted mx-auto mb-4" />
-              <p className="text-[14px] font-medium text-text-secondary">Aún no hay valoraciones clínicas registradas</p>
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
-
-    {/* MODAL HISTORIAL COMPLETO */}
-    {fullChartModal.isOpen && (
-      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setFullChartModal(prev => ({...prev, isOpen: false}))}>
-        <div className="bg-bg-base border border-border-default rounded-[16px] w-full max-w-4xl p-8 relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
-          <button 
-            onClick={() => setFullChartModal(prev => ({...prev, isOpen: false}))}
-            className="absolute top-6 right-6 p-2 rounded-[8px] bg-bg-surface hover:bg-bg-elevated text-text-secondary hover:text-white transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          <div className="mb-8">
-            <h2 className="text-[20px] font-bold text-white uppercase tracking-wider m-0">{fullChartModal.title}</h2>
-            <p className="text-[13px] text-text-muted mt-1 m-0">Gráfica detallada de toda la evolución temporal del paciente ({fullHistoryData.length} registros)</p>
-          </div>
-          
-          <div style={{ width: '100%', height: '400px', marginTop: '16px' }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={fullHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
-                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
-                 <XAxis 
-                   dataKey="fecha" 
-                   tickFormatter={(val) => formatDateShort(val)}
-                   tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                   axisLine={false}
-                   tickLine={false}
-                   dy={10}
-                 />
-                 <YAxis 
-                   tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
-                   axisLine={false}
-                   tickLine={false}
-                   domain={['auto', 'auto']}
-                 />
-                 <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0', fontSize: '12px' }} itemStyle={{ color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
-                 <Area 
-                   type="monotone" 
-                   dataKey={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'grasaEvolucion' : 'kgGrasaEvolucion') : fullChartModal.baseDataKey} 
-                   name={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'Porcentaje de Grasa (%)' : 'Kilos Grasa (KG)') : fullChartModal.baseName}
-                   stroke="#f0f0f0" 
-                   strokeWidth={2} 
-                   fill="rgba(240, 240, 240, 0.05)"
-                   dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
-                 />
-              </AreaChart>
-            </ResponsiveContainer>
-          </div>
+            ) : (
+              <div className="py-20 text-center border border-border-default border-dashed rounded-[12px] bg-bg-surface">
+                <ClipboardList className="h-8 w-8 text-text-muted mx-auto mb-4" />
+                <p className="text-[14px] font-medium text-text-secondary">Aún no hay valoraciones clínicas registradas</p>
+              </div>
+            )}
+          </section>
         </div>
       </div>
-    )}
 
-    {ConfirmDialogComponent}
-  </>
+      {/* MODAL HISTORIAL COMPLETO */}
+      {fullChartModal.isOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-fade-in" onClick={() => setFullChartModal(prev => ({ ...prev, isOpen: false }))}>
+          <div className="bg-bg-base border border-border-default rounded-[16px] w-full max-w-4xl p-8 relative flex flex-col max-h-[90vh]" onClick={e => e.stopPropagation()}>
+            <button
+              onClick={() => setFullChartModal(prev => ({ ...prev, isOpen: false }))}
+              className="absolute top-6 right-6 p-2 rounded-[8px] bg-bg-surface hover:bg-bg-elevated text-text-secondary hover:text-white transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <div className="mb-8">
+              <h2 className="text-[20px] font-bold text-white uppercase tracking-wider m-0">{fullChartModal.title}</h2>
+              <p className="text-[13px] text-text-muted mt-1 m-0">Gráfica detallada de toda la evolución temporal del paciente ({fullHistoryData.length} registros)</p>
+            </div>
+
+            <div style={{ width: '100%', height: '400px', marginTop: '16px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={fullHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                  <XAxis
+                    dataKey="fecha"
+                    tickFormatter={(val) => formatDateShort(val)}
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    dy={10}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                    axisLine={false}
+                    tickLine={false}
+                    domain={['auto', 'auto']}
+                  />
+                  <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0', fontSize: '12px' }} itemStyle={{ color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                  <Area
+                    type="monotone"
+                    dataKey={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'grasaEvolucion' : 'kgGrasaEvolucion') : fullChartModal.baseDataKey}
+                    name={fullChartModal.isFatModal ? (fatChartMode === 'pct' ? 'Porcentaje de Grasa (%)' : 'Kilos Grasa (KG)') : fullChartModal.baseName}
+                    stroke="#f0f0f0"
+                    strokeWidth={2}
+                    fill="rgba(240, 240, 240, 0.05)"
+                    dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {ConfirmDialogComponent}
+    </>
   );
 };
 
