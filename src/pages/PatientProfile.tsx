@@ -429,6 +429,7 @@ const PatientProfile = () => {
                 <ClinicalSection title="Estilo de Vida y Dinámica" icon={Activity} data={{
                   'Objetivo': (paciente.ejercicio || (paciente as any).datosEjercicio)?.objetivo || 'N/A',
                   'Gym de Origen': (paciente.ejercicio || (paciente as any).datosEjercicio)?.gymOrigen || 'N/A',
+                  'Hora Entrenamiento': (paciente.ejercicio || (paciente as any).datosEjercicio)?.horaEntrenamiento || 'N/A',
                   'Disciplinas': formatDisciplinasForDisplay(
                     (paciente.ejercicio || (paciente as any).datosEjercicio)?.disciplina,
                     {
@@ -479,8 +480,6 @@ const PatientProfile = () => {
                       { label: 'Preferencias (Gusta)', value: paciente.antecedentes?.alimentosGustan },
                       { label: 'Aversiones (No gusta)', value: paciente.antecedentes?.alimentosNoGustan },
                       { label: 'Signos y Síntomas', value: paciente.antecedentes?.signosYSintomas },
-                      { label: 'Historial Suplementos', value: paciente.antecedentes?.historialProductos },
-                      { label: 'Recomendación Suplementos', value: paciente.antecedentes?.recomendacionSuplementos },
                     ].map(({ label, value }) => (
                       <div key={label} className="space-y-2">
                         <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{label}</p>
@@ -491,6 +490,30 @@ const PatientProfile = () => {
                         )}
                       </div>
                     ))}
+                    {/* Suplementos activos de última consulta */}
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">Suplementos — Última Consulta</p>
+                      {(currentVal?.suplementosDetalle && currentVal.suplementosDetalle.length > 0) ? (
+                        <ul className="m-0 p-0 space-y-1">
+                          {currentVal.suplementosDetalle.filter((s: any) => s.activo !== false).map((s: any, i: number) => (
+                            <li key={s.id || i} className="flex items-start gap-2">
+                              <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-green-500" />
+                              <span className="text-[13px] font-medium text-text-primary leading-snug">
+                                {s.nombre}{s.indicaciones ? ` — ${s.indicaciones}` : ''}
+                              </span>
+                            </li>
+                          ))}
+                          {currentVal.suplementosDetalle.filter((s: any) => s.activo === false).map((s: any, i: number) => (
+                            <li key={`inact-${s.id || i}`} className="flex items-start gap-2">
+                              <span className="mt-1.5 w-1.5 h-1.5 rounded-full flex-shrink-0 bg-[#555]" />
+                              <span className="text-[13px] font-medium text-text-muted line-through leading-snug">{s.nombre}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-[14px] font-medium text-text-muted tracking-tight">—</p>
+                      )}
+                    </div>
                   </div>
                 </div>
 

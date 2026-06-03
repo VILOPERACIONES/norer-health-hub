@@ -109,12 +109,12 @@ const NewPatient = () => {
   const [form, setForm] = useState({
     nombre: '', apellido: '', lada: '52', telefono: '', email: '',
     fechaNacimiento: '', sexo: 'F' as 'M' | 'F',
-    objetivo: '', gymOrigen: '',
+    objetivo: '', gymOrigen: '', horaEntrenamiento: '',
     nivelActividad: 'Sedentario',
     porcentajeSedentario: '', porcentajeLeve: '', porcentajeModerado: '', porcentajeIntenso: '',
     historialProductos: '', recomSuplementos: '',
     alimentosNoGusta: '', alimentosGusta: '', alergico: '',
-    patologia: '', cirugias: '', estrenimiento: 'No',
+    patologia: '', cirugias: '', farmacos: '', cicloMenstrual: '', estrenimiento: 'No',
     alcohol: 'No', tabaco: 'No', agua: '',
     signosSintomas: '',
     talla: '',
@@ -170,6 +170,7 @@ const NewPatient = () => {
       ejercicio: {
         objetivo: form.objetivo,
         gymOrigen: form.gymOrigen,
+        horaEntrenamiento: form.horaEntrenamiento,
         ...encodeDisciplinas(disciplinas),
         nivelActividad: form.nivelActividad,
         porcentajeSedentario: parseFloat(form.porcentajeSedentario) || 0,
@@ -181,6 +182,8 @@ const NewPatient = () => {
       antecedentes: {
         patologia: form.patologia,
         cirugias: form.cirugias,
+        farmacos: form.farmacos,
+        cicloMenstrual: form.cicloMenstrual,
         alergias: form.alergico,
         alimentosGustan: form.alimentosGusta,
         alimentosNoGustan: form.alimentosNoGusta,
@@ -251,6 +254,7 @@ const NewPatient = () => {
         <FormSection title="Dinámica Deportiva" icon={Activity} defaultOpen={false}>
           <Input label="Objetivo" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Ej: Aumento de masa muscular, pérdida de grasa" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
+          <Input label="Hora de Entrenamiento" value={form.horaEntrenamiento} onChange={(v: string) => update('horaEntrenamiento', v)} placeholder="Ej: 7:00am / Tarde" />
           <div className="col-span-full space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1">Disciplinas</label>
@@ -375,6 +379,8 @@ const NewPatient = () => {
         <FormSection title="Perfil Clínico" icon={Heart} defaultOpen={false}>
           <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
           <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
+          <Input label="Fármacos / Medicamentos" value={form.farmacos} onChange={(v: string) => update('farmacos', v)} placeholder="Metformina 500mg, Eutirox..." />
+          <Input label="Ciclo Menstrual" value={form.cicloMenstrual} onChange={(v: string) => update('cicloMenstrual', v)} placeholder="Regular / Irregular / N/A" />
           <Select label="Tránsito Intestinal" value={form.estrenimiento} onChange={(v: string) => update('estrenimiento', v)} options={['No', 'Leve', 'Frecuente']} />
           <Select label="Consumo de Alcohol" value={form.alcohol} onChange={(v: string) => update('alcohol', v)} options={['No', 'Social', 'Frecuente']} />
           <Select label="Hábito Tabáquico" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Ocasional', 'Frecuente']} />

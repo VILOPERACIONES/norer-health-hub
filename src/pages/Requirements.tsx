@@ -279,7 +279,7 @@ const Requirements = () => {
               <span className="font-bold flex items-center gap-2 m-0 text-text-primary"><Activity className="w-[18px] h-[18px] text-text-muted" /> Paso 4: Distribución por Tiempos</span>
            </h2>
            <div className="overflow-x-auto rounded-[8px] border border-border-subtle custom-scrollbar">
-              <table className="w-full text-left min-w-[1000px] border-collapse bg-bg-surface">
+              <table className="w-full text-left min-w-[800px] border-collapse bg-bg-surface">
                  <thead className="bg-bg-elevated border-b border-border-subtle text-[12px] font-medium text-text-muted uppercase">
                    <tr>
                      <th className="px-4 py-3">Grupo</th>

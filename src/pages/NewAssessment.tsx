@@ -713,8 +713,8 @@ const NewAssessment = () => {
       )}
 
       <div className="max-w-none w-full mx-auto flex flex-col flex-1 min-h-0">
-        {/* TOP HEADER */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pt-3 pb-2 text-[#f0f0f0]">
+        {/* TOP HEADER — sticky */}
+        <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 px-3 sm:px-4 md:px-6 lg:px-8 py-2 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a] flex flex-col sm:flex-row items-start sm:items-center justify-between text-[#f0f0f0]">
           {paciente && (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#333] text-[#f0f0f0] flex items-center justify-center font-bold text-[12px] uppercase">
@@ -746,7 +746,7 @@ const NewAssessment = () => {
         </div>
 
         {/* STEPPER */}
-        <div className="flex items-center justify-center max-w-lg mx-auto w-full mb-5 mt-1 shrink-0">
+        <div className="flex items-center justify-center max-w-lg mx-auto w-full mb-5 mt-4 shrink-0">
           {STEPS.map((s, i, arr) => (
             <React.Fragment key={s.id}>
               <div className="flex flex-col items-center gap-1 relative">
@@ -798,7 +798,7 @@ const NewAssessment = () => {
                     {/* Ejercicio */}
                     <div className="pt-4">
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Ejercicio</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3">
                         {([
                           { label: 'Objetivo', field: 'objetivo' },
                           { label: 'Nivel Actividad', field: 'nivelActividad' },
@@ -824,7 +824,7 @@ const NewAssessment = () => {
                     {/* Consumo Calórico */}
                     <div>
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Distribución Actividad (%)</p>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3">
                         {([
                           { label: 'Sedentario', field: 'porcentajeSedentario' },
                           { label: 'Leve', field: 'porcentajeLeve' },
@@ -892,7 +892,7 @@ const NewAssessment = () => {
                     {/* Antecedentes */}
                     <div>
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Antecedentes</p>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
                         {([
                           { label: 'Patología / Enfermedades', field: 'patologia' },
                           { label: 'Cirugías / Traumas', field: 'cirugias' },
@@ -1078,12 +1078,12 @@ const NewAssessment = () => {
                     </div>
                     {suplementacionActiva && (
                       <div className="space-y-4 animate-fade-in">
-                        <div className="grid grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                        <div className="grid grid-cols-[20px_1fr_36px] xs:grid-cols-[20px_1fr_1fr_36px] md:grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-2 md:gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
                           <div></div>
                           <div>Suplemento</div>
-                          <div>Indicaciones / Dosis</div>
-                          <div>Tiempo</div>
-                          <div className="text-center">Estado</div>
+                          <div className="hidden xs:block">Indicaciones</div>
+                          <div className="hidden md:block">Tiempo</div>
+                          <div className="hidden md:block text-center">Estado</div>
                           <div></div>
                         </div>
                         <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
@@ -1102,14 +1102,14 @@ const NewAssessment = () => {
                                 setDragSupIdx(null);
                               }}
                               onDragEnd={() => setDragSupIdx(null)}
-                              className={`grid grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border transition-colors group ${dragSupIdx === idx ? 'opacity-40 border-brand-primary' : 'border-[#2a2a2a] hover:border-[#444]'}`}
+                              className={`grid grid-cols-[20px_1fr_36px] xs:grid-cols-[20px_1fr_1fr_36px] md:grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-2 md:gap-4 items-center bg-[#181818] p-3 rounded-[8px] border transition-colors group ${dragSupIdx === idx ? 'opacity-40 border-brand-primary' : 'border-[#2a2a2a] hover:border-[#444]'}`}
                             >
                               <div className="flex items-center justify-center cursor-grab text-[#444] group-hover:text-[#666]">
                                 <GripVertical className="w-4 h-4" />
                               </div>
                               <input type="text" value={sup.nombre} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].nombre = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. Creatina" className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
-                              <input type="text" value={sup.indicaciones} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].indicaciones = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. 1 scoop post-entreno" className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
-                              <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
+                              <input type="text" value={sup.indicaciones} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].indicaciones = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. 1 scoop post-entreno" className="hidden xs:block w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
+                              <div className="hidden md:block text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
                                 {(() => {
                                   if (!sup.fechaInicio) return '0 días';
                                   let end = new Date(); let suffix = '';
@@ -1122,7 +1122,7 @@ const NewAssessment = () => {
                                   return meses > 0 ? `${meses} mes${meses > 1 ? 'es' : ''}${suffix}` : `${diffDays} día${diffDays !== 1 ? 's' : ''}${suffix}`;
                                 })()}
                               </div>
-                              <div className="flex items-center justify-center w-[80px]">
+                              <div className="hidden md:flex items-center justify-center w-[80px]">
                                 <label className="relative inline-flex items-center cursor-pointer">
                                   <input type="checkbox" className="sr-only peer" checked={sup.activo} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].activo = e.target.checked; setSuplementosDetalle(a); }} />
                                   <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>

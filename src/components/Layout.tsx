@@ -60,7 +60,7 @@ const Layout = () => {
   const renderSidebarContent = (isMobileView: boolean) => {
     const isCollapsed = isMobileView ? false : collapsed;
     return (
-      <div className={`flex flex-col h-full bg-bg-surface border-r border-border-subtle transition-all duration-300 ${isCollapsed ? 'w-24' : 'w-full'} shadow-none relative`}>
+      <div className={`flex flex-col h-full bg-bg-surface border-r border-border-subtle transition-all duration-300 w-full shadow-none relative`}>
         <div className={`pt-8 pb-4 flex ${isCollapsed ? 'flex-col justify-center items-center gap-6 px-0' : 'justify-start px-6 pl-8'} transition-all`}>
           <Logo size="sm" collapsed={isCollapsed} />
         </div>
@@ -141,7 +141,7 @@ const Layout = () => {
   return (
     <div className="flex h-screen bg-bg-base overflow-hidden font-sans selection:bg-brand-primary selection:text-bg-base">
       {/* SIDEBAR PC */}
-      <aside className={`relative hidden lg:flex h-full flex-col flex-shrink-0 z-40 bg-bg-surface transition-all duration-300 ${collapsed ? 'w-24' : 'w-64'}`}>
+      <aside className={`relative hidden md:flex h-full flex-col flex-shrink-0 z-40 bg-bg-surface transition-all duration-300 ${collapsed ? 'w-16 md:w-20' : 'w-56 md:w-64 2xl:w-72'}`}>
         {renderSidebarContent(false)}
         
         <button 
@@ -154,7 +154,7 @@ const Layout = () => {
 
       {/* MOBILE SIDEBAR */}
       {mobileOpen && (
-        <div className="fixed inset-0 z-[60] lg:hidden">
+        <div className="fixed inset-0 z-[60] md:hidden">
           <div className="absolute inset-0 bg-black/80 backdrop-blur-md animate-fade-in" onClick={() => setMobileOpen(false)} />
           <aside className="relative w-64 h-full bg-bg-surface shadow-2xl animate-slide-up flex">
             {renderSidebarContent(true)}
@@ -164,7 +164,7 @@ const Layout = () => {
 
       <div className="flex-1 flex flex-col min-w-0 h-full">
         {/* MOBILE HEADER */}
-        <header className="h-[60px] lg:hidden bg-bg-base border-b border-border-subtle flex items-center justify-between px-4 sticky top-0 z-30 shadow-none">
+        <header className="h-[60px] md:hidden bg-bg-base border-b border-border-subtle flex items-center justify-between px-4 sticky top-0 z-30 shadow-none">
           <div className="flex items-center">
             <button 
               onClick={() => setMobileOpen(true)} 
@@ -179,7 +179,7 @@ const Layout = () => {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-4 md:px-8 pb-6 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 lg:px-8 pb-6 custom-scrollbar scroll-smooth bg-bg-base text-text-primary">
           <div className={`w-full ${location.pathname === '/dashboard' ? 'h-full overflow-hidden' : 'min-h-full pt-6'}`}>
             <Outlet />
           </div>
