@@ -10,7 +10,6 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 
 const defaultTiempos = ['Desayuno', 'Colación 1', 'Comida', 'Colación 2', 'Cena'];
 
@@ -88,7 +87,6 @@ export const CreateEditPlanForm = ({
   const [suplementosDetalle, setSuplementosDetalle] = useState<any[]>([]); // 💊 State independiente para persistencia
   const [showBarridoRef, setShowBarridoRef] = useState(false); // cerrado por defecto
   const [pacienteInfo, setPacienteInfo] = useState<any>(null); // antecedentes + datos clínicos del paciente
-  const [showResumenPaciente, setShowResumenPaciente] = useState(false);
   // Borradores locales del nombre de platillo mientras se edita — evita que el grupo desaparezca al vaciar el input
   const [platilloDrafts, setPlatilloDrafts] = useState<Record<string, string>>({});
 
@@ -786,7 +784,7 @@ export const CreateEditPlanForm = ({
 
   return (
     <>
-      <div className="space-y-8 animate-fade-in pb-20 max-w-none w-full mt-2">
+      <div className="animate-fade-in max-w-none w-full mt-2">
         <div className="sticky top-0 z-30 -mx-4 md:-mx-8 px-4 md:px-8 pt-3 -mt-8 mb-4 pb-3 bg-[#0a0a0a]/95 backdrop-blur-md border-b border-[#1a1a1a] flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div className="space-y-2">
             {(!onSaved || onCancel) && (
@@ -805,16 +803,6 @@ export const CreateEditPlanForm = ({
           </div>
 
           <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-            {!isBasePlan && pacienteInfo && (
-              <button
-                onClick={() => setShowResumenPaciente(true)}
-                className="w-full sm:w-auto px-[14px] py-[10px] bg-[#1a1a1a] border border-[#2a2a2a] hover:border-[#444] text-[#c0c0c0] hover:text-white rounded-[8px] text-[13px] font-medium transition-all flex items-center justify-center gap-2"
-                title="Ver resumen clínico del paciente"
-              >
-                <FileText className="h-[15px] w-[15px]" />
-                Resumen
-              </button>
-            )}
             {/* Botón Guardar Cambios / Generar Menú arriba - Ahora siempre visible */}
             <button
               onClick={handleSave}
@@ -841,7 +829,8 @@ export const CreateEditPlanForm = ({
           )}
         </div>
 
-        <div className="space-y-6">
+        <div className="flex gap-5 items-start pb-20 pt-2">
+          <div className="flex-1 min-w-0 space-y-6">
           {/* DASHBOARD DE REQUERIMIENTOS: Unificado en la parte superior */}
           <div className="bg-[#111111] p-8 rounded-[12px] animate-slide-up border border-[#2a2a2a] shadow-xl">
             <div className="flex flex-col gap-10">
@@ -1524,7 +1513,105 @@ export const CreateEditPlanForm = ({
               </div>
             ))}
           </div>
-        </div>
+          </div>{/* closes flex-1 main col */}
+
+          {/* ─── Resumen clínico sidebar ─── */}
+          {!isBasePlan && pacienteInfo && (
+            <aside className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar space-y-3">
+              <div className="bg-[#111] border border-[#2a2a2a] rounded-[12px] p-4">
+                <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-1">{pacienteNombre}</p>
+                <p className="text-[10px] font-bold text-[#3a3a3a] uppercase tracking-widest">Resumen clínico · Solo lectura</p>
+              </div>
+
+              <div className="space-y-2">
+                {/* Número de comidas */}
+                {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
+                  <SidebarSeccion titulo="Número de comidas">
+                    <p className="text-[12px] font-bold text-white leading-snug">
+                      {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.join(', ')}
+                    </p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Ejercicio */}
+                {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (
+                  <SidebarSeccion titulo="Ejercicio">
+                    <div className="space-y-0.5">
+                      {pacienteInfo.ejercicio?.objetivo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Objetivo:</span> {pacienteInfo.ejercicio.objetivo}</p>}
+                      {pacienteInfo.ejercicio?.disciplina && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Disciplina:</span> {pacienteInfo.ejercicio.disciplina}</p>}
+                      {pacienteInfo.ejercicio?.frecuencia && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Frecuencia:</span> {pacienteInfo.ejercicio.frecuencia}</p>}
+                      {pacienteInfo.ejercicio?.nivelActividad && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Nivel:</span> {pacienteInfo.ejercicio.nivelActividad}</p>}
+                    </div>
+                  </SidebarSeccion>
+                )}
+
+                {/* Suplementos activos */}
+                {suplementosDetalle.filter((s: any) => s.activo && s.nombre).length > 0 && (
+                  <SidebarSeccion titulo="Suplementos activos">
+                    <ul className="space-y-1">
+                      {suplementosDetalle.filter((s: any) => s.activo && s.nombre).map((s: any, i: number) => (
+                        <li key={i} className="text-[12px] text-[#e0e0e0] flex items-start gap-1.5">
+                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                          <span><span className="font-semibold text-white">{s.nombre}</span>{s.indicaciones && <span className="text-[#8a8a8a]"> — {s.indicaciones}</span>}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </SidebarSeccion>
+                )}
+
+                {/* Notas clínicas */}
+                {valData?.comentarios && (
+                  <SidebarSeccion titulo="Notas clínicas">
+                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.comentarios}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Alimentos a evitar */}
+                {Array.isArray(valData?.evitar) && valData.evitar.filter((e: any) => e?.valor?.trim()).length > 0 && (
+                  <SidebarSeccion titulo="Alimentos a evitar">
+                    <ul className="space-y-1">
+                      {valData.evitar.filter((e: any) => e?.valor?.trim()).map((e: any, i: number) => (
+                        <li key={i} className="text-[12px] text-red-300 flex items-start gap-1.5">
+                          <span className="mt-0.5 shrink-0 text-red-500">✕</span> {e.valor}
+                        </li>
+                      ))}
+                    </ul>
+                  </SidebarSeccion>
+                )}
+
+                {/* Patología */}
+                {pacienteInfo?.antecedentes?.patologia && (
+                  <SidebarSeccion titulo="Patología"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p></SidebarSeccion>
+                )}
+
+                {/* Fármacos */}
+                {pacienteInfo?.antecedentes?.farmacos && (
+                  <SidebarSeccion titulo="Fármacos"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.farmacos}</p></SidebarSeccion>
+                )}
+
+                {/* Alergias */}
+                {pacienteInfo?.antecedentes?.alergias && (
+                  <SidebarSeccion titulo="Alergias"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p></SidebarSeccion>
+                )}
+
+                {/* No consume / no le gustan */}
+                {pacienteInfo?.antecedentes?.alimentosNoGustan && (
+                  <SidebarSeccion titulo="No consume / No le gustan"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosNoGustan}</p></SidebarSeccion>
+                )}
+
+                {/* Ciclo menstrual */}
+                {pacienteInfo?.antecedentes?.cicloMenstrual && (
+                  <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
+                )}
+
+                {/* Historial suplementos */}
+                {pacienteInfo?.antecedentes?.historialProductos && (
+                  <SidebarSeccion titulo="Historial suplementos"><p className="text-[12px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p></SidebarSeccion>
+                )}
+              </div>
+            </aside>
+          )}
+        </div>{/* closes flex wrapper */}
 
       </div>
       {/* ─── Save-as-Platillo Modal ─── */}
@@ -1583,98 +1670,14 @@ export const CreateEditPlanForm = ({
 
       {ConfirmDialogComponent}
 
-      {/* ─── Resumen clínico del paciente ─── */}
-      <Sheet open={showResumenPaciente} onOpenChange={setShowResumenPaciente}>
-        <SheetContent side="right" className="w-[360px] sm:w-[400px] bg-[#111] border-l border-[#2a2a2a] overflow-y-auto">
-          <SheetHeader className="mb-5">
-            <SheetTitle className="text-white text-[16px] font-bold">
-              {pacienteNombre}
-            </SheetTitle>
-            <p className="text-[11px] text-[#555] uppercase tracking-widest font-bold">Resumen clínico · Solo lectura</p>
-          </SheetHeader>
-
-          <div className="space-y-5">
-            {/* Número de comidas */}
-            {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
-              <ResumenSeccion titulo="Número de comidas">
-                <p className="text-[14px] font-bold text-white">
-                  {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.join(', ')}
-                </p>
-              </ResumenSeccion>
-            )}
-
-            {/* Suplementos activos */}
-            {suplementosDetalle.filter((s: any) => s.activo && s.nombre).length > 0 && (
-              <ResumenSeccion titulo="Suplementos activos">
-                <ul className="space-y-1">
-                  {suplementosDetalle.filter((s: any) => s.activo && s.nombre).map((s: any, i: number) => (
-                    <li key={i} className="text-[13px] text-[#e0e0e0]">
-                      <span className="font-semibold text-white">{s.nombre}</span>
-                      {s.indicaciones && <span className="text-[#8a8a8a]"> — {s.indicaciones}</span>}
-                    </li>
-                  ))}
-                </ul>
-              </ResumenSeccion>
-            )}
-
-            {/* Notas clínicas */}
-            {valData?.comentarios && (
-              <ResumenSeccion titulo="Notas clínicas">
-                <p className="text-[13px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.comentarios}</p>
-              </ResumenSeccion>
-            )}
-
-            {/* Alimentos a evitar (del plan) */}
-            {Array.isArray(valData?.evitar) && valData.evitar.filter((e: any) => e?.valor?.trim()).length > 0 && (
-              <ResumenSeccion titulo="Alimentos a evitar">
-                <ul className="space-y-1">
-                  {valData.evitar.filter((e: any) => e?.valor?.trim()).map((e: any, i: number) => (
-                    <li key={i} className="text-[13px] text-red-300 flex items-start gap-1.5">
-                      <span className="mt-0.5 shrink-0 text-red-500">✕</span> {e.valor}
-                    </li>
-                  ))}
-                </ul>
-              </ResumenSeccion>
-            )}
-
-            {/* Patología */}
-            {pacienteInfo?.antecedentes?.patologia && (
-              <ResumenSeccion titulo="Patología / Enfermedades">
-                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p>
-              </ResumenSeccion>
-            )}
-
-            {/* Alergias */}
-            {pacienteInfo?.antecedentes?.alergias && (
-              <ResumenSeccion titulo="Alergias">
-                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p>
-              </ResumenSeccion>
-            )}
-
-            {/* Alimentos que no le gustan */}
-            {pacienteInfo?.antecedentes?.alimentosNoGustan && (
-              <ResumenSeccion titulo="No consume / No le gustan">
-                <p className="text-[13px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosNoGustan}</p>
-              </ResumenSeccion>
-            )}
-
-            {/* Historial de suplementos (del perfil) */}
-            {pacienteInfo?.antecedentes?.historialProductos && (
-              <ResumenSeccion titulo="Historial de suplementos">
-                <p className="text-[13px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p>
-              </ResumenSeccion>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </>
   );
 };
 
-function ResumenSeccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
+function SidebarSeccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
   return (
     <div className="border border-[#2a2a2a] rounded-[8px] p-3 bg-[#0f0f0f]">
-      <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-2">{titulo}</p>
+      <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-1.5">{titulo}</p>
       {children}
     </div>
   );
