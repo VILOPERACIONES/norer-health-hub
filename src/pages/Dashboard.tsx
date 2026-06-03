@@ -1,10 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { usePatients } from '@/hooks/usePatients';
 import { 
   Users, UserPlus, ClipboardList, Activity, Plus,
   MessageSquare, BookOpen, Trophy, MoreHorizontal,
   Clock, Check, Square, ChevronDown, ChevronsLeft,
-  ChevronLeft, ChevronRight, ChevronsRight, ArrowUpRight, ArrowDownRight
+  ChevronLeft, ChevronRight, ChevronsRight, ArrowUpRight, ArrowDownRight,
+  CalendarCheck2, AlertTriangle
 } from 'lucide-react';
 import api from '@/lib/api';
 import type { DashboardMetricas, Alerta } from '@/types';
@@ -13,102 +16,104 @@ import { getBadgeForValuation } from '@/lib/format';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Dashboard = () => {
-  const [metricas, setMetricas] = useState<DashboardMetricas | null>(null);
-  const [alertas, setAlertas] = useState<Alerta[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
-  const [topClientes, setTopClientes] = useState<{
-    id: string;
-    nombre: string;
-    valoraciones: number;
-  }[]>([]);
-  // Datos para la tabla "Últimos Pacientes" — misma lógica que Pending.tsx
-  const [ultimosPendientes, setUltimosPendientes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { data: pacientesData = [], isLoading: loadingPacientes } = usePatients();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Intentar endpoint dedicado de top-clientes primero
-        const [metRes, alertRes, pacRes] = await Promise.all([
-          api.get('/api/dashboard/metricas'),
-          api.get('/api/dashboard/alertas'),
-          api.get('/api/pacientes'),
-        ]);
+  // Queries para métricas, alertas y top clientes
+  const { data: metricas } = useQuery({
+    queryKey: ['dashboard', 'metricas'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/metricas');
+      return res.data?.data || res.data;
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
 
-        setMetricas(metRes.data?.data || metRes.data);
-        setAlertas(alertRes.data?.data || alertRes.data || []);
+  const { data: alertas = [] } = useQuery({
+    queryKey: ['dashboard', 'alertas'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/alertas');
+      return res.data?.data || res.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
 
-        // ── Construir "Últimos Pacientes" con la misma lógica de Pending.tsx ──
-        const pacientesData: any[] = pacRes.data?.data || pacRes.data || [];
-        const pendItems: any[] = [];
-        pacientesData.forEach((pac: any) => {
-          const valArr: any[] = pac.valoraciones || [];
-          valArr.forEach((val: any) => {
-            // Inyectar plan si no viene dentro de la valoración
-            if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
-              const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
-              if (planAsociado) {
-                val.plan = planAsociado;
-                val.planId = planAsociado.id;
-                val.estadoEnvio = planAsociado.estadoEnvio;
-              }
-            }
-            const statusInfo = getBadgeForValuation(val);
-            if (statusInfo.text !== 'Enviado') {
-              pendItems.push({
-                pacienteId: pac.id,
-                nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
-                fecha: val.fecha,
-                numeroValoracion: val.numeroValoracion,
-                val,
-                statusInfo,
-              });
-            }
-          });
-        });
-        // Ordenar por fecha más reciente primero
-        pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
-        setUltimosPendientes(pendItems);
+  const { data: topClientesRaw } = useQuery({
+    queryKey: ['dashboard', 'top-clientes'],
+    queryFn: async () => {
+      const res = await api.get('/api/dashboard/top-clientes');
+      return res.data?.data || res.data || [];
+    },
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
 
-        // Top clientes: preferir endpoint dedicado, fallback desde pacientesData
-        try {
-          const topRes = await api.get('/api/dashboard/top-clientes');
-          const topData = topRes.data?.data || topRes.data || [];
-          setTopClientes(topData.slice(0, 10));
-        } catch {
-          const top = pacientesData
-            .map((p: any) => ({
-              id: p.id,
-              nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
-              valoraciones:
-                p._count?.valoraciones ??
-                p.totalValoraciones ??
-                p.numeroValoraciones ??
-                (Array.isArray(p.valoraciones) ? p.valoraciones.length : 0),
-            }))
-            .filter((p: any) => p.valoraciones > 0)
-            .sort((a: any, b: any) => b.valoraciones - a.valoraciones)
-            .slice(0, 10);
-          setTopClientes(top);
+  // Determinar top-clientes (usando el endpoint si tiene datos, o un fallback de pacientesData)
+  const topClientes = useMemo(() => {
+    if (topClientesRaw && topClientesRaw.length > 0) return topClientesRaw.slice(0, 10);
+    return pacientesData
+      .map((p: any) => ({
+        id: p.id,
+        nombre: `${p.nombre} ${p.apellido || ''}`.trim(),
+        valoraciones: p._count?.valoraciones ?? p.totalValoraciones ?? p.numeroValoraciones ?? (Array.isArray(p.valoraciones) ? p.valoraciones.length : 0),
+      }))
+      .filter((p: any) => p.valoraciones > 0)
+      .sort((a: any, b: any) => b.valoraciones - a.valoraciones)
+      .slice(0, 10);
+  }, [topClientesRaw, pacientesData]);
+
+  const ultimosPendientes = useMemo(() => {
+    const pendItems: any[] = [];
+    pacientesData.forEach((pac: any) => {
+      const valArr: any[] = pac.valoraciones || [];
+      valArr.forEach((val: any) => {
+        if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
+          const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
+          if (planAsociado) {
+            val.plan = planAsociado;
+            val.planId = planAsociado.id;
+            val.estadoEnvio = planAsociado.estadoEnvio;
+          }
         }
-      } catch (err) {
-        console.error('Error cargando dashboard:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
-  }, []);
+        const statusInfo = getBadgeForValuation(val);
+        if (statusInfo.text !== 'Enviado') {
+          // Próxima sesión: fuente primaria = cita vinculada a la valoración (val.tieneCita)
+          // Fallback = plan.proximaSesion (guardado al confirmar desde el plan)
+          const planData = val.plan;
+          const proximaSesion = val.tieneCita
+            ? (val.proximaCita || true)
+            : (planData?.proximaSesion || null);
+          pendItems.push({
+            pacienteId: pac.id,
+            nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
+            fecha: val.fecha,
+            numeroValoracion: val.numeroValoracion,
+            val,
+            statusInfo,
+            proximaSesion,
+          });
+        }
+      });
+    });
+    return pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+  }, [pacientesData]);
+
+  const loading = loadingPacientes && !metricas;
 
   const userName = user?.nombre?.split(' ')[0] || 'Especialista';
 
   // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
   const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de menú').length;
   const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú en Proceso').length;
+  const planesListos     = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú Listo').length;
   const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
@@ -168,7 +173,7 @@ const Dashboard = () => {
         text: `${pctPendientes}%`,
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
       },
-      sub: `${planesSinAsignar} Pendiente de menú · ${planesEnProceso} Menú en proceso`,
+      sub: `${planesSinAsignar} Pendiente · ${planesEnProceso} En proceso · ${planesListos} Listo`,
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
     },
     {
@@ -195,11 +200,11 @@ const Dashboard = () => {
 
   return (
     <div 
-      className="flex flex-col gap-4 animate-fade-in h-full overflow-hidden" 
+      className="flex flex-col gap-6 animate-fade-in h-full overflow-y-auto overflow-x-hidden lg:overflow-hidden pb-12 lg:pb-0" 
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {/* HEADER SECTION */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#f0f0f0] m-0 tracking-tight">
             Bienvenido de vuelta, {userName}! 
@@ -208,10 +213,10 @@ const Dashboard = () => {
             Work Hard. Play Hard.
           </p>
         </div>
-        <div className="flex gap-4">
+        <div className="flex gap-4 w-full md:w-auto">
           <button
             onClick={() => navigate('/pacientes/nuevo')}
-            className="flex items-center gap-2 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] px-[16px] py-[10px] text-[13px] font-semibold transition-colors hover:bg-white border border-transparent shadow-sm"
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] px-[16px] py-[10px] text-[13px] font-semibold transition-colors hover:bg-white border border-transparent shadow-sm"
           >
             <Plus className="h-[16px] w-[16px]" /> Registrar nuevo paciente
           </button>
@@ -219,7 +224,7 @@ const Dashboard = () => {
       </div>
 
       {/* KPI CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {cards.map((c, i) => (
           <div key={i} className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] p-5 flex flex-col gap-4">
             {/* Título e ícono */}
@@ -231,13 +236,13 @@ const Dashboard = () => {
             </div>
 
             {/* Número | separador | % badge — DISEÑO ORIGINAL */}
-            <div className="flex items-center justify-between bg-[#181818] border border-[#2a2a2a] rounded-[12px] px-5 py-4">
-              <p className="text-[32px] font-normal text-[#f0f0f0] m-0 leading-none tracking-tight tabular-nums">
+            <div className="flex items-center justify-between bg-[#181818] border border-[#2a2a2a] rounded-[12px] px-4 sm:px-5 py-4">
+              <p className="text-[28px] sm:text-[32px] font-normal text-[#f0f0f0] m-0 leading-none tracking-tight tabular-nums">
                 {c.value}
               </p>
-              <div className="flex items-center gap-4 h-8">
+              <div className="flex items-center gap-3 sm:gap-4 h-8">
                 <div className="w-[1px] h-full bg-[#2a2a2a]" />
-                <span className={`text-[13px] font-normal tracking-wide whitespace-nowrap ${c.badge.color}`}>
+                <span className={`text-[12px] sm:text-[13px] font-normal tracking-wide whitespace-nowrap ${c.badge.color}`}>
                   {c.badge.text}
                 </span>
               </div>
@@ -252,11 +257,11 @@ const Dashboard = () => {
       </div>
 
       {/* SECCIÓN PRINCIPAL: Tablas */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6 flex-1 lg:min-h-0 lg:overflow-hidden shrink-0">
         
         {/* TOP CLIENTES */}
-        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
-          <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a]">
+        <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-[300px] lg:min-h-0 lg:overflow-hidden">
+          <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a] shrink-0">
             <div className="flex items-center gap-2">
               <Trophy className="w-4 h-4 text-[#f59e0b]" />
               <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">Top Clientes</h2>
@@ -316,15 +321,15 @@ const Dashboard = () => {
         </div>
 
         {/* ULTIMOS PACIENTES (2/3 Width on Large Screens) */}
-        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-0 overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#2a2a2a]">
+        <div className="lg:col-span-8 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-[400px] lg:min-h-0 lg:overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#2a2a2a] shrink-0">
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
               Últimos Pacientes
             </h2>
           </div>
 
-          <div className="flex-1 min-h-0 overflow-auto w-full">
-            <table className="w-full text-left border-collapse min-w-[500px]">
+          <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar w-full">
+            <table className="w-full text-left border-collapse min-w-[600px]">
               <thead>
                 <tr className="border-b border-[#2a2a2a] whitespace-nowrap">
                   <th className="pl-5 pr-3 py-3 w-12 text-center" style={{ width: '48px' }}>
@@ -333,13 +338,16 @@ const Dashboard = () => {
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Nombre de Paciente</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Estatus</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Fecha de Consulta</th>
+                  <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a] text-center">Próxima sesión</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
                 {ultimosPendientes.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="py-12 text-center">
-                      <p className="text-[13px] text-[#8a8a8a]">Sin pacientes pendientes. Todo al día ✨</p>
+                    <td colSpan={5} className="py-16">
+                      <div className="flex flex-col items-center justify-center gap-2">
+                        <p className="text-[13px] text-[#8a8a8a] text-center">Sin pacientes pendientes. Todo al día ✨</p>
+                      </div>
                     </td>
                   </tr>
                 ) : (
@@ -348,6 +356,7 @@ const Dashboard = () => {
                       ? new Date(item.fecha.includes('T') ? item.fecha.split('T')[0] + 'T12:00:00' : item.fecha)
                           .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—';
+                    const hasNextSession = !!item.proximaSesion;
                     return (
                       <tr
                         key={`${item.pacienteId}-${item.val.id || i}`}
@@ -367,6 +376,17 @@ const Dashboard = () => {
                         </td>
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
                           {dateStr}
+                        </td>
+                        <td className="px-3 py-[14px] text-center">
+                          {hasNextSession ? (
+                            <span title={item.proximaSesion} className="inline-flex items-center justify-center">
+                              <CalendarCheck2 className="w-4 h-4 text-emerald-400" />
+                            </span>
+                          ) : (
+                            <span title="Sin cita agendada" className="inline-flex items-center justify-center">
+                              <AlertTriangle className="w-4 h-4 text-amber-500/60" />
+                            </span>
+                          )}
                         </td>
                       </tr>
                     );

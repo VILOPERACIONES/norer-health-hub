@@ -1,9 +1,8 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
 
-// Timeout de 12s — si el backend no responde en 12s, el usuario ve un error
-// en lugar de quedarse esperando indefinidamente.
-const api = axios.create({ timeout: 12_000 });
+// Timeout de 30s — agendar citas en Cal.com toma su tiempo porque envía correos y procesa webhooks internamente.
+const api = axios.create({ timeout: 30_000 });
 
 // ── Request interceptor ───────────────────────────────────────────────────────
 api.interceptors.request.use((config) => {
@@ -30,7 +29,11 @@ api.interceptors.response.use(
     // Solo reintentamos errores de red o 5xx (no errores 4xx del cliente).
     const isNetworkError = !error.response;
     const isServerError = error.response?.status >= 500;
-    const shouldRetry = (isNetworkError || isServerError) && !config._retryCount;
+    
+    // Explicitly don't retry 409 Conflicts or any 4xx.
+    const isConflict = error.response?.status === 409;
+    
+    const shouldRetry = (isNetworkError || isServerError) && !isConflict && !config._retryCount;
 
     if (shouldRetry) {
       config._retryCount = config._retryCount ?? 0;

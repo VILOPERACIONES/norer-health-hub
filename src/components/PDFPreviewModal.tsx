@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, FileText, Check, Settings2 } from 'lucide-react';
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
@@ -15,12 +15,19 @@ interface PDFPreviewModalProps {
 }
 
 export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading }: PDFPreviewModalProps) {
-  const [meta, setMeta] = useState<any>({
-    showPageHistorial: true,
-    showPageMenus: true,
-    showPageIntercambio: true,
-    showPageExtras: true,
-    ...planCustomMeta
+  const [meta, setMeta] = useState<any>(() => {
+    const saved = localStorage.getItem('norder_pdfCustomMetaPrefs');
+    const defaultPrefs = saved ? JSON.parse(saved) : {};
+    return {
+      showPageHistorial: true,
+      showPageMenus: true,
+      showPageIntercambio: true,
+      showPageExtras: true,
+      showContacto: true,
+      soloEquivalencias: false,
+      ...defaultPrefs,
+      ...planCustomMeta
+    };
   });
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -50,23 +57,52 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
     }
   };
 
-  useEffect(() => {
-    if (isOpen && planId) {
-      fetchPdf(meta);
-    }
-  }, [isOpen, planId]);
+  // Ref para distinguir entre la carga inicial y cambios del usuario en meta
+  const isInitialLoad = useRef(true);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isOpen && planId) {
-      const handler = setTimeout(() => {
-        fetchPdf(meta);
-      }, 1000);
-      return () => clearTimeout(handler);
+    if (!isOpen || !planId) {
+      // Al cerrar: limpiar estado para la próxima apertura
+      if (!isOpen) {
+        isInitialLoad.current = true;
+        if (debounceRef.current) clearTimeout(debounceRef.current);
+      }
+      return;
     }
-  }, [meta, isOpen, planId]);
+
+    if (isInitialLoad.current) {
+      // Primera apertura: cargar inmediatamente sin debounce
+      isInitialLoad.current = false;
+      fetchPdf(meta);
+    } else {
+      // Cambios subsecuentes (toggles del usuario): debounce de 900ms
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        fetchPdf(meta);
+      }, 900);
+    }
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [isOpen, meta, planId]);
+
 
   const handleToggle = (key: string) => {
-    setMeta({ ...meta, [key]: !meta[key] });
+    const newMeta = { ...meta, [key]: !meta[key] };
+    setMeta(newMeta);
+    
+    // Guardar opciones booleanas en preferencias
+    const prefsToSave = {
+      showPageHistorial: newMeta.showPageHistorial !== false,
+      showPageMenus: newMeta.showPageMenus !== false,
+      showPageIntercambio: newMeta.showPageIntercambio !== false,
+      showPageExtras: newMeta.showPageExtras !== false,
+      showContacto: newMeta.showContacto !== false,
+      soloEquivalencias: newMeta.soloEquivalencias === true,
+    };
+    localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
 
   const handleSave = async () => {
@@ -105,6 +141,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                   <h3 className="text-[11px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Selección de Hojas</h3>
                   <div className="space-y-2">
                     <ToggleItem label="1. Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
+                    <ToggleItem label="Correo y Teléfono" active={meta.showContacto !== false} onChange={() => handleToggle('showContacto')} isSubItem />
                     <ToggleItem label="2. Menús Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
                     <ToggleItem label="Solo equivalencias" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
                     <ToggleItem label="3. Lista SMAE" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />

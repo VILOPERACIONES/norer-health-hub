@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown } from 'lucide-react';
+import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown, ChevronDown } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,9 +28,11 @@ const Platillos = () => {
   const [platillos, setPlatillos] = useState<Platillo[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('');
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [currentPlatillo, setCurrentPlatillo] = useState<Partial<Platillo> | null>(null);
+  const [previewPlatillo, setPreviewPlatillo] = useState<Platillo | null>(null);
 
   useEffect(() => {
     fetchPlatillos();
@@ -58,7 +60,10 @@ const Platillos = () => {
   };
 
   const handleEdit = (p: Platillo) => {
-    setCurrentPlatillo({ ...p });
+    setCurrentPlatillo({ 
+      ...p,
+      ingredientes: (p.ingredientes || []).map(i => ({ ...i, id: i.id || Math.random().toString(36).substr(2, 9) }))
+    });
     setIsEditing(true);
   };
 
@@ -98,6 +103,7 @@ const Platillos = () => {
   const addIngrediente = () => {
     if (!currentPlatillo) return;
     const newIng: Ingrediente = {
+      id: Math.random().toString(36).substr(2, 9),
       descripcion: '',
       cantidad: 0,
       unidad: 'GR',
@@ -122,10 +128,11 @@ const Platillos = () => {
     setCurrentPlatillo({ ...currentPlatillo, ingredientes: newIngs });
   };
 
-  const filtered = platillos.filter(p => 
-    p.nombre.toLowerCase().includes(search.toLowerCase()) || 
-    p.categoria.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = platillos.filter(p => {
+    const matchSearch = p.nombre.toLowerCase().includes(search.toLowerCase());
+    const matchCategory = categoryFilter === '' || p.categoria.toUpperCase() === categoryFilter.toUpperCase();
+    return matchSearch && matchCategory;
+  });
 
   // Obtener todas las categorías únicas para sugerencias
   const suggestedCategories = Array.from(new Set([
@@ -163,26 +170,20 @@ const Platillos = () => {
               />
             </div>
             
-            <div className="flex flex-wrap gap-2 items-center">
-              <Button 
-                variant={search === '' ? 'default' : 'outline'} 
-                size="sm" 
-                onClick={() => setSearch('')}
-                className="text-[10px] h-8 font-black uppercase tracking-widest px-4"
+            <div className="relative w-full sm:w-auto">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="w-full sm:w-[240px] h-10 bg-bg-surface border border-border-subtle text-text-primary text-[11px] font-black uppercase tracking-widest rounded-md pl-4 pr-10 outline-none focus:border-brand-primary appearance-none transition-colors hover:border-text-muted"
               >
-                Todos
-              </Button>
-              {suggestedCategories.map(cat => (
-                <Button 
-                  key={cat}
-                  variant={search.toUpperCase() === cat ? 'default' : 'outline'} 
-                  size="sm" 
-                  onClick={() => setSearch(cat)}
-                  className="text-[10px] h-8 font-black uppercase tracking-widest px-4 border-border-subtle"
-                >
-                  {cat}
-                </Button>
-              ))}
+                <option value="">TODAS LAS CATEGORÍAS</option>
+                {suggestedCategories.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+              <div className="absolute right-0 top-0 bottom-0 flex items-center justify-center w-10 pointer-events-none border-l border-border-subtle/50">
+                <ChevronDown className="w-4 h-4 text-text-muted" />
+              </div>
             </div>
           </div>
 
@@ -214,7 +215,7 @@ const Platillos = () => {
                       </thead>
                       <tbody className="divide-y divide-border-subtle/50">
                         {catPlatillos.map(p => (
-                          <tr key={p.id} className="hover:bg-bg-base/30 transition-colors group">
+                          <tr key={p.id} onClick={() => setPreviewPlatillo(p)} className="hover:bg-bg-base/30 transition-colors group cursor-pointer">
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-brand-primary/10 flex items-center justify-center">
@@ -247,7 +248,7 @@ const Platillos = () => {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  onClick={() => handleEdit(p)}
+                                  onClick={(e) => { e.stopPropagation(); handleEdit(p); }}
                                   className="h-8 w-8 p-0"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
@@ -255,7 +256,7 @@ const Platillos = () => {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
-                                  onClick={() => handleDelete(p.id)}
+                                  onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
                                   className="h-8 w-8 p-0 text-accent-red hover:bg-accent-red/10"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
@@ -412,7 +413,7 @@ const Platillos = () => {
               <div className="bg-bg-base p-6 rounded-2xl border border-border-subtle space-y-6 shadow-inner">
                 {currentPlatillo?.ingredientes?.map((ing, idx) => (
                   <SmaeIngredientePicker 
-                    key={idx}
+                    key={ing.id || idx}
                     index={idx}
                     ingrediente={ing}
                     onUpdate={(upd) => updateIngrediente(idx, upd)}
@@ -433,6 +434,76 @@ const Platillos = () => {
             </div>
           </div>
         </Card>
+      )}
+
+      {/* ─── Modal de Vista Previa ─── */}
+      {previewPlatillo && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-border-subtle overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 bg-bg-base/50 border-b border-border-subtle">
+              <div>
+                <h2 className="text-xl font-bold text-text-primary flex items-center gap-2">
+                  <Utensils className="w-5 h-5 text-brand-primary" />
+                  {previewPlatillo.nombre}
+                </h2>
+                <span className="inline-block mt-1 text-[10px] font-bold tracking-widest text-text-muted uppercase bg-bg-base px-2 py-0.5 rounded border border-border-subtle">
+                  {previewPlatillo.categoria}
+                </span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setPreviewPlatillo(null)} className="h-8 w-8 p-0 text-text-muted hover:text-white">
+                <X className="w-5 h-5" />
+              </Button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 flex-1 overflow-y-auto custom-scrollbar">
+              <h3 className="text-[11px] font-black text-text-muted uppercase tracking-widest mb-3">Composición ({previewPlatillo.ingredientes?.length || 0} items)</h3>
+              <div className="space-y-3">
+                {previewPlatillo.ingredientes?.map((ing, i) => (
+                  <div key={i} className="flex items-start justify-between bg-bg-base p-3 rounded-xl border border-border-subtle">
+                    <div>
+                      <p className="text-sm font-bold text-text-primary">{ing.descripcion}</p>
+                      <p className="text-xs text-text-muted mt-0.5">
+                        {ing.cantidad} {ing.unidad}
+                      </p>
+                    </div>
+                    {ing.eqGrupo && (
+                      <span className="text-[10px] font-medium text-[#90c2ff] bg-[#90c2ff]/10 px-2 py-1 rounded border border-[#90c2ff]/20">
+                        {ing.eqCantidad} Eq {ing.eqGrupo}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer with actions */}
+            <div className="p-5 border-t border-border-subtle bg-bg-base/30 flex items-center justify-between">
+               <Button 
+                 variant="outline" 
+                 className="text-accent-red border-accent-red/20 hover:bg-accent-red/10"
+                 onClick={() => {
+                   const id = previewPlatillo.id;
+                   setPreviewPlatillo(null);
+                   handleDelete(id);
+                 }}
+               >
+                 <Trash2 className="w-4 h-4 mr-2" /> Eliminar
+               </Button>
+               <Button 
+                 variant="default"
+                 onClick={() => { 
+                   setPreviewPlatillo(null);
+                   handleEdit(previewPlatillo); 
+                 }}
+                 className="bg-brand-primary text-bg-base hover:bg-white"
+               >
+                 <Edit2 className="w-4 h-4 mr-2" /> Editar Platillo
+               </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

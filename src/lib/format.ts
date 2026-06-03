@@ -2,19 +2,36 @@ const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 
 
 export const formatDate = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—';
-  // Parche Timezone: si trae formato ISO, centrar a medio día (12:00) 
-  // para evitar restar días en zonas horarias negativas como UTM-6.
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] + 'T12:00:00' : dateStr;
-  const d = new Date(cleanStr);
+  // Si trae "T00:00:00.000Z" (fecha pura de BD) o no trae "T" ni "Z" (YYYY-MM-DD),
+  // le forzamos UTC o medio día para que no se atrase un día en UTC-6.
+  // Pero si trae una hora real (ej: citas de Cal.com con T15:00:00.000Z), lo dejamos convertir a hora local.
+  let isDateOnly = false;
+  if (!dateStr.includes('T') || dateStr.includes('T00:00:00.000Z')) isDateOnly = true;
+
+  const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '—';
+
+  // Si era solo fecha, forzamos usar los métodos UTC para ignorar el desfase local y mostrar la fecha exacta pactada
+  if (isDateOnly) {
+    return `${d.getUTCDate()} de ${MONTHS[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
+  }
+
+  // Si trae hora real, extraemos en formato local
   return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
 };
 
 export const formatDateShort = (dateStr: string | null | undefined): string => {
   if (!dateStr) return '—';
-  const cleanStr = dateStr.includes('T') ? dateStr.split('T')[0] + 'T12:00:00' : dateStr;
-  const d = new Date(cleanStr);
+  let isDateOnly = false;
+  if (!dateStr.includes('T') || dateStr.includes('T00:00:00.000Z')) isDateOnly = true;
+
+  const d = new Date(dateStr);
   if (isNaN(d.getTime())) return '—';
+
+  if (isDateOnly) {
+    return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
+  }
+
   return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
 };
 
@@ -27,33 +44,33 @@ export const formatDecimal = (n: number | string | null | undefined, decimals = 
 
 export const getBadgeForValuation = (val: any) => {
   if (!val) return { text: 'Sin Registro', cls: 'bg-gray-500/10 text-gray-500 border-gray-500/20' };
-  
+
   if (val.estadoFlujo) {
     if (val.estadoFlujo === 'Pendiente de plan') return { text: 'Pendiente de menú', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
-    if (val.estadoFlujo === 'Plan en Proceso')   return { text: 'Menú en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
-    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Menú en Proceso',   cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' }; // fusionado
-    if (val.estadoFlujo === 'Enviado')           return { text: 'Enviado',           cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
+    if (val.estadoFlujo === 'Plan en Proceso') return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    if (val.estadoFlujo === 'Listo para enviar') return { text: 'Menú Listo', cls: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
+    if (val.estadoFlujo === 'Enviado') return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
   }
-  
+
   const plan = val.plan;
   const planId = val.planId || plan?.id;
   const estadoEnvio = val.estadoEnvio || plan?.estadoEnvio || 'pendiente';
   const hasBarrido = val.hasBarrido;
-  
+
   if (!hasBarrido && !planId) {
     return { text: 'Pendiente de menú', cls: 'bg-rose-500/10 text-rose-500 border-rose-500/20' };
   }
-  
+
+  // Plan asignado pero sin menús completos → aún en proceso
   if (!planId || (plan && (!plan.menus || plan.menus.length === 0) && estadoEnvio !== 'enviado')) {
     return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
   }
-  
+
   if (estadoEnvio === 'pendiente') {
-    // Plan completo pero aún no enviado → sigue siendo "en proceso"
-    return { text: 'Menú en Proceso', cls: 'bg-amber-500/10 text-amber-500 border-amber-500/20' };
+    // Plan terminado y guardado, falta enviar
+    return { text: 'Menú Listo', cls: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
   }
-  
-  // Verde únicamente cuando el plan ya fue enviado al paciente.
+
   return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
 };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, Check, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import type { Ingrediente, EquivalenciaItem } from '@/types';
@@ -39,15 +39,19 @@ interface SmaeAlimento {
   id: string;
   nombre: string;
   grupo: string;
-  pesoGramos: number;       // gramos por 1 equivalencia ← ancla de cálculo
+  equivalentesBase?: number; // cuántos eq del grupo base vale la porción (default 1)
+  pesoGramos: number;       // valor ancla (gramos o cualquier unidad base)
+  unidadBase?: string;      // ej. 'g', 'botellita', 'paquete'
   porcionCasera?: string;
   cantidadPorcion?: number;
   unidadPorcion?: string;
+  equivalencias?: { grupo: string; cantidad: number | string }[]; // Multi-grupo
 }
 
 interface Props {
   ingrediente: Ingrediente;
   index: number;
+  gapByGroup?: Record<string, number>;
   onUpdate: (updated: Partial<Ingrediente>) => void;
   onRemove: () => void;
 }
@@ -62,7 +66,7 @@ const loadSmae = async (): Promise<SmaeAlimento[]> => {
 };
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRemove }: Props) => {
+export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onUpdate, onRemove }: Props) => {
   const [allAlimentos, setAllAlimentos] = useState<SmaeAlimento[]>([]);
   const [query, setQuery] = useState(ing.descripcion || '');
   const [results, setResults] = useState<SmaeAlimento[]>([]);
@@ -70,18 +74,24 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
 
   // ─── Estado de cantidades ──────────────────────────────────────────────────
   const [cantidad, setCantidad] = useState<string>(ing.cantidad?.toString() || '');
-  const [unidad, setUnidad]     = useState(ing.unidad || 'GR');
+  const [unidad, setUnidad] = useState(ing.unidad || 'GR');
 
   // ─── smaeGrPorEq: gramos por 1 equivalencia (persiste en BD) ──────────────
   // Si el ingrediente ya tiene este valor (reload desde BD), lo usamos directamente.
   // Si no, lo derivamos del catálogo cuando el usuario selecciona.
   const [smaeGrPorEq, setSmaeGrPorEq] = useState<number>(ing.smaeGrPorEq || 0);
+  const [smaePiezasPorEq, setSmaePiezasPorEq] = useState<number>(0); // piezas/porción casera por 1 eq (catálogo)
   const [smaeGrupoKey, setSmaeGrupoKey] = useState<string>(''); // clave interna del grupo (ej. 'aoaMuyBajo')
 
   // ─── Multi-equivalencias ───────────────────────────────────────────────────
   const initEquivs = (): EquivalenciaItem[] => {
-    if (ing.equivalencias && ing.equivalencias.length > 0) return ing.equivalencias;
-    if (ing.eqCantidad !== undefined && ing.eqGrupo) {
+    // Filtramos equivalencias vacías (sin grupo) que se pudieron haber guardado
+    // cuando el usuario escribió un alimento libre sin seleccionar del catálogo SMAE.
+    const validEquivs = (ing.equivalencias || []).filter(
+      (e) => e.grupo && String(e.grupo).trim() !== ''
+    );
+    if (validEquivs.length > 0) return validEquivs;
+    if (ing.eqCantidad !== undefined && ing.eqGrupo && ing.eqGrupo.trim() !== '') {
       return [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }];
     }
     return [{ cantidad: '', grupo: '' }];
@@ -116,9 +126,23 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
 
   const wrapperRef = useRef<HTMLDivElement>(null);
   const hasUserTyped = useRef(false);
+  const lastSentUpdate = useRef<string>('');
+  const isFocused = useRef(false); // Bloqueo de sincronización mientras se escribe
 
   // ─── Carga catálogo una sola vez ───────────────────────────────────────────
   useEffect(() => { loadSmae().then(setAllAlimentos); }, []);
+
+  // ─── Re-derivar ancla piezas + grupo desde catálogo al cargar ingrediente ──
+  // Necesario tras reload: BD solo guarda smaeGrPorEq, no piezas/eq ni grupoKey.
+  useEffect(() => {
+    if (allAlimentos.length === 0 || !ing.descripcion) return;
+    if (smaePiezasPorEq > 0 && smaeGrupoKey) return;
+    const match = allAlimentos.find(a => a.nombre === ing.descripcion);
+    if (match) {
+      if (smaePiezasPorEq === 0 && match.cantidadPorcion) setSmaePiezasPorEq(match.cantidadPorcion);
+      if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
+    }
+  }, [allAlimentos, ing.descripcion]);
 
   // ─── Cerrar dropdown al hacer clic afuera ─────────────────────────────────
   useEffect(() => {
@@ -130,6 +154,33 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // ─── Sincronizar con props cuando el padre actualiza (importar/escalar) ───
+  useEffect(() => {
+    // Si el usuario está activamente editando este ingrediente, NO sincronizamos
+    // cantidad o equivalencias desde props para evitar el "congelamiento" o saltos.
+    if (isFocused.current) return;
+
+    const propCant = ing.cantidad?.toString() || '';
+    if (propCant !== cantidad) setCantidad(propCant);
+    if (ing.unidad !== unidad) setUnidad(ing.unidad || 'GR');
+
+    let effectiveGrPorEq = ing.smaeGrPorEq || 0;
+    if (effectiveGrPorEq === 0 && Number(ing.cantidad) > 0 && Number(ing.eqCantidad) > 0) {
+      effectiveGrPorEq = parseFloat((Number(ing.cantidad) / Number(ing.eqCantidad)).toFixed(3));
+    }
+    if (effectiveGrPorEq !== smaeGrPorEq) setSmaeGrPorEq(effectiveGrPorEq);
+
+    if (ing.descripcion !== query) {
+      setQuery(ing.descripcion || '');
+      hasUserTyped.current = false;
+    }
+
+    const nextEquivs = initEquivs();
+    if (JSON.stringify(nextEquivs) !== JSON.stringify(equivalencias)) {
+      setEquivalencias(nextEquivs);
+    }
+  }, [ing]);
 
   // ─── Filtro de búsqueda ────────────────────────────────────────────────────
   useEffect(() => {
@@ -144,10 +195,21 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     setShowDropdown(filtered.length > 0);
   }, [query, allAlimentos]);
 
+  // ─── Sistema de redondeo especial para EQUIVALENCIAS ────────────────────
+  // Regla: decimal ≤ 0.3 → entero hacia abajo  |  0.4 → 0.5  |  ≥ 0.5 y ≤ 0.6 → 0.5  |  > 0.6 → entero hacia arriba
+  // Resumen: solo puede resultar en entero o .5
+  const roundEq = (val: number): number => {
+    const base = Math.floor(val);
+    const dec = val - base;
+    if (dec <= 0.3) return base;            // baja al entero
+    if (dec <= 0.6) return base + 0.5;     // punto medio
+    return base + 1;                        // sube al entero
+  };
+
   // ─── Función núcleo: calcular eq a partir de gramos ───────────────────────
-  // Usa smaeGrPorEq. Sólo actualiza el primer grupo de equivalencias (el del catálogo).
+  // Usa smaeGrPorEq. Redondea con roundEq para solo producir enteros o .5
   const grToEq = (gr: number, grxeq: number): number =>
-    grxeq > 0 ? parseFloat((gr / grxeq).toFixed(2)) : 0;
+    grxeq > 0 ? roundEq(gr / grxeq) : 0;
 
   // ─── Función inversa: calcular gramos a partir de eq ─────────────────────
   const eqToGr = (eq: number, grxeq: number): number =>
@@ -164,70 +226,223 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
     const grupoColor = GRUPO_COLORS[grupoKey] || '#8a8a8a';
 
     // Porción por defecto: porción casera si existe, si no pesoGramos en GR
-    const cantFinal = alimento.cantidadPorcion ?? grPorEq;
-    const uFinal    = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
+    const baseCant = alimento.cantidadPorcion ?? grPorEq;
+    const uFinal = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
 
-    // Para calcular eq, convertimos a GR
-    const totalGr = alimento.cantidadPorcion ? grPorEq : cantFinal;
-    const eqVal = grToEq(totalGr, grPorEq);
+    // eq que aporta 1 porción del grupo base (editable en catálogo, default 1)
+    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
+    let eqVal = baseEq;
+    let finalCant = baseCant;
+
+    // Auto-escalado a la carta (Eliminamos el bloqueo de "unidades discretas" porque al
+    // agregar alimentos individuales sí queremos que multiplique la porción, ej: 1 eq = 17 fresas -> 2 eq = 34 fresas)
+    if (gapByGroup && gapByGroup[grupoKey] !== undefined && gapByGroup[grupoKey] > 0) {
+      const missing = gapByGroup[grupoKey];
+      const portions = missing / baseEq;   // cuántas porciones llenan el faltante
+      eqVal = missing;
+      finalCant = parseFloat((baseCant * portions).toFixed(2));
+    }
 
     const newEquivs: EquivalenciaItem[] = [{ cantidad: eqVal, grupo: eqLabel }];
 
     setSmaeGrPorEq(grPorEq);
+    setSmaePiezasPorEq(alimento.cantidadPorcion || 0);
     setSmaeGrupoKey(grupoKey);
-    setCantidad(cantFinal.toString());
+    setCantidad(finalCant.toString());
     setUnidad(uFinal);
     setEquivalencias(newEquivs);
 
-    onUpdate({
+    // Restaurar equivalencias adicionales del catálogo SMAE si existen
+    // (se incorporan como grupos adicionales en el array de equivalencias)
+    const eqsExtra = Array.isArray(alimento.equivalencias) ? alimento.equivalencias : [];
+    if (eqsExtra.length > 0) {
+      const allEquivs = [...newEquivs, ...eqsExtra];
+      setEquivalencias(allEquivs);
+    }
+    const updates: Partial<Ingrediente> = {
       descripcion: alimento.nombre,
-      cantidad: cantFinal,
+      cantidad: finalCant,
       unidad: uFinal,
       smaeGrPorEq: grPorEq,
       equivalencias: newEquivs,
       eqCantidad: eqVal,
       eqGrupo: eqLabel,
+    };
+
+    onUpdate(updates);
+
+    // Guardar lo que enviamos para no sobrescribirnos en el useEffect
+    lastSentUpdate.current = JSON.stringify({
+      cantidad: updates.cantidad,
+      unidad: updates.unidad,
+      descripcion: updates.descripcion,
+      equivalencias: updates.equivalencias,
+      smaeGrPorEq: updates.smaeGrPorEq
     });
   };
 
-  // ─── Cambio en GRAMOS → recalcular eq ────────────────────────────────────
-  // Sólo funciona cuando smaeGrPorEq > 0 (alimento del catálogo)
+  // ─── Cambio en GRAMOS (o cualquier cantidad) → recalcular eq ─────────────
+  // Prioridad: 1) ancla smaeGrPorEq en GR  2) ancla inferida  3) sin ancla
   const handleCantidadChange = (val: string) => {
     const num = parseFloat(val);
     setCantidad(val);
 
-    if (smaeGrPorEq > 0 && num > 0) {
-      // Convertir a GR si la unidad no es GR (asumimos que se ingresa en GR cuando no hay porción casera)
-      const totalGr = unidad === 'GR' ? num : num; // simplicidad: asumir siempre GR en modo ingreso manual
-      const eqVal = grToEq(totalGr, smaeGrPorEq);
-      const newEquivs = equivalencias.map((e, i) =>
-        i === 0 ? { ...e, cantidad: eqVal } : e
-      );
-      setEquivalencias(newEquivs);
-      onUpdate({ cantidad: num, unidad, equivalencias: newEquivs, eqCantidad: eqVal, eqGrupo: newEquivs[0].grupo });
-    } else {
-      onUpdate({ cantidad: num || 0, unidad });
+    if (isNaN(num) || num <= 0) {
+      onUpdate({ cantidad: 0, unidad, smaeGrPorEq });
+      return;
     }
-  };
 
-  // ─── Cambio en EQ (primer grupo) → recalcular gramos ─────────────────────
-  const handlePrimerEqChange = (val: string) => {
-    const eqNum = parseFloat(val);
-    updateEquiv(0, 'cantidad', val);   // actualiza el array de equivalencias
+    // Leer ancla actual
+    let activeAnchor = smaeGrPorEq;
+    let workingUnidad = unidad;
+    const firstEqNum = parseFloat(equivalencias[0]?.cantidad?.toString() || '0');
+    const prevCantNum = parseFloat(cantidad);
 
-    if (smaeGrPorEq > 0 && eqNum > 0) {
-      const newGr = eqToGr(eqNum, smaeGrPorEq);
-      setCantidad(newGr.toString());
+    // Inferir ancla solo si NO la tenemos y estamos en GR
+    if (activeAnchor === 0 && prevCantNum > 0 && firstEqNum > 0 && workingUnidad === 'GR') {
+      activeAnchor = parseFloat((prevCantNum / firstEqNum).toFixed(6));
+      setSmaeGrPorEq(activeAnchor);
+    }
+
+    // Heurística: si la unidad es casera (PZA/taza) pero el usuario tecleó una cantidad típica de gramos
+    // (>= 20 y >> piezas razonables), asumimos gramos y auto-convertimos a GR para evitar eq desbordados.
+    if (
+      activeAnchor > 0 &&
+      workingUnidad.toUpperCase().trim() !== 'GR' &&
+      num >= 20 &&
+      (smaePiezasPorEq === 0 || num > smaePiezasPorEq * 10)
+    ) {
+      workingUnidad = 'GR';
       setUnidad('GR');
-      onUpdate({ cantidad: newGr, unidad: 'GR' });
+    }
+
+    if (activeAnchor > 0) {
+      let eqVal: number;
+
+      if (workingUnidad === 'GR') {
+        // Canónico: gramos ÷ ancla = eq  (siempre exacto)
+        eqVal = grToEq(num, activeAnchor);
+      } else {
+        // Unidad casera (PZA, taza…)
+        // Preferimos el ancla fija del catálogo (smaePiezasPorEq) para que no se contamine
+        // tras cambios de unidad. Fallback: ratio cantidad/eq actual.
+        if (smaePiezasPorEq > 0) {
+          eqVal = roundEq(num / smaePiezasPorEq);
+        } else if (prevCantNum > 0 && firstEqNum > 0) {
+          eqVal = roundEq((num * firstEqNum) / prevCantNum);
+        } else {
+          eqVal = firstEqNum; // fallback: no cambia eq
+        }
+      }
+
+      const scale = prevCantNum > 0 ? num / prevCantNum : 0;
+      const newEquivs = equivalencias.map((e, i) => {
+        if (i === 0) return { ...e, cantidad: eqVal };
+        const oldVal = parseFloat(e.cantidad?.toString() || '0');
+        if (oldVal <= 0 || scale <= 0) return e;
+        return { ...e, cantidad: roundEq(oldVal * scale) };
+      });
+      setEquivalencias(newEquivs);
+      onUpdate({
+        cantidad: num, unidad: workingUnidad,
+        equivalencias: newEquivs,
+        eqCantidad: eqVal,
+        eqGrupo: newEquivs[0]?.grupo,
+        smaeGrPorEq: activeAnchor,
+      });
+      lastSentUpdate.current = JSON.stringify({ cantidad: num, unidad: workingUnidad, descripcion: query, equivalencias: newEquivs, smaeGrPorEq: activeAnchor });
+    } else {
+      // Sin ancla: guardamos solo la cantidad sin tocar las eq
+      onUpdate({ cantidad: num, unidad: workingUnidad, smaeGrPorEq: 0 });
+      lastSentUpdate.current = JSON.stringify({ cantidad: num, unidad: workingUnidad, descripcion: query, equivalencias, smaeGrPorEq: 0 });
     }
   };
 
-  // ─── Helpers de multi-equivalencias ───────────────────────────────────────
+  // ─── Cambio en EQ (primer grupo o cualquiera) ─────────────────────────────
+  // Si idx === 0 y tiene ancla SMAE, el cambio regenera la cantidad con exactitud
+  const handleEqChange = (idx: number, val: string) => {
+    const eqNum = parseFloat(val);
+    const oldEquivs = [...equivalencias];
+    const oldEq0 = parseFloat(oldEquivs[0]?.cantidad?.toString() || '0');
+    const oldCant = parseFloat(cantidad);
+
+    // Guardamos el valor raw mientras el usuario escribe; si es número lo almacenamos como tal
+    // Si el cambio es en idx 0, escalamos también las equivalencias secundarias proporcionalmente
+    const scaleSecondary = idx === 0 && !isNaN(eqNum) && eqNum > 0 && oldEq0 > 0;
+    const newEquivs = oldEquivs.map((e, i) => {
+      if (i === idx) return { ...e, cantidad: isNaN(eqNum) ? val : eqNum };
+      if (scaleSecondary) {
+        const oldVal = parseFloat(e.cantidad?.toString() || '0');
+        if (oldVal > 0) return { ...e, cantidad: roundEq(oldVal * (eqNum / oldEq0)) };
+      }
+      return e;
+    });
+    setEquivalencias(newEquivs);
+
+    // Leer ancla actual
+    let activeAnchor = smaeGrPorEq;
+
+    // Inferir ancla SOLO si no la tenemos y tenemos suficiente info en GR
+    if (activeAnchor === 0 && oldCant > 0 && oldEq0 > 0 && unidad === 'GR') {
+      activeAnchor = parseFloat((oldCant / oldEq0).toFixed(6));
+      setSmaeGrPorEq(activeAnchor);
+    }
+
+    let updates: Partial<Ingrediente> = {
+      equivalencias: newEquivs,
+      eqCantidad: isNaN(eqNum) ? 0 : eqNum,
+      eqGrupo: newEquivs[0].grupo,
+      smaeGrPorEq: activeAnchor,
+    };
+
+    // Si es el primer grupo y el número es válido, recalculamos la cantidad
+    if (idx === 0 && !isNaN(eqNum) && eqNum > 0) {
+      if (activeAnchor > 0) {
+        if (unidad === 'GR') {
+          // ✅ Canónico GR: ancla × eq = gramos EXACTOS (nunca deriva)
+          const newGr = eqToGr(eqNum, activeAnchor);
+          setCantidad(newGr.toString());
+          updates.cantidad = newGr;
+          updates.unidad = 'GR';
+        } else {
+          // Unidad casera: rescalamos proporcionalmente (piezas_por_eq × eqNum)
+          // piezas_por_eq = oldCant / oldEq0  (ratio estable fijado al seleccionar el alimento)
+          if (oldEq0 > 0 && oldCant > 0) {
+            // Calculamos cuántas piezas corresponden a 1 eq y multiplicamos
+            const piezasPorEq = oldCant / oldEq0;
+            const newCant = parseFloat((piezasPorEq * eqNum).toFixed(2));
+            setCantidad(newCant.toString());
+            updates.cantidad = newCant;
+          }
+        }
+      } else if (oldEq0 > 0 && oldCant > 0) {
+        // Sin ancla en absoluto: regla de tres simple
+        const scale = eqNum / oldEq0;
+        const newCant = parseFloat((oldCant * scale).toFixed(2));
+        setCantidad(newCant.toString());
+        updates.cantidad = newCant;
+      }
+    }
+
+    onUpdate(updates);
+
+    lastSentUpdate.current = JSON.stringify({
+      cantidad: updates.cantidad ?? Number(cantidad),
+      unidad: updates.unidad ?? unidad,
+      descripcion: query,
+      equivalencias: updates.equivalencias ?? equivalencias,
+      smaeGrPorEq: activeAnchor
+    });
+  };
+
   const updateEquiv = (idx: number, field: 'cantidad' | 'grupo', val: string, shouldNormalize = false) => {
-    const finalVal = field === 'grupo' && shouldNormalize ? normalizeGroup(val) : val;
+    if (field === 'cantidad') {
+      handleEqChange(idx, val);
+      return;
+    }
+    const finalVal = shouldNormalize ? normalizeGroup(val) : val;
     const newEquivs = equivalencias.map((e, i) =>
-      i === idx ? { ...e, [field]: field === 'cantidad' ? (parseFloat(finalVal as string) || finalVal) : finalVal } : e
+      i === idx ? { ...e, [field]: finalVal } : e
     );
     setEquivalencias(newEquivs);
     onUpdate({
@@ -327,14 +542,38 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
               value={query}
               onChange={(e) => {
                 hasUserTyped.current = true;
-                setQuery(e.target.value);
-                // Si el usuario escribe libremente, pierde el ancla SMAE
-                if (smaeGrPorEq > 0) setSmaeGrPorEq(0);
-                onUpdate({ descripcion: e.target.value });
+                const val = e.target.value;
+                setQuery(val);
+
+                if (val.trim() === '') {
+                  // Limpieza total: borra cantidad, suelta presupuesto y resetea tabla
+                  setSmaeGrPorEq(0);
+                  setSmaePiezasPorEq(0);
+                  setCantidad('');
+                  setUnidad('GR');
+                  setEquivalencias([]);
+                  setSmaeGrupoKey('');
+                  onUpdate({
+                    descripcion: '', cantidad: '', unidad: 'GR', smaeGrPorEq: 0,
+                    equivalencias: [], eqCantidad: 0, eqGrupo: ''
+                  });
+                } else if (smaeGrPorEq > 0) {
+                  // Soltó el ancla SMAE escribiendo otra cosa: suelta el presupuesto para re-escala
+                  setSmaeGrPorEq(0);
+                  setSmaePiezasPorEq(0);
+                  setEquivalencias([]);
+                  setSmaeGrupoKey('');
+                  onUpdate({
+                    descripcion: val, smaeGrPorEq: 0, equivalencias: [],
+                    eqCantidad: 0, eqGrupo: ''
+                  });
+                } else {
+                  onUpdate({ descripcion: val });
+                }
               }}
               onFocus={() => hasUserTyped.current && results.length > 0 && setShowDropdown(true)}
               placeholder="Buscar en catálogo SMAE o escribir libre..."
-              className="w-full pl-8 pr-28 py-2 bg-bg-base rounded-[6px] text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
+              className="w-full pl-8 pr-28 py-2 bg-bg-base rounded-[6px] text-[13px] font-semibold text-white outline-none border border-border-subtle focus:border-[#555] transition-colors placeholder:text-[#999] placeholder:font-medium"
             />
             {grupoLabel && (
               <span
@@ -364,8 +603,8 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
                     className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] transition-colors flex items-center justify-between gap-3 border-b border-[#222] last:border-0"
                   >
                     <div>
-                      <p className="text-[13px] font-medium text-white m-0">{a.nombre}</p>
-                      <p className="text-[11px] text-[#8a8a8a] m-0">
+                      <p className="text-[13px] font-bold text-white m-0">{a.nombre}</p>
+                      <p className="text-[11px] font-medium text-[#b0b0b0] m-0">
                         {a.pesoGramos}g = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${a.unidadPorcion}` : `${a.pesoGramos}g`} por porción
                       </p>
                     </div>
@@ -438,13 +677,16 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div>
           <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1">
-            Cantidad{hasSmae ? ' (GR)' : ''}
+            Cantidad{unidad ? ` (${unidad.toUpperCase()})` : ''}
           </label>
           <input
-            type="number"
+            type="text"
+            inputMode="decimal"
             value={cantidad}
             onChange={(e) => handleCantidadChange(e.target.value)}
-            className={`w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-center outline-none border transition-colors ${hasSmae ? 'text-[#90c2ff] border-[#90c2ff]/30 focus:border-[#90c2ff]' : 'text-text-primary border-border-subtle focus:border-[#444]'}`}
+            onFocus={() => isFocused.current = true}
+            onBlur={() => isFocused.current = false}
+            className={`w-full bg-bg-base px-2 py-2 rounded-[6px] text-[13px] font-bold text-center outline-none border transition-colors ${hasSmae ? 'text-[#90c2ff] border-[#90c2ff]/30 focus:border-[#90c2ff]' : 'text-white border-border-subtle focus:border-[#444]'}`}
             placeholder="0"
           />
         </div>
@@ -452,8 +694,36 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
           <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1">Unidad</label>
           <input
             value={unidad}
-            onChange={(e) => { setUnidad(e.target.value); onUpdate({ unidad: e.target.value }); }}
-            className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[12px] font-medium text-text-primary text-center outline-none border border-border-subtle focus:border-[#444]"
+            onChange={(e) => {
+              const newUnidad = e.target.value;
+              const newUnidadUpper = newUnidad.toUpperCase().trim();
+              const oldUnidadUpper = unidad.toUpperCase().trim();
+              setUnidad(newUnidad);
+
+              if (smaeGrPorEq > 0) {
+                const currentEq = equivalencias[0] ? parseFloat(equivalencias[0].cantidad.toString()) : 0;
+
+                if (currentEq > 0) {
+                  // GR → preserve eq, convert cantidad a gramos
+                  if (newUnidadUpper === 'GR' && oldUnidadUpper !== 'GR') {
+                    const newCant = eqToGr(currentEq, smaeGrPorEq);
+                    setCantidad(newCant.toString());
+                    onUpdate({ unidad: newUnidad, cantidad: newCant });
+                    return;
+                  }
+                  // GR → otra unidad (PZA/taza/etc): convert via piezasPorEq si lo tenemos
+                  if (oldUnidadUpper === 'GR' && newUnidadUpper !== 'GR' && smaePiezasPorEq > 0) {
+                    const newCant = parseFloat((currentEq * smaePiezasPorEq).toFixed(2));
+                    setCantidad(newCant.toString());
+                    onUpdate({ unidad: newUnidad, cantidad: newCant });
+                    return;
+                  }
+                }
+              }
+
+              onUpdate({ unidad: newUnidad });
+            }}
+            className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[13px] font-bold text-white text-center outline-none border border-border-subtle focus:border-[#444]"
             placeholder="GR"
           />
         </div>
@@ -477,64 +747,65 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, onUpdate, onRem
           const suggestions = isGrupoFocused ? getGrupoSuggestions(idx) : [];
 
           return (
-          <div key={idx} className="flex items-center gap-1.5">
-            {idx > 0 && <span className="text-[10px] font-bold text-[#555] w-4 text-center flex-shrink-0">+</span>}
-            {idx === 0 && <span className="w-4 flex-shrink-0" />}
+            <div key={idx} className="flex items-center gap-1.5">
+              {idx > 0 && <span className="text-[11px] font-black text-[#888] w-4 text-center flex-shrink-0">+</span>}
+              {idx === 0 && <span className="w-4 flex-shrink-0" />}
 
-            {/* Cantidad eq — si es idx 0 y tiene ancla SMAE, el cambio regenera los gramos */}
-            <input
-              type="number"
-              value={eq.cantidad.toString()}
-              onChange={(e) => idx === 0 && hasSmae ? handlePrimerEqChange(e.target.value) : updateEquiv(idx, 'cantidad', e.target.value)}
-              className={`w-16 bg-bg-base px-2 py-1.5 rounded-[6px] text-[12px] font-medium text-center outline-none border transition-colors flex-shrink-0 ${
-                hasSmae && idx === 0 ? 'text-[#90c2ff] border-[#90c2ff]/30' : 'text-text-primary border-border-subtle focus:border-[#444]'
-              }`}
-              placeholder="0"
-            />
-            <span className="text-[10px] text-[#555] flex-shrink-0">eq</span>
-
-            {/* Grupo combobox con sugerencias */}
-            <div className="relative flex-1" ref={el => { equivRefs.current[idx] = el; }}>
+              {/* Cantidad eq — si es idx 0 y tiene ancla SMAE, el cambio regenera los gramos */}
               <input
-                value={grupoDisplay}
-                onChange={(e) => {
-                  setGrupoInputValues(prev => ({ ...prev, [idx]: e.target.value }));
-                  setFocusedEquivIdx(idx);
-                }}
-                onFocus={() => setFocusedEquivIdx(idx)}
-                onBlur={() => commitGrupoInput(idx)}
-                className={`w-full bg-bg-base px-2 py-1.5 rounded-[6px] text-[12px] font-medium outline-none border transition-colors ${
-                  hasSmae && idx === 0 ? 'text-[#90c2ff] border-[#90c2ff]/30' : 'text-text-primary border-border-subtle focus:border-[#444]'
-                }`}
-                placeholder="Grupo (ej. AOA Muy Bajo)"
+                type="text"
+                inputMode="decimal"
+                value={eq.cantidad.toString()}
+                onChange={(e) => handleEqChange(idx, e.target.value)}
+                onFocus={() => { isFocused.current = true; }}
+                onBlur={() => { isFocused.current = false; }}
+                className={`w-16 bg-bg-base px-2 py-1.5 rounded-[6px] text-[13px] font-bold text-center outline-none border transition-colors flex-shrink-0 ${hasSmae && idx === 0 ? 'text-[#90c2ff] border-[#90c2ff]/30' : 'text-white border-border-subtle focus:border-[#444]'
+                  }`}
+                placeholder="0"
               />
-              {isGrupoFocused && suggestions.length > 0 && (
-                <div className="absolute z-50 left-0 right-0 bottom-full mb-1 bg-[#111] border border-[#444] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,0.5)] max-h-[180px] overflow-y-auto custom-scrollbar">
-                  {suggestions.map(label => {
-                    const col = GRUPO_COLORS[Object.entries(GRUPO_LABELS).find(([, v]) => v === label)?.[0] || ''] || '#8a8a8a';
-                    return (
-                      <button
-                        key={label}
-                        type="button"
-                        onMouseDown={(e) => { e.preventDefault(); selectGrupoForEquiv(idx, label); }}
-                        className="w-full text-left px-3 py-2 text-[12px] font-medium text-[#ccc] hover:bg-[#1a1a1a] hover:text-white transition-colors flex items-center gap-2 border-b border-[#222] last:border-0"
-                      >
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col }} />
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
+              <span className="text-[11px] font-bold text-[#999] flex-shrink-0">eq</span>
+
+              {/* Grupo combobox con sugerencias */}
+              <div className="relative flex-1" ref={el => { equivRefs.current[idx] = el; }}>
+                <input
+                  value={grupoDisplay}
+                  onChange={(e) => {
+                    setGrupoInputValues(prev => ({ ...prev, [idx]: e.target.value }));
+                    setFocusedEquivIdx(idx);
+                  }}
+                  onFocus={() => setFocusedEquivIdx(idx)}
+                  onBlur={() => commitGrupoInput(idx)}
+                  className={`w-full bg-bg-base px-2 py-1.5 rounded-[6px] text-[13px] font-bold outline-none border transition-colors ${hasSmae && idx === 0 ? 'text-[#90c2ff] border-[#90c2ff]/30' : 'text-white border-border-subtle focus:border-[#444]'
+                    }`}
+                  placeholder="Grupo (ej. AOA Muy Bajo)"
+                />
+                {isGrupoFocused && suggestions.length > 0 && (
+                  <div className="absolute z-50 left-0 right-0 bottom-full mb-1 bg-[#111] border border-[#444] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,0.5)] max-h-[180px] overflow-y-auto custom-scrollbar">
+                    {suggestions.map(label => {
+                      const col = GRUPO_COLORS[Object.entries(GRUPO_LABELS).find(([, v]) => v === label)?.[0] || ''] || '#8a8a8a';
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          onMouseDown={(e) => { e.preventDefault(); selectGrupoForEquiv(idx, label); }}
+                          className="w-full text-left px-3 py-2 text-[12px] font-semibold text-white hover:bg-[#1a1a1a] transition-colors flex items-center gap-2 border-b border-[#222] last:border-0"
+                        >
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: col }} />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {equivalencias.length > 1 && (
+                <button type="button" onClick={() => removeEquiv(idx)}
+                  className="text-[#555] hover:text-accent-red transition-colors p-1 flex-shrink-0">
+                  <X className="w-3 h-3" />
+                </button>
               )}
             </div>
-
-            {equivalencias.length > 1 && (
-              <button type="button" onClick={() => removeEquiv(idx)}
-                className="text-[#555] hover:text-accent-red transition-colors p-1 flex-shrink-0">
-                <X className="w-3 h-3" />
-              </button>
-            )}
-          </div>
           );
         })}
 

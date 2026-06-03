@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity } from 'lucide-react';
+import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity, Calendar as CalendarIcon } from 'lucide-react';
 import api from '@/lib/api';
+import CalcomScheduling from '@/components/CalcomScheduling';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -148,6 +149,7 @@ const AssessmentDetail = () => {
   const { toast } = useToast();
   const [val, setVal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [pacienteCitas, setPacienteCitas] = useState<any[]>([]);
 
   // Barrido: estado controlado por el padre, se pasa al componente compartido
   const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
@@ -155,11 +157,30 @@ const AssessmentDetail = () => {
   const [showBarrido, setShowBarrido] = useState(true);
   const [savingBarrido, setSavingBarrido] = useState(false);
 
+  // Cal.com Scheduling Independiente
+  const [calcomData, setCalcomData] = useState<any>(null);
+  const [isScheduling, setIsScheduling] = useState(false);
+
+  // Helper para cargar las citas del paciente por separado
+  const fetchPacienteCitas = async () => {
+    try {
+      const { data } = await api.get(`/api/pacientes/${pacienteId}`);
+      const paciente = data?.data || data;
+      setPacienteCitas(paciente?.citas || []);
+    } catch {
+      // silenciar — las citas no son críticas para mostrar la valoración
+    }
+  };
+
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const { data } = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
-        const serverData = data?.data || data;
+        // Cargar valoración y citas del paciente en paralelo
+        const [valRes] = await Promise.all([
+          api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`),
+          fetchPacienteCitas(),
+        ]);
+        const serverData = valRes.data?.data || valRes.data;
         if (serverData) setVal(serverData);
 
         // Cargar barrido — el backend devuelve { data: null } si no existe
@@ -182,6 +203,52 @@ const AssessmentDetail = () => {
     };
     fetchAll();
   }, [pacienteId, valoracionId]);
+
+  const handleScheduleCita = async () => {
+    if (!calcomData) return;
+    setIsScheduling(true);
+    try {
+      await api.post('/api/citas/agendar', {
+        pacienteId,
+        valoracionId, // Vincula la cita a la valoración de la cual se origina
+        name: calcomData.name,
+        email: calcomData.email,
+        phone: calcomData.phone,
+        eventTypeId: calcomData.eventTypeId,
+        modalidad: calcomData.modalidad,
+        fecha: calcomData.fecha
+      });
+      toast({ title: 'Cita agendada correctamente', description: 'El paciente recibirá una invitación por correo.' });
+      setCalcomData(null);
+
+      // Refrescar valoración Y citas del paciente
+      const [valRes] = await Promise.all([
+        api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`),
+        fetchPacienteCitas(),
+      ]);
+      setVal(valRes.data?.data || valRes.data);
+
+    } catch (err: any) {
+      let errorMsg = 'Hubo un problema al contactar con la API.';
+      if (err.response?.data?.details) {
+        errorMsg = typeof err.response.data.details === 'string'
+          ? err.response.data.details
+          : JSON.stringify(err.response.data.details);
+      } else if (err.response?.data?.error) {
+        errorMsg = err.response.data.error;
+      } else if (err.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      }
+      toast({
+        title: 'Error al agendar',
+        description: errorMsg,
+        variant: 'destructive',
+        duration: 8000
+      });
+    } finally {
+      setIsScheduling(false);
+    }
+  };
 
   const handleGuardarBarrido = async () => {
     if (!barridoData) return;
@@ -266,7 +333,7 @@ const AssessmentDetail = () => {
             ) : (
               <h1 className="text-[28px] font-bold text-text-primary tracking-tight m-0">Detalles de Consulta</h1>
             )}
-            
+
             {val.paciente && (
               <p className="text-[18px] font-semibold text-text-primary mt-1 tracking-tight">
                 Detalles de Consulta
@@ -341,24 +408,73 @@ const AssessmentDetail = () => {
           </div>
         )}
 
-        {val.temarioConsulta?.length > 0 && (
+        {val.notasLibres && (
           <div className="p-6 md:p-8 border-b border-border-subtle">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
-                <Brain className="h-4 w-4" />
+            <p className="text-[12px] font-medium text-text-muted m-0 mb-2">Notas Libres / Lineamientos</p>
+            <pre className="text-[13px] leading-relaxed text-text-secondary font-mono bg-bg-elevated/30 rounded-[8px] p-4 m-0 whitespace-pre-wrap overflow-x-auto">{val.notasLibres}</pre>
+            {val.adjuntosJson && Array.isArray(val.adjuntosJson) && val.adjuntosJson.length > 0 && (
+              <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
+                {val.adjuntosJson.map((adj: any, i: number) => (
+                  <div key={adj.id || i} className="rounded-[8px] overflow-hidden border border-border-subtle aspect-square">
+                    <img src={adj.dataUrl} alt={adj.nombre} className="w-full h-full object-cover" />
+                  </div>
+                ))}
               </div>
-              <h3 className="text-[14px] font-semibold text-text-primary m-0">Acuerdos y Temario</h3>
-            </div>
-            <div className="space-y-4">
-              {val.temarioConsulta.map((tema: any, i: number) => (
-                <div key={tema.id || i} className="border-l-2 border-brand-primary pl-4 py-1">
-                  <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1">{tema.tema}</h4>
-                  <p className="text-[14px] text-text-secondary leading-relaxed m-0">{tema.detalle}</p>
-                </div>
-              ))}
-            </div>
+            )}
           </div>
         )}
+
+        {val.temarioConsulta?.length > 0 && (() => {
+          const COMP_MARKER = '__COMPETENCIA_NOTES__';
+          const compItem = val.temarioConsulta.find((t: any) => t.tema === COMP_MARKER);
+          const restItems = val.temarioConsulta.filter((t: any) => t.tema !== COMP_MARKER);
+          let comp: { antes?: string; durante?: string; despues?: string } | null = null;
+          if (compItem) {
+            try { comp = JSON.parse(compItem.detalle || '{}'); } catch { comp = null; }
+          }
+          return (
+            <>
+              {restItems.length > 0 && (
+                <div className="p-6 md:p-8 border-b border-border-subtle">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                      <Brain className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Notas en Consulta</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {restItems.map((tema: any, i: number) => (
+                      <div key={tema.id || i} className="border-l-2 border-brand-primary pl-4 py-1">
+                        <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1">{tema.tema}</h4>
+                        <p className="text-[14px] text-text-secondary leading-relaxed m-0">{tema.detalle}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {comp && (comp.antes || comp.durante || comp.despues) && (
+                <div className="p-6 md:p-8 border-b border-border-subtle">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                      <Brain className="h-4 w-4" />
+                    </div>
+                    <h3 className="text-[14px] font-semibold text-text-primary m-0">Notas de Competencia</h3>
+                  </div>
+                  <div className="space-y-4">
+                    {(['antes', 'durante', 'despues'] as const).map(fase => comp![fase] ? (
+                      <div key={fase} className="border-l-2 border-brand-primary pl-4 py-1">
+                        <h4 className="text-[13px] font-semibold text-text-primary m-0 mb-1 uppercase tracking-wider">
+                          {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'}
+                        </h4>
+                        <p className="text-[14px] text-text-secondary leading-relaxed m-0 whitespace-pre-wrap">{comp![fase]}</p>
+                      </div>
+                    ) : null)}
+                  </div>
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* ESQUEMA DE SUPLEMENTACIÓN */}
@@ -370,8 +486,8 @@ const AssessmentDetail = () => {
             </div>
             <h3 className="text-[15px] font-bold text-text-primary m-0 uppercase tracking-wide">Esquema de Suplementación</h3>
           </div>
-          <div className="overflow-hidden">
-            <table className="w-full border-collapse text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-left min-w-[500px]">
               <thead>
                 <tr className="bg-bg-elevated border-b border-border-subtle">
                   <th className="px-6 py-3 text-[11px] font-black text-text-muted uppercase tracking-widest w-[30%]">Suplemento</th>
@@ -385,12 +501,12 @@ const AssessmentDetail = () => {
                   .map((sup: any, idx: number) => {
                     const endDate = sup.activo ? new Date() : (sup.fechaFin ? new Date(sup.fechaFin) : new Date());
                     const diasMs = endDate.getTime() - new Date(sup.fechaInicio).getTime();
-                    const diasTotales = Math.max(1, Math.floor(diasMs / (1000 * 3600 * 24)));
+                    const diasTotales = Math.max(0, Math.floor(diasMs / (1000 * 3600 * 24)));
                     const meses = Math.floor(diasTotales / 30);
                     const diasExtra = diasTotales % 30;
                     const tiempoStr = meses > 0
                       ? `${meses} mes${meses > 1 ? 'es' : ''}${diasExtra > 0 ? ` y ${diasExtra} d` : ''}`
-                      : `${diasTotales} día${diasTotales > 1 ? 's' : ''}`;
+                      : `${diasTotales} día${diasTotales !== 1 ? 's' : ''}`;
 
                     return (
                       <tr key={idx} className="group hover:bg-bg-elevated/50 transition-colors">
@@ -401,11 +517,10 @@ const AssessmentDetail = () => {
                               <span className={`text-[13px] font-bold leading-tight ${sup.activo ? 'text-text-primary' : 'text-text-muted line-through'}`}>
                                 {sup.nombre}
                               </span>
-                              <span className={`ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[4px] ${
-                                sup.activo
+                              <span className={`ml-2 text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-[4px] ${sup.activo
                                   ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
                                   : 'bg-bg-elevated text-text-muted border border-border-subtle'
-                              }`}>
+                                }`}>
                                 {sup.activo ? 'activo' : 'suspendido'}
                               </span>
                             </div>
@@ -495,6 +610,91 @@ const AssessmentDetail = () => {
           hasEquivalencias={!!barridoData && ((barridoData.kcalTotal || 0) > 0 || Object.values(barridoData.porciones || {}).some((v: any) => Number(v) > 0))}
         />
       </div>
+
+      {/* AGENDAR CITA DE SEGUIMIENTO */}
+      <div className="bg-bg-surface border border-border-subtle rounded-[12px] p-6 space-y-4">
+        {(() => {
+          // val.paciente.citas ya viene filtrado por valoracionId desde el backend.
+          // pacienteCitas es un fallback adicional por si acaso.
+          const citasMap = new Map<string, any>();
+          [...(val?.paciente?.citas || []), ...pacienteCitas].forEach((c: any) => {
+            if (c?.id) citasMap.set(c.id, c);
+          });
+          const todasLasCitas = Array.from(citasMap.values());
+
+          const citaDeEstaValoracion = todasLasCitas.find(
+            (c: any) => c.valoracionId === valoracionId
+          );
+
+          if (citaDeEstaValoracion) {
+            return (
+              <div>
+                <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-[8px] bg-brand-primary/10 text-brand-primary">
+                      <CalendarIcon className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-[15px] font-semibold text-text-primary m-0">Seguimiento Programado</h3>
+                      <p className="text-[12px] text-text-muted m-0 mt-0.5">Cita agendada para esta consulta</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 p-4 bg-bg-elevated rounded-[10px] border border-border-subtle">
+                  <p className="text-[14px] font-medium text-text-primary m-0 opacity-80">Próxima sesión:</p>
+                  <p className="text-[16px] font-bold text-brand-primary mt-1.5 mb-0">
+                    {formatDate(citaDeEstaValoracion.fecha)} a las {new Date(citaDeEstaValoracion.fecha).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                  </p>
+                  <p className="text-[13px] text-text-muted mt-1.5 mb-0 capitalize inline-block px-2 py-1 bg-bg-surface rounded-md border border-border-subtle">
+                    Modalidad: {citaDeEstaValoracion.modalidad}
+                  </p>
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <>
+              <div className="flex items-center justify-between border-b border-border-subtle pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-[8px] bg-bg-elevated text-text-muted">
+                    <CalendarIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-semibold text-text-primary m-0">Agendar Seguimiento</h3>
+                    <p className="text-[12px] text-text-muted m-0 mt-0.5">Envía una invitación formal al paciente usando Cal.com</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <CalcomScheduling
+                  pacienteData={val?.paciente ? { nombre: val.paciente.nombre, email: val.paciente.email, telefono: val.paciente.telefono } : undefined}
+                  onSelection={setCalcomData}
+                />
+              </div>
+
+              {calcomData && (
+                <div className="flex justify-end pt-4 border-t border-border-subtle mt-4">
+                  <button
+                    onClick={handleScheduleCita}
+                    disabled={isScheduling}
+                    className="flex items-center gap-2 px-6 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isScheduling ? (
+                      <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />
+                    ) : (
+                      <Check className="w-4 h-4" />
+                    )}
+                    Confirmar y Enviar Invitación
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </div>
+
     </div>
   );
 };

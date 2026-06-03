@@ -14,7 +14,9 @@ export const usePatients = (search = '') => {
       const list = data?.data || data;
       return Array.isArray(list) ? (list as Paciente[]) : [];
     },
-    staleTime: 3 * 60 * 1000, // 3 min — lista de pacientes no cambia frecuentemente
+    staleTime: 60 * 1000,           // 1 min — navegación instantánea desde cache
+    refetchInterval: 60 * 1000,     // Refresca en background cada minuto
+    placeholderData: (prev) => prev, // Muestra datos anteriores mientras refresca
   });
 };
 
@@ -27,7 +29,8 @@ export const usePaciente = (id: string | undefined) => {
       return (data?.data || data) as Paciente;
     },
     enabled: !!id,
-    staleTime: 3 * 60 * 1000,
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
   });
 };
 

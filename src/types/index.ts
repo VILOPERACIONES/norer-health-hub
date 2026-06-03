@@ -83,6 +83,7 @@ export interface Antecedentes {
   signosYSintomas?: string | null;
   historialProductos?: string;
   recomendacionSuplementos?: string;
+  suplementosDetalle?: Suplemento[];
 }
 
 export interface ConsumoCalorico {
@@ -206,6 +207,7 @@ export interface TiempoComida {
   bebida?: string;       // Bebida del tiempo (ej. "500ml agua con limón")
   suplTiempo?: string;   // Suplemento del tiempo (ej. "1 scoop Whey protein")
   suplNotas?: string;    // Notas libres / suplementos (solo texto en PDF)
+  ademas?: string;       // Extra / Acompañamientos
   ingredientes: Ingrediente[];
 }
 
@@ -213,6 +215,9 @@ export interface EquivalenciaItem {
   cantidad: number | string;
   grupo: string;
 }
+
+/** Alias para compatibilidad con código de stash */
+export type EqExtra = EquivalenciaItem;
 
 export interface Ingrediente {
   id?: string;

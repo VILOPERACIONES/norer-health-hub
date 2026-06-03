@@ -1,27 +1,28 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen } from 'lucide-react';
+import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <input 
+    <input
       type={type}
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       readOnly={readOnly}
-      className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`} 
-      placeholder={placeholder} 
+      className={`w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle ${readOnly ? 'opacity-60 cursor-not-allowed' : 'hover:border-border-default'}`}
+      placeholder={placeholder}
     />
   </div>
 );
 
 const LADAS = [
   { code: '52', label: '+52 (MX)' },
-  { code: '1',  label: '+1 (US/CA)' },
+  { code: '1', label: '+1 (US/CA)' },
   { code: '34', label: '+34 (ES)' },
   { code: '54', label: '+54 (AR)' },
   { code: '57', label: '+57 (CO)' },
@@ -54,9 +55,9 @@ const PhoneInput = ({ label, ladaValue, onLadaChange, phoneValue, onPhoneChange,
 const Select = ({ label, value, onChange, options }: any) => (
   <div className="space-y-2 group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <select 
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
       className="w-full bg-bg-elevated rounded-[8px] px-4 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default appearance-none cursor-pointer"
       style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%238a8a8a\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\' /%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 1rem center', backgroundSize: '1rem' }}
     >
@@ -68,11 +69,11 @@ const Select = ({ label, value, onChange, options }: any) => (
 const TextArea = ({ label, value, onChange, placeholder }: any) => (
   <div className="space-y-2 col-span-full group">
     <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none">{label}</label>
-    <textarea 
-      value={value} 
-      onChange={(e) => onChange(e.target.value)} 
-      className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default min-h-[120px] resize-y" 
-      placeholder={placeholder} 
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="w-full bg-bg-elevated rounded-[8px] p-4 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default min-h-[120px] resize-y"
+      placeholder={placeholder}
     />
   </div>
 );
@@ -99,16 +100,17 @@ const EditPatient = () => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const [suplementosIniciales, setSuplementosIniciales] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
+
   const [form, setForm] = useState({
     nombre: '', apellido: '', lada: '52', telefono: '', email: '',
     fechaNacimiento: '', sexo: 'F' as 'M' | 'F',
-    objetivo: '', gymOrigen: '', disciplina: '', frecuencia: '', tiempo: '',
+    objetivo: '', gymOrigen: '', horaEntrenamiento: '',
     nivelActividad: 'Sedentario',
     porcentajeSedentario: '', porcentajeLeve: '', porcentajeModerado: '', porcentajeIntenso: '',
-    historialProductos: '', recomSuplementos: '',
+    historialProductos: '', recomSuplementos: '', // legacy — ya no se usan en UI, se mantienen por compat
     alimentosNoGusta: '', alimentosGusta: '', alergico: '',
-    patologia: '', cirugias: '', estrenimiento: 'No',
+    patologia: '', cirugias: '', farmacos: '', cicloMenstrual: '', estrenimiento: 'No',
     alcohol: 'No', tabaco: 'No', agua: '',
     signosSintomas: '',
     talla: '',
@@ -125,14 +127,14 @@ const EditPatient = () => {
           const ej = p.ejercicio || p.datosEjercicio || {};
           const ant = p.antecedentes || {};
           const hab = p.habitos || p.consumoCalorico || {};
-          
+
           setForm({
             nombre: p.nombre || '',
             apellido: p.apellido || '',
             // parse lada from stored number (e.g. "529993670065" -> lada="52", telefono="9993670065")
             ...(() => {
               const raw = (p.telefono || '').replace(/\D/g, '');
-              const knownLadas = ['52','1','34','54','57','56','51'];
+              const knownLadas = ['52', '1', '34', '54', '57', '56', '51'];
               const matched = knownLadas.find(l => raw.startsWith(l));
               return matched
                 ? { lada: matched, telefono: raw.slice(matched.length) }
@@ -154,12 +156,10 @@ const EditPatient = () => {
               if (p.peso != null && p.peso !== '') return p.peso.toString();
               return '';
             })(),
-            
+
             objetivo: ej.objetivo || '',
             gymOrigen: ej.gymOrigen || '',
-            disciplina: ej.disciplina || '',
-            frecuencia: ej.frecuencia || '',
-            tiempo: ej.tiempo || '',
+            horaEntrenamiento: ej.horaEntrenamiento || '',
             nivelActividad: ej.nivelActividad || 'Sedentario',
             porcentajeSedentario: ej.porcentajeSedentario?.toString() || '',
             porcentajeLeve: ej.porcentajeLeve?.toString() || '',
@@ -174,6 +174,8 @@ const EditPatient = () => {
             alergico: ant.alergias || ant.alergico || '',
             patologia: ant.patologia || '',
             cirugias: ant.cirugias || '',
+            farmacos: ant.farmacos || '',
+            cicloMenstrual: ant.cicloMenstrual || '',
             estrenimiento: ant.estrenimiento || 'No',
             alcohol: ant.consumoAlcohol || ant.alcohol || 'No',
             tabaco: ant.tabaco || 'No',
@@ -187,6 +189,10 @@ const EditPatient = () => {
               return '';
             })(),
           });
+          setDisciplinas(decodeDisciplinas(ej.disciplina, { frecuencia: ej.frecuencia, tiempo: ej.tiempo }));
+          if (ant.suplementosDetalle && Array.isArray(ant.suplementosDetalle)) {
+            setSuplementosIniciales(ant.suplementosDetalle.map((s: any) => ({ ...s, id: s.id || Math.random().toString() })));
+          }
         }
       } catch (err) {
         toast({ title: 'Error', description: 'No se pudo cargar la información del paciente', variant: 'destructive' });
@@ -198,7 +204,13 @@ const EditPatient = () => {
   }, [id, toast]);
 
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
-  
+
+  const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
+  const addDisciplina = () => setDisciplinas([...disciplinas, { disciplina: '', frecuencia: '', tiempo: '' }]);
+  const removeDisciplina = (idx: number) => setDisciplinas(disciplinas.length > 1 ? disciplinas.filter((_, i) => i !== idx) : disciplinas);
+  const updateDisciplina = (idx: number, field: keyof DisciplinaItem, val: string) =>
+    setDisciplinas(disciplinas.map((d, i) => i === idx ? { ...d, [field]: val } : d));
+
   const edad = useMemo(() => {
     if (!form.fechaNacimiento) return 0;
     const birth = new Date(form.fechaNacimiento);
@@ -226,26 +238,27 @@ const EditPatient = () => {
       edad,
       estatura: form.talla,
       peso: parseFloat(form.peso) || null,
-      complexion: form.complexion === 'Ectomorfo' ? 1 
-                  : (form.complexion === 'Mesomorfo' || form.complexion === 'Mesomorfico') ? 2 
-                  : form.complexion === 'Endomorfo' ? 3 : null,
-      
+      complexion: form.complexion === 'Ectomorfo' ? 1
+        : (form.complexion === 'Mesomorfo' || form.complexion === 'Mesomorfico') ? 2
+          : form.complexion === 'Endomorfo' ? 3 : null,
+
       ejercicio: {
         objetivo: form.objetivo,
         gymOrigen: form.gymOrigen,
-        disciplina: form.disciplina,
-        frecuencia: form.frecuencia,
-        tiempo: form.tiempo,
+        horaEntrenamiento: form.horaEntrenamiento,
+        ...encodeDisciplinas(disciplinas),
         nivelActividad: form.nivelActividad,
         porcentajeSedentario: parseFloat(form.porcentajeSedentario) || 0,
         porcentajeLeve: parseFloat(form.porcentajeLeve) || 0,
         porcentajeModerado: parseFloat(form.porcentajeModerado) || 0,
         porcentajeIntenso: parseFloat(form.porcentajeIntenso) || 0,
       },
-      
+
       antecedentes: {
         patologia: form.patologia,
         cirugias: form.cirugias,
+        farmacos: form.farmacos,
+        cicloMenstrual: form.cicloMenstrual,
         alergias: form.alergico,
         alimentosGustan: form.alimentosGusta,
         alimentosNoGustan: form.alimentosNoGusta,
@@ -254,10 +267,9 @@ const EditPatient = () => {
         consumoAlcohol: form.alcohol,
         tabaco: form.tabaco,
         agua: form.agua,
-        historialProductos: form.historialProductos,
-        recomendacionSuplementos: form.recomSuplementos
+        suplementosDetalle: suplementosIniciales.filter(s => s.nombre.trim())
       },
-      
+
 
     };
 
@@ -266,7 +278,12 @@ const EditPatient = () => {
       toast({ title: 'Expediente actualizado correctamente' });
       navigate(`/pacientes/${id}`);
     } catch (err: any) {
-      toast({ title: 'Error de Sistema', description: 'No se pudo actualizar el expediente', variant: 'destructive' });
+      const msg = err.response?.data?.error || err.response?.data?.message || err.message || '';
+      if (err.response?.status === 409 || msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('telefono') || msg.toLowerCase().includes('correo') || msg.toLowerCase().includes('email')) {
+        toast({ title: 'Dato Duplicado', description: msg, variant: 'destructive', duration: 8000 });
+      } else {
+        toast({ title: 'Error de Sistema', description: msg || 'No se pudo actualizar el expediente.', variant: 'destructive' });
+      }
     } finally {
       setSaving(false);
     }
@@ -314,23 +331,91 @@ const EditPatient = () => {
         </FormSection>
 
         <FormSection title="Dinámica Deportiva" icon={Activity}>
-          <Input label="Objetivo Primario" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
+          <Input label="Objetivo" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Recomposición corporal" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
-          <Input label="Disciplina" value={form.disciplina} onChange={(v: string) => update('disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
-          <Input label="Frecuencia" value={form.frecuencia} onChange={(v: string) => update('frecuencia', v)} placeholder="EJ: 5 días a la semana" />
-          <Input label="Duración Sesión" value={form.tiempo} onChange={(v: string) => update('tiempo', v)} placeholder="EJ: 60-90 Minutos" />
-          <Select label="Nivel de Actividad" value={form.nivelActividad} onChange={(v: string) => update('nivelActividad', v)} options={['Sedentario', 'Leve', 'Moderado', 'Intenso']} />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 col-span-full">
-            <Input label="Sedentario %" value={form.porcentajeSedentario} onChange={(v: string) => update('porcentajeSedentario', v)} placeholder="0" type="number" />
-            <Input label="Leve %" value={form.porcentajeLeve} onChange={(v: string) => update('porcentajeLeve', v)} placeholder="0" type="number" />
-            <Input label="Moderado %" value={form.porcentajeModerado} onChange={(v: string) => update('porcentajeModerado', v)} placeholder="0" type="number" />
-            <Input label="Intenso %" value={form.porcentajeIntenso} onChange={(v: string) => update('porcentajeIntenso', v)} placeholder="0" type="number" />
+          <Input label="Hora de Entrenamiento" value={form.horaEntrenamiento} onChange={(v: string) => update('horaEntrenamiento', v)} placeholder="Ej: 7:00am / Tarde" />
+          <div className="col-span-full space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1">Disciplinas</label>
+              <button
+                type="button"
+                onClick={addDisciplina}
+                className="flex items-center gap-1 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
+              >
+                <Plus className="w-3 h-3" /> Agregar disciplina
+              </button>
+            </div>
+            {disciplinas.map((d, idx) => (
+              <div key={idx} className="grid sm:grid-cols-3 gap-3 items-end p-3 bg-bg-elevated/40 border border-border-subtle rounded-[8px] relative">
+                <Input label={`Disciplina ${disciplinas.length > 1 ? idx + 1 : ''}`} value={d.disciplina} onChange={(v: string) => updateDisciplina(idx, 'disciplina', v)} placeholder="Crossfit / Pesas / Correr" />
+                <Input label="Frecuencia" value={d.frecuencia} onChange={(v: string) => updateDisciplina(idx, 'frecuencia', v)} placeholder="EJ: 5 días a la semana" />
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Input label="Duración" value={d.tiempo} onChange={(v: string) => updateDisciplina(idx, 'tiempo', v)} placeholder="EJ: 60-90 min" />
+                  </div>
+                  {disciplinas.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeDisciplina(idx)}
+                      className="p-3 text-text-muted hover:text-accent-red rounded-[8px] hover:bg-bg-elevated transition-colors"
+                      title="Eliminar disciplina"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
+          <Select label="Nivel de Actividad" value={form.nivelActividad} onChange={(v: string) => update('nivelActividad', v)} options={['Sedentario', 'Leve', 'Moderado', 'Intenso']} />
         </FormSection>
 
         <FormSection title="Anamnesis y Suplementación" icon={Shield}>
-          <TextArea label="Historial de Suplementos (Fase Actual)" value={form.historialProductos} onChange={(v: string) => update('historialProductos', v)} placeholder="Describa los productos que consume el paciente actualmente..." />
-          <TextArea label="Propuesta Inicial de Suplementación" value={form.recomSuplementos} onChange={(v: string) => update('recomSuplementos', v)} placeholder="Recomendaciones basadas en el objetivo..." />
+          <div className="col-span-full space-y-3">
+            <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none block">
+              Suplementos Actuales del Paciente
+            </label>
+            <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] p-4 space-y-2">
+              {suplementosIniciales.length > 0 && (
+                <div className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest border-b border-[#2a2a2a] mb-2">
+                  <div>Suplemento</div><div>Indicaciones / Dosis</div><div className="text-center">Activo</div><div></div>
+                </div>
+              )}
+              <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                {suplementosIniciales.map((sup, idx) => (
+                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a]">
+                    <input type="text" value={sup.nombre}
+                      onChange={(e) => { const a = [...suplementosIniciales]; a[idx] = { ...a[idx], nombre: e.target.value }; setSuplementosIniciales(a); }}
+                      placeholder="Ej. Creatina"
+                      className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
+                    <input type="text" value={sup.indicaciones}
+                      onChange={(e) => { const a = [...suplementosIniciales]; a[idx] = { ...a[idx], indicaciones: e.target.value }; setSuplementosIniciales(a); }}
+                      placeholder="Ej. 5g pre-entreno"
+                      className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
+                    <div className="flex justify-center">
+                      <button type="button"
+                        onClick={() => { const a = [...suplementosIniciales]; a[idx] = { ...a[idx], activo: !a[idx].activo }; setSuplementosIniciales(a); }}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${sup.activo ? 'bg-accent-green' : 'bg-[#333]'}`}>
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${sup.activo ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
+                    <button type="button" onClick={() => setSuplementosIniciales(suplementosIniciales.filter((_, i) => i !== idx))}
+                      className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                ))}
+                {suplementosIniciales.length === 0 && <p className="text-[12px] text-[#8a8a8a] text-center py-4">Sin suplementos registrados.</p>}
+              </div>
+              <div className="flex justify-end pt-2">
+                <button type="button"
+                  onClick={() => setSuplementosIniciales([...suplementosIniciales, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }])}
+                  className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider">
+                  <Plus className="w-4 h-4" /> Agregar Suplemento
+                </button>
+              </div>
+            </div>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 col-span-full">
             <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
             <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
@@ -341,6 +426,8 @@ const EditPatient = () => {
         <FormSection title="Perfil Clínico" icon={Heart}>
           <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
           <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
+          <Input label="Fármacos / Medicamentos" value={form.farmacos} onChange={(v: string) => update('farmacos', v)} placeholder="Metformina 500mg, Eutirox..." />
+          <Input label="Ciclo Menstrual" value={form.cicloMenstrual} onChange={(v: string) => update('cicloMenstrual', v)} placeholder="Regular / Irregular / N/A" />
           <Select label="Tránsito Intestinal" value={form.estrenimiento} onChange={(v: string) => update('estrenimiento', v)} options={['No', 'Leve', 'Frecuente']} />
           <Select label="Consumo de Alcohol" value={form.alcohol} onChange={(v: string) => update('alcohol', v)} options={['No', 'Social', 'Frecuente']} />
           <Select label="Hábito Tabáquico" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Ocasional', 'Frecuente']} />

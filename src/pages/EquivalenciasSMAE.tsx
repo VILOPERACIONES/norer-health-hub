@@ -1,21 +1,48 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal, Minus } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+interface EquivalenciaExtra {
+  grupo: string;
+  cantidad: number | string;
+}
+
 interface AlimentoSMAE {
   id: string;
   nombre: string;
   grupo: string;
+  equivalentesBase?: number;   // cuántos eq del grupo base vale la porción (default 1)
   pesoGramos: number;
+  unidadBase: string;          // unidad del valor ancla: g, ml, oz, pz, etc.
   porcionCasera: string | null;
   cantidadPorcion: number | null;
   unidadPorcion: string | null;
   notas: string | null;
   esPersonalizado: boolean;
+  equivalencias?: EquivalenciaExtra[] | string | null; // Grupos SMAE adicionales
 }
+
+const UNIDADES_BASE = [
+  { value: 'g',         label: 'g — gramos' },
+  { value: 'ml',        label: 'ml — mililitros' },
+  { value: 'oz',        label: 'oz — onzas' },
+  { value: 'pz',        label: 'pz — pieza' },
+  { value: 'serv',      label: 'serv — servicio/scoop' },
+  { value: 'medida',    label: 'medida — medida/scoop' },
+  { value: 'paquete',   label: 'paquete' },
+  { value: 'botellita', label: 'botellita' },
+  { value: 'lata',      label: 'lata' },
+  { value: 'tz',        label: 'tz — taza' },
+  { value: 'cdas',      label: 'cdas — cucharadas' },
+  { value: 'cdta',      label: 'cdta — cucharadita' },
+  { value: 'sobre',     label: 'sobre' },
+];
+
+const PRESET_UNIDADES = UNIDADES_BASE.map(u => u.value);
+const CUSTOM_UNIT = '__custom__';
 
 // Grupos SMAE con colores
 const GRUPOS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -43,23 +70,37 @@ const GRUPOS_KEYS = Object.keys(GRUPOS_CONFIG);
 const EMPTY_FORM: Omit<AlimentoSMAE, 'id'> = {
   nombre: '',
   grupo: 'verduras',
+  equivalentesBase: 1,
   pesoGramos: 0,
+  unidadBase: 'g',
   porcionCasera: '',
   cantidadPorcion: null,
   unidadPorcion: '',
   notas: '',
   esPersonalizado: true,
+  equivalencias: [],
 };
 
 // ─── Badge de grupo ──────────────────────────────────────────────────────────
-const GrupoBadge = ({ grupo }: { grupo: string }) => {
+const GrupoBadge = ({ grupo, cantidad }: { grupo: string; cantidad?: number }) => {
   const g = GRUPOS_CONFIG[grupo];
-  if (!g) return <span className="text-text-muted text-[12px]">{grupo}</span>;
+  const prefix = cantidad != null && cantidad !== 1 ? `${cantidad} ` : '';
+  if (!g) return <span className="text-text-muted text-[12px]">{prefix}{grupo}</span>;
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-[5px] text-[11px] font-medium border ${g.bg} ${g.color}`}>
-      {g.label}
+      {prefix}{g.label}
     </span>
   );
+};
+
+// ─── Componentes auxiliares ───────────────────────────────────────────────────
+const parseEquivs = (raw: AlimentoSMAE['equivalencias']): EquivalenciaExtra[] => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(e => e.grupo);
+  if (typeof raw === 'string') {
+    try { const arr = JSON.parse(raw); return Array.isArray(arr) ? arr.filter((e: any) => e.grupo) : []; } catch { return []; }
+  }
+  return [];
 };
 
 // ─── Modal Alimento ──────────────────────────────────────────────────────────
@@ -77,14 +118,32 @@ const ModalAlimento = ({
   );
   const [saving, setSaving] = useState(false);
 
+  // ─── Unidad personalizada (libertad para crear unidades propias) ────
+  const [unitMode, setUnitMode] = useState<'preset' | 'custom'>(
+    inicial?.unidadBase && !PRESET_UNIDADES.includes(inicial.unidadBase) ? 'custom' : 'preset'
+  );
+
+  // ─── Equivalencias adicionales (multi-grupo) ────────────────────────
+
+  const [extraEquivs, setExtraEquivs] = useState<EquivalenciaExtra[]>(
+    parseEquivs(inicial?.equivalencias)
+  );
+
+  const addEquiv   = () => setExtraEquivs(prev => [...prev, { grupo: '', cantidad: '' }]);
+  const removeEquiv = (i: number) => setExtraEquivs(prev => prev.filter((_, idx) => idx !== i));
+  const updateEquiv = (i: number, field: keyof EquivalenciaExtra, val: string) =>
+    setExtraEquivs(prev => prev.map((e, idx) => idx === i ? { ...e, [field]: field === 'cantidad' ? (parseFloat(val) || val) : val } : e));
+
   const set = (k: keyof typeof form, v: any) => setForm(f => ({ ...f, [k]: v }));
 
   const handleSubmit = async () => {
     if (!form.nombre.trim()) return;
     if (!form.pesoGramos || form.pesoGramos <= 0) return;
+    if (!form.unidadBase.trim()) return;
     setSaving(true);
     try {
-      await onSave(form);
+      const validEquivs = extraEquivs.filter(e => e.grupo.trim());
+      await onSave({ ...form, equivalencias: validEquivs.length > 0 ? validEquivs : [] });
     } finally {
       setSaving(false);
     }
@@ -121,33 +180,133 @@ const ModalAlimento = ({
             />
           </div>
 
-          {/* Grupo */}
+          {/* Grupo base + cantidad de equivalentes */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-text-secondary m-0">Grupo SMAE *</label>
-            <select
-              value={form.grupo}
-              onChange={(e) => set('grupo', e.target.value)}
-              className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
-            >
-              {GRUPOS_KEYS.map(k => (
-                <option key={k} value={k}>{GRUPOS_CONFIG[k].label}</option>
-              ))}
-            </select>
+            <label className="text-[12px] font-medium text-text-secondary m-0">Grupo SMAE base *</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={form.equivalentesBase ?? 1}
+                onChange={(e) => set('equivalentesBase', parseFloat(e.target.value) || 0)}
+                placeholder="1"
+                min="0"
+                step="0.5"
+                title="Cuántos equivalentes de este grupo vale la porción"
+                className="w-20 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <span className="self-center text-[11px] text-text-muted flex-shrink-0">eq de</span>
+              <select
+                value={form.grupo}
+                onChange={(e) => set('grupo', e.target.value)}
+                className="flex-1 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              >
+                {GRUPOS_KEYS.map(k => (
+                  <option key={k} value={k}>{GRUPOS_CONFIG[k].label}</option>
+                ))}
+              </select>
+            </div>
+            <p className="text-[11px] text-text-muted m-0">
+              Cuántos equivalentes del grupo base aporta la porción. Default 1. Ej. 1 serv de proteína = 2 eq AOA.
+            </p>
           </div>
 
-          {/* Peso por 1 equivalente */}
+          {/* Cantidad ancla por 1 equivalente */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-text-secondary m-0">Peso por 1 equivalente (g) *</label>
-            <input
-              type="number"
-              value={form.pesoGramos || ''}
-              onChange={(e) => set('pesoGramos', parseFloat(e.target.value) || 0)}
-              placeholder="Ej. 120"
-              min="0"
-              step="0.1"
-              className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
-            />
-            <p className="text-[11px] text-text-muted m-0">Cuántos gramos equivalen a 1 porción del grupo seleccionado</p>
+            <label className="text-[12px] font-medium text-text-secondary m-0">Cantidad por 1 equivalente *</label>
+            <div className="flex gap-2">
+              <input
+                type="number"
+                value={form.pesoGramos || ''}
+                onChange={(e) => set('pesoGramos', parseFloat(e.target.value) || 0)}
+                placeholder="Ej. 240"
+                min="0"
+                step="0.1"
+                className="flex-1 bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+              />
+              <select
+                value={unitMode === 'custom' ? CUSTOM_UNIT : (form.unidadBase || 'g')}
+                onChange={(e) => {
+                  if (e.target.value === CUSTOM_UNIT) {
+                    setUnitMode('custom');
+                    set('unidadBase', '');
+                  } else {
+                    setUnitMode('preset');
+                    set('unidadBase', e.target.value);
+                  }
+                }}
+                className="bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              >
+                {UNIDADES_BASE.map(u => (
+                  <option key={u.value} value={u.value}>{u.label}</option>
+                ))}
+                <option value={CUSTOM_UNIT}>Otra unidad…</option>
+              </select>
+            </div>
+            {unitMode === 'custom' && (
+              <input
+                autoFocus
+                type="text"
+                value={form.unidadBase}
+                onChange={(e) => set('unidadBase', e.target.value)}
+                placeholder="Escribe tu unidad. Ej. serv, scoop, barra, cápsula"
+                className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[14px] text-text-primary border border-border-subtle focus:border-[#444] outline-none transition-colors"
+              />
+            )}
+            <p className="text-[11px] text-text-muted m-0">
+              {form.unidadBase === 'g' || form.unidadBase === 'ml'
+                ? `Cuántos ${form.unidadBase} equivalen a 1 porción del grupo seleccionado`
+                : `Cuántas unidades (${form.unidadBase || 'unidad'}) equivalen a 1 porción del grupo seleccionado`}
+            </p>
+          </div>
+
+          {/* Equivalencias adicionales */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="text-[12px] font-medium text-text-secondary m-0">Equivalencias adicionales <span className="text-text-muted font-normal">(opcional)</span></label>
+              <button
+                type="button"
+                onClick={addEquiv}
+                className="flex items-center gap-1 text-[11px] text-[#90c2ff] hover:text-white transition-colors px-2 py-1 rounded-[6px] hover:bg-[#1a2a3a] border border-[#90c2ff]/20"
+              >
+                <Plus className="w-3 h-3" /> Añadir grupo
+              </button>
+            </div>
+            {extraEquivs.length === 0 && (
+              <p className="text-[11px] text-text-muted italic">
+                Usa esto si el alimento cuenta como más de 1 grupo SMAE. Ej: leche entera = 1 eq leche + 1 eq grasa.
+              </p>
+            )}
+            {extraEquivs.map((eq, idx) => (
+              <div key={idx} className="flex items-center gap-2">
+                <input
+                  type="number"
+                  value={eq.cantidad.toString()}
+                  onChange={e => updateEquiv(idx, 'cantidad', e.target.value)}
+                  placeholder="Cant."
+                  min="0"
+                  step="0.5"
+                  className="w-20 bg-bg-elevated rounded-[8px] px-2 py-2 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <span className="text-[11px] text-text-muted flex-shrink-0">eq</span>
+                <select
+                  value={eq.grupo}
+                  onChange={e => updateEquiv(idx, 'grupo', e.target.value)}
+                  className="flex-1 bg-bg-elevated rounded-[8px] px-2 py-2 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none"
+                >
+                  <option value="">Selecciona grupo...</option>
+                  {GRUPOS_KEYS.map(k => (
+                    <option key={k} value={GRUPOS_CONFIG[k].label}>{GRUPOS_CONFIG[k].label}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => removeEquiv(idx)}
+                  className="p-1.5 text-text-muted hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors"
+                >
+                  <Minus className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
           </div>
 
           {/* Porción casera */}
@@ -192,15 +351,22 @@ const ModalAlimento = ({
               className="w-full bg-bg-elevated rounded-[8px] px-3 py-2.5 text-[13px] text-text-primary border border-border-subtle focus:border-[#444] outline-none resize-none"
             />
           </div>
+
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 pb-6 gap-3">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-1">
             {form.pesoGramos > 0 && (
-              <span className="text-[12px] text-text-muted">
-                → <strong className="text-text-primary">{form.pesoGramos}g</strong> = 1 eq · <GrupoBadge grupo={form.grupo} />
-              </span>
+              <div className="flex flex-wrap items-center gap-2 text-[12px] text-text-muted">
+                → <strong className="text-text-primary">{form.pesoGramos}{form.unidadBase || 'g'}</strong> = {form.equivalentesBase ?? 1} eq · <GrupoBadge grupo={form.grupo} />
+                {extraEquivs.filter(e => e.grupo && e.cantidad).map((eq, i) => (
+                  <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
+                    <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>
+                    <span className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-wider">{eq.grupo}</span>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
           <div className="flex gap-2">
@@ -209,7 +375,7 @@ const ModalAlimento = ({
             </button>
             <button
               onClick={handleSubmit}
-              disabled={saving || !form.nombre.trim() || !form.pesoGramos}
+              disabled={saving || !form.nombre.trim() || !form.pesoGramos || !form.unidadBase.trim()}
               className="flex items-center gap-2 px-5 py-2 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50"
             >
               {saving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Check className="w-4 h-4" />}
@@ -416,17 +582,31 @@ const EquivalenciasSMAE = () => {
                       {a.notas && <p className="text-[12px] text-text-muted m-0 mt-0.5 italic">{a.notas}</p>}
                     </td>
                     <td className="px-4 py-3">
-                      <GrupoBadge grupo={a.grupo} />
+                      <div className="flex flex-wrap items-center gap-2">
+                        <GrupoBadge grupo={a.grupo} cantidad={a.equivalentesBase} />
+                        {parseEquivs(a.equivalencias).map((eq, i) => (
+                          <div key={i} className="flex items-center gap-1.5 bg-[#1a1a1a] px-2 py-1 rounded-[6px] border border-[#333]">
+                            <span className="text-[11px] font-bold text-brand-primary">+{eq.cantidad}</span>
+                            <span className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-wider">{eq.grupo}</span>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="text-[14px] font-bold text-text-primary">{a.pesoGramos}</span>
-                      <span className="text-[12px] text-text-muted ml-1">g</span>
+                      <span className="text-[12px] text-text-muted ml-1">{a.unidadBase || 'g'}</span>
                     </td>
                     <td className="px-4 py-3">
-                      {a.cantidadPorcion && a.unidadPorcion ? (
+                      {a.porcionCasera ? (
+                        <span className="text-[13px] text-text-secondary">
+                          {a.cantidadPorcion && a.unidadPorcion && !a.porcionCasera.startsWith(String(a.cantidadPorcion))
+                            ? `${a.cantidadPorcion} ${a.unidadPorcion} (${a.porcionCasera})`
+                            : a.porcionCasera
+                          }
+                        </span>
+                      ) : a.cantidadPorcion && a.unidadPorcion ? (
                         <span className="text-[13px] text-text-secondary">
                           {a.cantidadPorcion} {a.unidadPorcion}
-                          {a.porcionCasera ? ` (${a.porcionCasera})` : ''}
                         </span>
                       ) : (
                         <span className="text-[12px] text-text-muted">—</span>
@@ -457,6 +637,63 @@ const EquivalenciasSMAE = () => {
           </div>
         </div>
       )}
+
+      {/* ─── Referencia de Abreviaciones (mismo formato que la tabla de alimentos) ─── */}
+      <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden">
+        <div className="px-6 py-3 border-b border-border-subtle bg-bg-elevated flex items-center justify-between">
+          <p className="text-[12px] font-medium text-text-muted">
+            Referencia de Abreviaciones — {GRUPOS_KEYS.length} grupos SMAE
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-border-subtle">
+                <th className="px-6 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Clave</th>
+                <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Grupo</th>
+                <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Descripción</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-subtle">
+              {GRUPOS_KEYS.map((key) => {
+                const g = GRUPOS_CONFIG[key];
+                const descriptions: Record<string, string> = {
+                  verduras: 'Todas las verduras y hortalizas',
+                  frutas: 'Frutas frescas y secas',
+                  cerealSinGr: 'Cereales y tubérculos sin grasa añadida',
+                  cerealConGr: 'Cereales y tubérculos con grasa añadida',
+                  leguminosas: 'Frijol, lenteja, garbanzo, habas, etc.',
+                  aoaMuyBajo: 'Alimentos de origen animal con muy bajo contenido graso',
+                  aoaBajo: 'Alimentos de origen animal con bajo contenido graso',
+                  aoaModerado: 'Alimentos de origen animal con moderado contenido graso',
+                  aoaAlto: 'Alimentos de origen animal con alto contenido graso',
+                  lecheDesc: 'Leche y yogurt descremados',
+                  lecheSemi: 'Leche y yogurt semidescremados',
+                  lecheEntera: 'Leche y yogurt enteros',
+                  lecheAz: 'Leche y yogurt con azúcar añadida',
+                  grasaSinProt: 'Aceites, mantequilla, aguacate sin proteína',
+                  grasaConProt: 'Oleaginosas, semillas con proteína',
+                  azSinGr: 'Azúcares, mermeladas, miel sin grasa',
+                  azConGr: 'Chocolates, pasteles con grasa añadida',
+                };
+                return (
+                  <tr key={key} className="hover:bg-bg-elevated/40 transition-colors group">
+                    <td className="px-6 py-3">
+                      <span className="text-[14px] font-mono font-medium text-text-primary">{key}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <GrupoBadge grupo={key} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[13px] text-text-secondary">{descriptions[key] || g.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       {/* Modal crear/editar */}
       {showModal && (

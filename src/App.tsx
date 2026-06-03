@@ -25,7 +25,22 @@ import EquivalenciasSMAE from "@/pages/EquivalenciasSMAE";
 import Platillos from "@/pages/Platillos";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Datos sirven desde cache por 1 minuto — navegación instantánea
+      staleTime: 60 * 1000,
+      // Cache se mantiene 10 minutos en background
+      gcTime: 10 * 60 * 1000,
+      // Solo refresca si los datos están stale al volver a la pestaña
+      refetchOnWindowFocus: false,
+      // Solo 1 retry en error para no esperar demasiado
+      retry: 1,
+      // No refetch al reconectar para evitar doble carga
+      refetchOnReconnect: 'always',
+    },
+  },
+});
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = useAuthStore((s) => s.token);
