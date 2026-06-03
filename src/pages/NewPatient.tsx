@@ -300,15 +300,16 @@ const NewPatient = () => {
             </label>
             <div className="bg-[#111111] border border-[#2a2a2a] rounded-[12px] p-4 space-y-2">
               {suplementosIniciales.length > 0 && (
-                <div className="grid grid-cols-[1.5fr_2fr_40px] gap-3 items-center px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest border-b border-[#2a2a2a] mb-2">
+                <div className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center px-2 py-1 text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest border-b border-[#2a2a2a] mb-2">
                   <div>Suplemento</div>
                   <div>Indicaciones / Dosis</div>
+                  <div className="text-center">Activo</div>
                   <div></div>
                 </div>
               )}
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {suplementosIniciales.map((sup, idx) => (
-                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a]">
+                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a]">
                     <input
                       type="text"
                       value={sup.nombre}
@@ -331,6 +332,15 @@ const NewPatient = () => {
                       placeholder="Ej. 5g pre-entreno"
                       className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
                     />
+                    <div className="flex justify-center">
+                      <button
+                        type="button"
+                        onClick={() => { const arr = [...suplementosIniciales]; arr[idx] = { ...arr[idx], activo: !arr[idx].activo }; setSuplementosIniciales(arr); }}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${sup.activo ? 'bg-accent-green' : 'bg-[#333]'}`}
+                      >
+                        <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${sup.activo ? 'translate-x-4' : 'translate-x-1'}`} />
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => setSuplementosIniciales(suplementosIniciales.filter((_, i) => i !== idx))}

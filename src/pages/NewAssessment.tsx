@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -87,6 +87,7 @@ const NewAssessment = () => {
   const [tieneSuplementos, setTieneSuplementos] = useState(false);
   const [suplementos, setSuplementos] = useState<{ id: string; nombre: string; indicaciones: string; fechaInicio: string; activo: boolean }[]>([]);
 
+  const [dragSupIdx, setDragSupIdx] = useState<number | null>(null);
   const [notasLibres, setNotasLibres] = useState('');
   const [notasLibresOpen, setNotasLibresOpen] = useState(false);
   const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; tipo: string; dataUrl: string }[]>([]);
@@ -1077,7 +1078,8 @@ const NewAssessment = () => {
                     </div>
                     {suplementacionActiva && (
                       <div className="space-y-4 animate-fade-in">
-                        <div className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                        <div className="grid grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                          <div></div>
                           <div>Suplemento</div>
                           <div>Indicaciones / Dosis</div>
                           <div>Tiempo</div>
@@ -1086,7 +1088,25 @@ const NewAssessment = () => {
                         </div>
                         <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
                           {suplementosDetalle.map((sup, idx) => (
-                            <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a] group hover:border-[#444] transition-colors">
+                            <div
+                              key={sup.id}
+                              draggable
+                              onDragStart={() => setDragSupIdx(idx)}
+                              onDragOver={(e) => { e.preventDefault(); }}
+                              onDrop={() => {
+                                if (dragSupIdx === null || dragSupIdx === idx) return;
+                                const arr = [...suplementosDetalle];
+                                const [moved] = arr.splice(dragSupIdx, 1);
+                                arr.splice(idx, 0, moved);
+                                setSuplementosDetalle(arr);
+                                setDragSupIdx(null);
+                              }}
+                              onDragEnd={() => setDragSupIdx(null)}
+                              className={`grid grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-4 items-center bg-[#181818] p-3 rounded-[8px] border transition-colors group ${dragSupIdx === idx ? 'opacity-40 border-brand-primary' : 'border-[#2a2a2a] hover:border-[#444]'}`}
+                            >
+                              <div className="flex items-center justify-center cursor-grab text-[#444] group-hover:text-[#666]">
+                                <GripVertical className="w-4 h-4" />
+                              </div>
                               <input type="text" value={sup.nombre} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].nombre = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. Creatina" className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
                               <input type="text" value={sup.indicaciones} onChange={(e) => { const a = [...suplementosDetalle]; a[idx].indicaciones = e.target.value; setSuplementosDetalle(a); }} placeholder="Ej. 1 scoop post-entreno" className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors" />
                               <div className="text-[12px] font-medium text-[#c0c0c0] px-1 truncate">
