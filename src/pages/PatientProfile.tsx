@@ -443,11 +443,13 @@ const PatientProfile = () => {
                 <ClinicalSection title="Perfil Clínico y Patologías" icon={Heart} data={{
                   'Patología': paciente.antecedentes?.patologia || 'N/A',
                   'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
+                  'Fármacos': paciente.antecedentes?.farmacos || 'N/A',
                   'Alergias': paciente.antecedentes?.alergias || 'N/A',
                   'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
                   'Agua al día': paciente.antecedentes?.agua || 'N/A',
                   'Alcohol': paciente.antecedentes?.consumoAlcohol || 'N/A',
                   'Tabaco': paciente.antecedentes?.tabaco || 'N/A',
+                  'Ciclo Menstrual': paciente.antecedentes?.cicloMenstrual || 'N/A',
                 }} />
 
                 <div className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 hover:bg-bg-elevated/40 transition-colors lg:col-span-2">
@@ -477,6 +479,8 @@ const PatientProfile = () => {
                       { label: 'Preferencias (Gusta)', value: paciente.antecedentes?.alimentosGustan },
                       { label: 'Aversiones (No gusta)', value: paciente.antecedentes?.alimentosNoGustan },
                       { label: 'Signos y Síntomas', value: paciente.antecedentes?.signosYSintomas },
+                      { label: 'Historial Suplementos', value: paciente.antecedentes?.historialProductos },
+                      { label: 'Recomendación Suplementos', value: paciente.antecedentes?.recomendacionSuplementos },
                     ].map(({ label, value }) => (
                       <div key={label} className="space-y-2">
                         <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{label}</p>
@@ -489,6 +493,47 @@ const PatientProfile = () => {
                     ))}
                   </div>
                 </div>
+
+                {/* Recordatorio 24 horas */}
+                {paciente.habitos && Object.values(paciente.habitos).some((v: any) => v?.hora || v?.ayer || v?.usualmente) && (
+                  <div className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 hover:bg-bg-elevated/40 transition-colors lg:col-span-2">
+                    <div className="flex items-center gap-3 border-b border-border-subtle pb-4 mb-4">
+                      <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">Recordatorio 24 Horas</h4>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-[12px]">
+                        <thead>
+                          <tr className="border-b border-border-subtle">
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4 w-28">Tiempo</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Hora</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Ayer</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2">Usualmente</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border-subtle/30">
+                          {([
+                            { key: 'desayuno',  label: 'Desayuno' },
+                            { key: 'colacion1', label: 'Colación 1' },
+                            { key: 'almuerzo',  label: 'Comida' },
+                            { key: 'colacion2', label: 'Colación 2' },
+                            { key: 'cena',      label: 'Cena' },
+                          ] as { key: string; label: string }[]).map(({ key, label }) => {
+                            const row = (paciente.habitos as any)[key];
+                            if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
+                            return (
+                              <tr key={key}>
+                                <td className="py-2 pr-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.hora || '—'}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.ayer || '—'}</td>
+                                <td className="py-2 text-[13px] text-text-secondary">{row?.usualmente || '—'}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
