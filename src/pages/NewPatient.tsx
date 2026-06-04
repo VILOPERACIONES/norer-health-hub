@@ -388,17 +388,19 @@ const NewPatient = () => {
           <TextArea label="Signos y Síntomas Adicionales" value={form.signosSintomas} onChange={(v: string) => update('signosSintomas', v)} placeholder="Cansancio crónico, dolor de cabeza..." />
         </FormSection>
 
-        <div className="pt-6 flex justify-end items-center gap-6">
-          <p className="text-[14px] font-normal text-text-secondary m-0">Revisa los datos antes de guardar</p>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 bg-brand-primary text-bg-base px-[24px] py-[12px] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#e0e0e0] disabled:opacity-50"
-          >
-            {saving ? <div className="w-[18px] h-[18px] border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
-            {saving ? 'Guardando expediente...' : 'Guardar y registrar expediente'}
-          </button>
-        </div>
+      </div>
+
+      {/* Barra guardar sticky */}
+      <div className="sticky bottom-0 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 px-3 sm:px-4 md:px-6 lg:px-8 py-3 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-[#1a1a1a] flex items-center justify-between z-20">
+        <p className="text-[13px] text-text-muted hidden sm:block">Revisa los datos antes de guardar</p>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 bg-brand-primary text-bg-base px-[24px] py-[11px] rounded-[8px] text-[14px] font-bold transition-colors hover:bg-[#e0e0e0] disabled:opacity-50 ml-auto"
+        >
+          {saving ? <div className="w-[18px] h-[18px] border-2 border-black/20 border-t-black rounded-full animate-spin" /> : <Save className="h-[18px] w-[18px]" />}
+          {saving ? 'Guardando...' : 'Guardar expediente'}
+        </button>
       </div>
     </div>
   );
