@@ -570,10 +570,10 @@ const PatientProfile = () => {
 
           {/* KPIs */}
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
-            <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} active icon={Shield} />
+            <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} active icon={Activity} />
             <KpiCardCompact label="Kilos Grasa (KG)" value={`${(currentVal as any)?.masaGrasaReal || (currentVal as any)?.kgGrasa2comp || '--'} KG`} icon={Heart} />
-            <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} icon={Activity} />
+            <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
+            <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} icon={Shield} />
           </section>
 
           {/* PROGRESS CHARTS HIGH-CONTRAST */}
