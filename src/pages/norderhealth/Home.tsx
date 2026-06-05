@@ -39,18 +39,21 @@ function mealIcon(nombre: string): LucideIcon {
 
 export default function NorderHealthHome() {
   const navigate = useNavigate();
-  const { paciente, clearPortalAuth } = usePortalAuthStore();
+  const { paciente, token, clearPortalAuth } = usePortalAuthStore();
 
   const { data: me } = useQuery({
     queryKey: ['portal', 'me'],
     queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
     staleTime: 5 * 60 * 1000,
+    enabled: !!token,
   });
 
   const { data: planData, isLoading: loadingPlan } = useQuery({
     queryKey: ['portal', 'plan'],
     queryFn: () => portalApi.get('/api/portal/plan').then(r => r.data),
     staleTime: 5 * 60 * 1000,
+    enabled: !!token,
+    retry: 1,
   });
 
   const nombre = me?.nombre || paciente?.nombre || '';
