@@ -38,6 +38,7 @@ export interface Paciente {
   suscripcionIdExterno?: string | null;
   suscripcionInicio?: string | null;
   suscripcionFin?: string | null;
+  portalActivo?: boolean;
   ejercicio?: Ejercicio; 
   datosEjercicio?: Ejercicio; 
   antecedentes?: Antecedentes; 

@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "@/store/auth";
+import { usePortalAuthStore } from "@/store/portalAuth";
 import { useThemeStore } from "@/store/theme";
 import Layout from "@/components/Layout";
 import Login from "@/pages/Login";
@@ -24,6 +25,9 @@ import Settings from "@/pages/Settings";
 import EquivalenciasSMAE from "@/pages/EquivalenciasSMAE";
 import Platillos from "@/pages/Platillos";
 import NotFound from "@/pages/NotFound";
+import NorderHealthLogin from "@/pages/norderhealth/Login";
+import NorderHealthHome from "@/pages/norderhealth/Home";
+import NorderHealthChat from "@/pages/norderhealth/Chat";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -45,6 +49,12 @@ const queryClient = new QueryClient({
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const token = useAuthStore((s) => s.token);
   if (!token) return <Navigate to="/login" replace />;
+  return <>{children}</>;
+};
+
+const PortalRoute = ({ children }: { children: React.ReactNode }) => {
+  const token = usePortalAuthStore((s) => s.token);
+  if (!token) return <Navigate to="/norder-health/login" replace />;
   return <>{children}</>;
 };
 
@@ -125,6 +135,11 @@ const App = () => {
               <Route path="equivalencias" element={<PermissionGuard module="smae"><EquivalenciasSMAE /></PermissionGuard>} />
               <Route path="platillos" element={<PermissionGuard module="planes"><Platillos /></PermissionGuard>} />
             </Route>
+            {/* Norder Health — Portal paciente (PWA, fuera del CRM) */}
+            <Route path="/norder-health/login" element={<NorderHealthLogin />} />
+            <Route path="/norder-health" element={<PortalRoute><NorderHealthHome /></PortalRoute>} />
+            <Route path="/norder-health/chat" element={<PortalRoute><NorderHealthChat /></PortalRoute>} />
+
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
