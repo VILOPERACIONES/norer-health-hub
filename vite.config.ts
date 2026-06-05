@@ -30,8 +30,8 @@ export default defineConfig(({ mode }) => ({
         start_url: "/norder-health",
         scope: "/norder-health",
         icons: [
-          { src: "icon-portal.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-          { src: "icon-portal.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
+          { src: "favicon.ico", sizes: "64x64 32x32 24x24 16x16", type: "image/x-icon", purpose: "any" },
+          { src: "favicon.ico", sizes: "64x64 32x32 24x24 16x16", type: "image/x-icon", purpose: "maskable" },
         ],
       },
       workbox: {
