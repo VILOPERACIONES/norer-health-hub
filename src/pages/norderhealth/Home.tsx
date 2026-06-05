@@ -57,6 +57,8 @@ export default function NorderHealthHome() {
   });
 
   const nombre = me?.nombre || paciente?.nombre || '';
+  const apellido = me?.apellido || paciente?.apellido || '';
+  const nombreCompleto = [nombre, apellido].filter(Boolean).join(' ') || 'Bienvenido';
   const plan = planData?.plan;
   const tiempos = plan?.menus?.[0]?.tiempos || [];
 
@@ -68,7 +70,7 @@ export default function NorderHealthHome() {
         <div>
           <p className="text-[13px] text-[#555] font-medium">{greeting()}</p>
           <h1 className="text-[24px] font-bold text-white tracking-tight mt-0.5 leading-none">
-            {nombre.split(' ')[0] || 'Bienvenido'}
+            {nombreCompleto}
           </h1>
         </div>
         <button
