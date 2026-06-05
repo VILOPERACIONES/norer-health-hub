@@ -18,19 +18,20 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "logo-nrdr.png", "logo-nrdr.svg"],
+      includeAssets: ["favicon.ico", "icon-portal.svg", "logo-nrdr.svg"],
       manifest: {
         name: "Norder Health",
         short_name: "Norder Health",
-        description: "Tu asistente de nutrición personalizado",
+        description: "Tu nutriólogo digital personalizado",
         theme_color: "#0a0a0a",
         background_color: "#0a0a0a",
         display: "standalone",
+        orientation: "portrait",
         start_url: "/norder-health",
         scope: "/norder-health",
         icons: [
-          { src: "logo-nrdr.png", sizes: "192x192", type: "image/png" },
-          { src: "logo-nrdr.png", sizes: "512x512", type: "image/png" },
+          { src: "icon-portal.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
+          { src: "icon-portal.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
         ],
       },
       workbox: {

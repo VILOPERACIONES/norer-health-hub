@@ -9,7 +9,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-416, 1072],
+      "position": [
+        -416,
+        1072
+      ],
       "id": "87ff6a75-a5da-46bc-a606-b761e9d5861c",
       "name": "Webhook Portal",
       "webhookId": "portal-eyder"
@@ -42,7 +45,10 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [-192, 1072],
+      "position": [
+        -192,
+        1072
+      ],
       "id": "bd7825a2-a2fb-46a5-880f-d859dc3b00b1",
       "name": "Edit Fields3"
     },
@@ -72,7 +78,10 @@
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
-      "position": [0, 1072],
+      "position": [
+        0,
+        1072
+      ],
       "id": "if-portal-imagen",
       "name": "¿Tiene imagen?"
     },
@@ -87,7 +96,10 @@
       },
       "type": "n8n-nodes-base.convertToFile",
       "typeVersion": 1.1,
-      "position": [192, 880],
+      "position": [
+        192,
+        880
+      ],
       "id": "convert-file-portal",
       "name": "Convert to File Imagen"
     },
@@ -107,7 +119,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.googleGemini",
       "typeVersion": 1,
-      "position": [384, 880],
+      "position": [
+        384,
+        880
+      ],
       "id": "analyze-portal-imagen",
       "name": "Analyze tabla nutricional",
       "credentials": {
@@ -133,7 +148,10 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [576, 880],
+      "position": [
+        576,
+        880
+      ],
       "id": "edit-fields-12-img",
       "name": "Edit Fields12 imagen"
     },
@@ -153,7 +171,10 @@
       },
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
-      "position": [192, 1200],
+      "position": [
+        192,
+        1200
+      ],
       "id": "928b1dfe-d9a3-4515-a30e-a0e91d34571a",
       "name": "Edit Fields12"
     },
@@ -167,7 +188,10 @@
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [944, 1072],
+      "position": [
+        944,
+        1072
+      ],
       "id": "17a3ddef-8ef6-4153-8420-113e210feb52",
       "name": "Respond to Webhook"
     },
@@ -182,7 +206,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
       "typeVersion": 2.1,
-      "position": [752, 1072],
+      "position": [
+        752,
+        1072
+      ],
       "id": "62e7902a-1621-400c-a96d-3e94a1db89bf",
       "name": "AI Agent",
       "retryOnFail": true
@@ -197,7 +224,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
       "typeVersion": 1.3,
-      "position": [512, 960],
+      "position": [
+        512,
+        960
+      ],
       "id": "da42d9ad-ec51-4f34-9ebc-613ee534da0e",
       "name": "aporte_nutrimental1",
       "credentials": {
@@ -216,7 +246,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
       "typeVersion": 1.3,
-      "position": [48, 864],
+      "position": [
+        48,
+        864
+      ],
       "id": "c10c9e13-d921-45b9-a95f-7699d396bc5c",
       "name": "equivalencias_norder1",
       "credentials": {
@@ -235,7 +268,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1,
-      "position": [320, 832],
+      "position": [
+        320,
+        832
+      ],
       "id": "030bf9ee-1704-42d5-99e8-3cc10539b134",
       "name": "Google Gemini Chat Model",
       "credentials": {
@@ -254,7 +290,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
       "typeVersion": 1.3,
-      "position": [400, 608],
+      "position": [
+        400,
+        608
+      ],
       "id": "cac49980-247b-4d7d-a59a-91f12b04f42d",
       "name": "Postgres Chat Memory",
       "credentials": {
@@ -275,7 +314,10 @@
       },
       "type": "n8n-nodes-gemini-search.geminiSearchToolTool",
       "typeVersion": 1,
-      "position": [832, 960],
+      "position": [
+        832,
+        960
+      ],
       "id": "ddd6079f-dadb-415b-9efd-03764de3e57e",
       "name": "peso_neto_smae1",
       "credentials": {
@@ -291,7 +333,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
       "typeVersion": 1,
-      "position": [704, 656],
+      "position": [
+        704,
+        656
+      ],
       "id": "7712afff-8f72-4edf-ba0f-76a055a89795",
       "name": "Embeddings Google Gemini3",
       "credentials": {
@@ -307,7 +352,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
       "typeVersion": 1,
-      "position": [16, 688],
+      "position": [
+        16,
+        688
+      ],
       "id": "22a07e9f-bd58-423d-a422-6eafe5b796ac",
       "name": "Embeddings Google Gemini1",
       "credentials": {
@@ -324,7 +372,10 @@
       },
       "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
       "typeVersion": 1.1,
-      "position": [480, 816],
+      "position": [
+        480,
+        816
+      ],
       "id": "a0f75732-8a00-4066-ae1f-bea3662a617c",
       "name": "Google Gemini Chat Model1",
       "credentials": {
@@ -351,65 +402,208 @@
       },
       "type": "n8n-nodes-base.httpRequestTool",
       "typeVersion": 4.4,
-      "position": [432, 1376],
+      "position": [
+        432,
+        1376
+      ],
       "id": "32a82d44-6c82-438f-8427-7dbcc6d02741",
       "name": "get_plan_paciente"
     }
   ],
   "connections": {
     "Webhook Portal": {
-      "main": [[{ "node": "Edit Fields3", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Edit Fields3": {
-      "main": [[{ "node": "¿Tiene imagen?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "¿Tiene imagen?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "¿Tiene imagen?": {
       "main": [
-        [{ "node": "Convert to File Imagen", "type": "main", "index": 0 }],
-        [{ "node": "Edit Fields12", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Convert to File Imagen",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields12",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Convert to File Imagen": {
-      "main": [[{ "node": "Analyze tabla nutricional", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Analyze tabla nutricional",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Analyze tabla nutricional": {
-      "main": [[{ "node": "Edit Fields12 imagen", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Edit Fields12 imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Edit Fields12 imagen": {
-      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Edit Fields12": {
-      "main": [[{ "node": "AI Agent", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "AI Agent": {
-      "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "aporte_nutrimental1": {
-      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "equivalencias_norder1": {
-      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Google Gemini Chat Model": {
-      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 0 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Postgres Chat Memory": {
-      "ai_memory": [[{ "node": "AI Agent", "type": "ai_memory", "index": 0 }]]
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
     },
     "peso_neto_smae1": {
-      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Embeddings Google Gemini3": {
-      "ai_embedding": [[{ "node": "aporte_nutrimental1", "type": "ai_embedding", "index": 0 }]]
+      "ai_embedding": [
+        [
+          {
+            "node": "aporte_nutrimental1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Embeddings Google Gemini1": {
-      "ai_embedding": [[{ "node": "equivalencias_norder1", "type": "ai_embedding", "index": 0 }]]
+      "ai_embedding": [
+        [
+          {
+            "node": "equivalencias_norder1",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Google Gemini Chat Model1": {
-      "ai_languageModel": [[{ "node": "AI Agent", "type": "ai_languageModel", "index": 1 }]]
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 1
+          }
+        ]
+      ]
     },
     "get_plan_paciente": {
-      "ai_tool": [[{ "node": "AI Agent", "type": "ai_tool", "index": 0 }]]
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "pinData": {},
