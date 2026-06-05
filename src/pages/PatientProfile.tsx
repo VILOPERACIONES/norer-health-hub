@@ -282,6 +282,22 @@ const PatientProfile = () => {
 
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
+  const [isActivatingPortal, setIsActivatingPortal] = useState(false);
+
+  const handleTogglePortal = async () => {
+    if (!paciente || isActivatingPortal) return;
+    setIsActivatingPortal(true);
+    try {
+      const newState = !paciente.portalActivo;
+      await api.put(`/api/portal/activar/${id}`, { activar: newState });
+      queryClient.invalidateQueries({ queryKey: ['paciente', id] });
+      toast({ title: newState ? 'Portal Norder Health activado' : 'Portal desactivado' });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo cambiar el estado del portal', variant: 'destructive' });
+    } finally {
+      setIsActivatingPortal(false);
+    }
+  };
   const [fullChartModal, setFullChartModal] = useState<{
     isOpen: boolean, title: string, baseDataKey: string, baseName: string, isFatModal?: boolean
   }>({ isOpen: false, title: '', baseDataKey: '', baseName: '' });
@@ -408,6 +424,32 @@ const PatientProfile = () => {
             <InfoItem label="Teléfono" value={paciente.telefono ? paciente.telefono.replace(/\D/g, '').slice(-10) : '—'} icon={Phone} />
             <InfoItem label="Email" value={paciente.email || '—'} icon={Mail} />
             <InfoItem label="Registro" value={formatDate(paciente.fechaRegistro)} icon={Calendar} />
+          </section>
+
+          {/* NORDER HEALTH PORTAL */}
+          <section className="flex items-center justify-between px-5 py-3.5 bg-bg-surface border border-border-subtle rounded-[14px]">
+            <div className="flex items-center gap-3">
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border uppercase tracking-wider ${
+                paciente.portalActivo
+                  ? 'bg-[#0f2e1a] text-[#4ade80] border-[#4ade80]/20'
+                  : 'bg-bg-elevated text-text-muted border-border-subtle'
+              }`}>
+                {paciente.portalActivo ? 'Activo' : 'Inactivo'}
+              </span>
+              <span className="text-[12px] text-text-secondary font-medium">Norder Health</span>
+              {paciente.suscripcionFin && (
+                <span className="text-[11px] text-text-muted hidden sm:inline">
+                  Vence: {formatDate(paciente.suscripcionFin)}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleTogglePortal}
+              disabled={isActivatingPortal}
+              className="flex items-center gap-2 px-[14px] py-[7px] text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-bg-elevated transition-colors disabled:opacity-50"
+            >
+              {isActivatingPortal ? '...' : (paciente.portalActivo ? 'Desactivar Portal' : 'Activar Portal')}
+            </button>
           </section>
 
           {showFullExpediente && (
