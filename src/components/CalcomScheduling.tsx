@@ -186,7 +186,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
         {/* COLUMNA 1: DATOS PACIENTE (PRE-LLENADOS) */}
         <div className="flex flex-col gap-3 p-3 bg-[#181818]/50 rounded-[12px] border border-[#222]">
           <div className="space-y-1">
-            <label className="text-[9px] font-bold text-[#666] uppercase tracking-widest ml-1">Nombre Completo</label>
+            <label className="text-[9px] font-bold text-text-secondary uppercase tracking-widest ml-1">Nombre Completo</label>
             <input 
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -194,7 +194,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[9px] font-bold text-[#666] uppercase tracking-widest ml-1">Correo Electrónico</label>
+            <label className="text-[9px] font-bold text-text-secondary uppercase tracking-widest ml-1">Correo Electrónico</label>
             <input 
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -202,7 +202,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[9px] font-bold text-[#666] uppercase tracking-widest ml-1">Teléfono</label>
+            <label className="text-[9px] font-bold text-text-secondary uppercase tracking-widest ml-1">Teléfono</label>
             <input 
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -216,7 +216,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
         <div className="flex flex-col gap-4">
           <div className="space-y-1.5 font-sans">
              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest ml-1">Modalidad</label>
+                <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest ml-1">Modalidad</label>
                 {eventDetails && (
                   <span className="text-[10px] font-bold text-brand-primary uppercase bg-brand-primary/10 px-2 py-0.5 rounded-full">
                     {eventDetails.length || eventDetails.duration}
@@ -245,7 +245,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
           </div>
 
           <div className="space-y-1.5 font-sans">
-            <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest ml-1">Fecha</label>
+            <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest ml-1">Fecha</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -280,7 +280,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
           
           {selectedSlot && (
             <div className="mt-auto p-3 bg-[#181818] border border-[#333] rounded-[12px] animate-in zoom-in-95 font-sans">
-              <p className="text-[10px] font-bold text-[#666] uppercase tracking-wider mb-1">Resumen de Cita</p>
+              <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Resumen de Cita</p>
               <p className="text-[12px] font-bold text-white capitalize">
                 {eventDetails?.title || modalidad} — {format(new Date(selectedSlot), "d 'de' MMMM", { locale: es })}
               </p>
@@ -293,7 +293,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
 
         {/* COLUMNA DE SLOTS */}
         <div className="flex flex-col gap-2">
-          <label className="text-[10px] font-bold text-[#666] uppercase tracking-widest flex items-center justify-between ml-1">
+          <label className="text-[10px] font-bold text-text-secondary uppercase tracking-widest flex items-center justify-between ml-1">
             Horarios Disponibles
             {loadingSlots && <Loader2 className="h-3 w-3 animate-spin text-brand-primary" />}
           </label>

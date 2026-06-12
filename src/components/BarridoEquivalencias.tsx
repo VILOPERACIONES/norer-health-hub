@@ -62,7 +62,7 @@ const GRUPOS: { key: string; label: string }[] = [
   { key: 'azConGr', label: 'Az con grasa' },
 ];
 
-const DEFAULT_TIEMPOS = ['Desayuno', 'Colación', 'Almuerzo', 'Merienda', 'Cena'];
+const DEFAULT_TIEMPOS = ['Desayuno', 'Colación', 'Almuerzo', 'Colación 2', 'Cena'];
 
 // ─── Helpers: parsear número y limpiar input decimal ──────────────────────────
 const toNum = (v: any): number => {

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity, Calendar as CalendarIcon } from 'lucide-react';
+import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import CalcomScheduling from '@/components/CalcomScheduling';
 import { formatDate } from '@/lib/format';
@@ -157,6 +157,10 @@ const AssessmentDetail = () => {
   const [showBarrido, setShowBarrido] = useState(true);
   const [savingBarrido, setSavingBarrido] = useState(false);
 
+  // A1: Soft delete
+  const [deletingConsulta, setDeletingConsulta] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Cal.com Scheduling Independiente
   const [calcomData, setCalcomData] = useState<any>(null);
   const [isScheduling, setIsScheduling] = useState(false);
@@ -250,6 +254,25 @@ const AssessmentDetail = () => {
     }
   };
 
+  // A1: Soft delete de la consulta
+  const handleSoftDelete = async () => {
+    setDeletingConsulta(true);
+    try {
+      await api.delete(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}`);
+      toast({ title: 'Consulta eliminada', description: 'El registro fue archivado correctamente.' });
+      navigate(`/pacientes/${pacienteId}`);
+    } catch (err: any) {
+      toast({
+        title: 'Error al eliminar',
+        description: err.response?.data?.error || 'No se pudo archivar la consulta.',
+        variant: 'destructive'
+      });
+    } finally {
+      setDeletingConsulta(false);
+      setShowDeleteConfirm(false);
+    }
+  };
+
   const handleGuardarBarrido = async () => {
     if (!barridoData) return;
     setSavingBarrido(true);
@@ -308,6 +331,38 @@ const AssessmentDetail = () => {
 
   return (
     <div className="space-y-8 animate-fade-in pb-20 w-full">
+
+      {/* A1: Modal confirmación soft delete */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#111] border border-[#2e1a1a] rounded-[16px] p-8 max-w-sm w-full shadow-2xl text-center">
+            <div className="w-14 h-14 rounded-full bg-[#2e1a1a] flex items-center justify-center mx-auto mb-5">
+              <Trash2 className="w-6 h-6 text-accent-red" />
+            </div>
+            <h3 className="text-[18px] font-bold text-white m-0 mb-2">¿Archivar esta consulta?</h3>
+            <p className="text-[13px] text-[#8a8a8a] mb-6 leading-relaxed">
+              La consulta #{val.numeroValoracion} quedará oculta del expediente. Los datos se conservan y pueden recuperarse si es necesario.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleSoftDelete}
+                disabled={deletingConsulta}
+                className="w-full py-3 bg-accent-red text-white rounded-[10px] text-[14px] font-bold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {deletingConsulta ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Sí, archivar consulta
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="w-full py-3 bg-[#1a1a1a] text-[#8a8a8a] border border-[#333] rounded-[10px] text-[14px] font-medium hover:text-white transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6 pt-6 pb-6 border-b border-border-subtle">
         <div className="space-y-2">
@@ -344,6 +399,22 @@ const AssessmentDetail = () => {
               {formatDate(val.fecha)} {val.hora ? `· ${val.hora}` : ''} · ID: {val.id?.slice(-12).toUpperCase()}
             </p>
           </div>
+        </div>
+
+        {/* A1: Acciones de la consulta */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate(`/pacientes/${pacienteId}/valoraciones/${valoracionId}/editar`)}
+            className="flex items-center gap-2 px-4 py-2 bg-bg-elevated border border-border-subtle rounded-[8px] text-[13px] font-medium text-text-secondary hover:text-text-primary transition-colors"
+          >
+            <Edit2 className="w-4 h-4" /> Editar
+          </button>
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-[#1a0f0f] border border-accent-red/20 rounded-[8px] text-[13px] font-medium text-accent-red hover:bg-[#2e1a1a] transition-colors"
+          >
+            <Trash2 className="w-4 h-4" /> Archivar
+          </button>
         </div>
       </header>
 
