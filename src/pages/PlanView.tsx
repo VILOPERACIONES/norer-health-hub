@@ -73,16 +73,17 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                         })
                     })) || [];
 
-                    // Si el plan no tiene suplementosDetalle pero tiene valoracionId,
-                    // cargar desde la valoración enlazada
-                    if ((!serverData.suplementosDetalle || serverData.suplementosDetalle.length === 0) && serverData.valoracionId) {
+                    // Siempre sincronizar suplementosDetalle desde la valoración enlazada
+                    // para que cambios en el toggle de la valoración se reflejen aquí
+                    if (serverData.valoracionId) {
                         try {
                             const valRes = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${serverData.valoracionId}`);
                             const valData = valRes.data?.data || valRes.data;
-                            if (valData?.suplementosDetalle?.length > 0) {
-                                serverData.suplementosDetalle = valData.suplementosDetalle;
+                            if (valData) {
+                                // Si la valoración tiene suplementos, usarlos; si envió [] (toggle off), respetar eso
+                                serverData.suplementosDetalle = valData.suplementosDetalle ?? serverData.suplementosDetalle ?? [];
                             }
-                        } catch { /* No-op: si falla, el plan simplemente no muestra suplementos */ }
+                        } catch { /* No-op: si falla, usar los del plan */ }
                     }
 
                     setPlan(serverData);

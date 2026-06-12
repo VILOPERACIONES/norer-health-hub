@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, X, ArrowLeft, Send } from 'lucide-react';
+import { Camera, X, ArrowLeft, Send, Loader2 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
 
@@ -91,7 +91,8 @@ function Bubble({ msg }: { msg: ChatMessage }) {
 export default function NorderHealthChat() {
   const navigate = useNavigate();
   const { paciente } = usePortalAuthStore();
-  const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [historialCargado, setHistorialCargado] = useState(false);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
@@ -104,6 +105,26 @@ export default function NorderHealthChat() {
     queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
     staleTime: 5 * 60 * 1000,
   });
+
+  const { data: historialData, isLoading: loadingHistorial } = useQuery({
+    queryKey: ['portal', 'mensajes'],
+    queryFn: () => portalApi.get('/api/portal/mensajes').then(r => r.data),
+    staleTime: Infinity,
+  });
+
+  useEffect(() => {
+    if (historialCargado) return;
+    if (loadingHistorial) return;
+    const remotos: ChatMessage[] = (historialData?.mensajes ?? []).map((m: any) => ({
+      id: m.id,
+      content: m.contenido,
+      sender: m.rol as 'user' | 'eyder',
+      timestamp: new Date(m.createdAt),
+      imagePreview: m.tieneImagen ? undefined : undefined,
+    }));
+    setMessages(remotos.length > 0 ? remotos : [WELCOME]);
+    setHistorialCargado(true);
+  }, [historialData, loadingHistorial, historialCargado]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -240,7 +261,13 @@ export default function NorderHealthChat() {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4" style={{ overscrollBehavior: 'contain' }}>
-        {messages.map(msg => <Bubble key={msg.id} msg={msg} />)}
+        {!historialCargado ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 size={20} className="text-[#333] animate-spin" />
+          </div>
+        ) : (
+          messages.map(msg => <Bubble key={msg.id} msg={msg} />)
+        )}
         <div ref={bottomRef} className="h-2" />
       </div>
 

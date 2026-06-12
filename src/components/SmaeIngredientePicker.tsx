@@ -74,7 +74,9 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
 
   // ─── Estado de cantidades ──────────────────────────────────────────────────
   const [cantidad, setCantidad] = useState<string>(ing.cantidad?.toString() || '');
-  const [unidad, setUnidad] = useState(ing.unidad || 'GR');
+  // Estado interno SIEMPRE en mayúsculas: la lógica de conversión compara contra 'GR'
+  // (la BD puede traer unidades en minúsculas; el display se hace lowercase vía CSS)
+  const [unidad, setUnidad] = useState((ing.unidad || 'GR').toUpperCase());
 
   // ─── smaeGrPorEq: gramos por 1 equivalencia (persiste en BD) ──────────────
   // Si el ingrediente ya tiene este valor (reload desde BD), lo usamos directamente.
@@ -163,7 +165,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
 
     const propCant = ing.cantidad?.toString() || '';
     if (propCant !== cantidad) setCantidad(propCant);
-    if (ing.unidad !== unidad) setUnidad(ing.unidad || 'GR');
+    if ((ing.unidad || 'GR').toUpperCase() !== unidad.toUpperCase()) setUnidad((ing.unidad || 'GR').toUpperCase());
 
     let effectiveGrPorEq = ing.smaeGrPorEq || 0;
     if (effectiveGrPorEq === 0 && Number(ing.cantidad) > 0 && Number(ing.eqCantidad) > 0) {
@@ -605,7 +607,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
                     <div>
                       <p className="text-[13px] font-bold text-white m-0">{a.nombre}</p>
                       <p className="text-[11px] font-medium text-[#b0b0b0] m-0">
-                        {a.pesoGramos}g = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${a.unidadPorcion}` : `${a.pesoGramos}g`} por porción
+                        {a.pesoGramos}g = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${String(a.unidadPorcion || '').toLowerCase()}` : `${a.pesoGramos}g`} por porción
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
@@ -677,7 +679,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
       <div className="grid grid-cols-2 gap-2 mb-2">
         <div>
           <label className="text-[10px] text-text-muted uppercase tracking-wider block mb-1">
-            Cantidad{unidad ? ` (${unidad.toUpperCase()})` : ''}
+            Cantidad{unidad ? ` (${unidad.toLowerCase()})` : ''}
           </label>
           <input
             type="text"
@@ -723,8 +725,8 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
 
               onUpdate({ unidad: newUnidad });
             }}
-            className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[13px] font-bold text-white text-center outline-none border border-border-subtle focus:border-[#444]"
-            placeholder="GR"
+            className="w-full bg-bg-base px-2 py-2 rounded-[6px] text-[13px] font-bold text-white text-center outline-none border border-border-subtle focus:border-[#444] lowercase"
+            placeholder="gr"
           />
         </div>
       </div>
@@ -733,7 +735,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
       <div className="space-y-1.5">
         <div className="flex items-center justify-between mb-1">
           <label className="text-[10px] uppercase tracking-wider text-text-muted">
-            Equivalencias{hasSmae ? ' (auto ↔ GR)' : ' (manual)'}
+            Equivalencias{hasSmae ? ' (auto ↔ gr)' : ' (manual)'}
           </label>
           <button type="button" onClick={addEquiv}
             className="flex items-center gap-1 text-[10px] text-[#90c2ff] hover:text-white transition-colors px-1.5 py-0.5 rounded hover:bg-[#1a2a3a]">

@@ -68,6 +68,13 @@ export interface Ejercicio {
   porcentajeIntenso?: number;
 }
 
+export interface Farmaco {
+  id: string;
+  nombre: string;
+  tiempoTomando: string;
+  activo: boolean;
+}
+
 export interface Antecedentes {
   id?: string;
   pacienteId?: string;
@@ -76,6 +83,7 @@ export interface Antecedentes {
   alergias?: string;
   patologia?: string;
   cirugias?: string;
+  farmacos?: string;
   estrenimiento?: string | null;
   consumoAlcohol?: string;
   tabaco?: string;
@@ -85,6 +93,7 @@ export interface Antecedentes {
   historialProductos?: string;
   recomendacionSuplementos?: string;
   suplementosDetalle?: Suplemento[];
+  farmacosDetalle?: Farmaco[];
 }
 
 export interface ConsumoCalorico {

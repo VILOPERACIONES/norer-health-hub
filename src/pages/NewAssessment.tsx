@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
@@ -78,9 +79,18 @@ const NewAssessment = () => {
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [calcomData, setCalcomData] = useState<{ fecha: string; modalidad: string; eventTypeId: number; name: string; email: string; phone: string } | null>(null);
 
+  const queryClient = useQueryClient();
+
   const [suplementacionActiva, setSuplementacionActiva] = useState(false);
   const [suplementosDetalle, setSuplementosDetalle] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean; fechaInicio?: string; fechaFin?: string }[]>([]);
+  const [farmacosDetalle, setFarmacosDetalle] = useState<{ id: string; nombre: string; tiempoTomando: string; activo: boolean }[]>([]);
+  const [dragFarmIdx, setDragFarmIdx] = useState<number | null>(null);
+  const [historialSupDetalle, setHistorialSupDetalle] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
+  const [dragHistSupIdx, setDragHistSupIdx] = useState<number | null>(null);
+  const [registroSupAdded, setRegistroSupAdded] = useState<Set<string>>(new Set());
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
+  // B8: en modo edición, plan ya vinculado a esta valoración — el paso 3 lo edita en vez de duplicar
+  const [planVinculadoId, setPlanVinculadoId] = useState<string | null>(null);
   const [pendingDraft, setPendingDraft] = useState<any>(null);
   const [showDraftPrompt, setShowDraftPrompt] = useState(false);
 
@@ -95,18 +105,18 @@ const NewAssessment = () => {
   const [expediente, setExpediente] = useState({
     objetivo: '', nivelActividad: '', gymOrigen: '', horaEntrenamiento: '', disciplina: '', frecuencia: '', tiempo: '',
     porcentajeSedentario: '10', porcentajeLeve: '20', porcentajeModerado: '30', porcentajeIntenso: '40',
-    patologia: '', cirugias: '', farmacos: '', alergias: '', alimentosNoGustan: '', alimentosGustan: '',
+    patologia: '', cirugias: '', alergias: '', alimentosNoGustan: '', alimentosGustan: '',
     agua: '', estrenimiento: '', signosYSintomas: '', consumoAlcohol: '', tabaco: '',
-    cicloMenstrual: '', historialProductos: '', recomendacionSuplementos: '',
+    cicloMenstrual: '', historialProductos: '', farmacos: '',
   });
   const [expedienteModified, setExpedienteModified] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [habitos, setHabitos] = useState({
-    desayuno:  { hora: '', ayer: '', usualmente: '' },
+    desayuno: { hora: '', ayer: '', usualmente: '' },
     colacion1: { hora: '', ayer: '', usualmente: '' },
-    almuerzo:  { hora: '', ayer: '', usualmente: '' },
+    almuerzo: { hora: '', ayer: '', usualmente: '' },
     colacion2: { hora: '', ayer: '', usualmente: '' },
-    cena:      { hora: '', ayer: '', usualmente: '' },
+    cena: { hora: '', ayer: '', usualmente: '' },
   });
   const [habitosModified, setHabitosModified] = useState(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
@@ -129,6 +139,29 @@ const NewAssessment = () => {
       reader.readAsDataURL(file);
     });
     e.target.value = '';
+  };
+
+  const seedFarmacosDetalle = (ant: any) => {
+    if (ant.farmacosDetalle && Array.isArray(ant.farmacosDetalle) && ant.farmacosDetalle.length > 0) {
+      setFarmacosDetalle(ant.farmacosDetalle.map((f: any) => ({ ...f, id: f.id || Math.random().toString() })));
+    } else if (ant.farmacos) {
+      setFarmacosDetalle([{ id: Date.now().toString(), nombre: ant.farmacos, tiempoTomando: '', activo: true }]);
+    } else {
+      setFarmacosDetalle([]);
+    }
+  };
+
+  const seedHistorialSupDetalle = (ant: any) => {
+    if (ant.suplementosDetalle && Array.isArray(ant.suplementosDetalle) && ant.suplementosDetalle.length > 0) {
+      setHistorialSupDetalle(ant.suplementosDetalle.map((s: any) => ({ id: s.id || Math.random().toString(), nombre: s.nombre || '', indicaciones: s.indicaciones || '', activo: s.activo !== false })));
+    } else {
+      setHistorialSupDetalle([]);
+    }
+  };
+
+  const updateFarmacosDetalle = (updater: (prev: { id: string; nombre: string; tiempoTomando: string; activo: boolean }[]) => { id: string; nombre: string; tiempoTomando: string; activo: boolean }[]) => {
+    setFarmacosDetalle(updater);
+    setExpedienteModified(true);
   };
 
   const updateExpediente = (field: string, value: string) => {
@@ -252,15 +285,16 @@ const NewAssessment = () => {
       tabaco: ant.tabaco || '',
       cicloMenstrual: ant.cicloMenstrual || '',
       historialProductos: ant.historialProductos || '',
-      recomendacionSuplementos: ant.recomendacionSuplementos || '',
     });
+    seedFarmacosDetalle(ant);
+    seedHistorialSupDetalle(ant);
     const h = p.habitos || {};
     setHabitos({
-      desayuno:  { hora: h.desayuno?.hora || '',  ayer: h.desayuno?.ayer || '',  usualmente: h.desayuno?.usualmente || '' },
+      desayuno: { hora: h.desayuno?.hora || '', ayer: h.desayuno?.ayer || '', usualmente: h.desayuno?.usualmente || '' },
       colacion1: { hora: h.colacion1?.hora || '', ayer: h.colacion1?.ayer || '', usualmente: h.colacion1?.usualmente || '' },
-      almuerzo:  { hora: h.almuerzo?.hora || '',  ayer: h.almuerzo?.ayer || '',  usualmente: h.almuerzo?.usualmente || '' },
+      almuerzo: { hora: h.almuerzo?.hora || '', ayer: h.almuerzo?.ayer || '', usualmente: h.almuerzo?.usualmente || '' },
       colacion2: { hora: h.colacion2?.hora || '', ayer: h.colacion2?.ayer || '', usualmente: h.colacion2?.usualmente || '' },
-      cena:      { hora: h.cena?.hora || '',      ayer: h.cena?.ayer || '',      usualmente: h.cena?.usualmente || '' },
+      cena: { hora: h.cena?.hora || '', ayer: h.cena?.ayer || '', usualmente: h.cena?.usualmente || '' },
     });
     setExpedienteModified(false);
     setHabitosModified(false);
@@ -297,19 +331,9 @@ const NewAssessment = () => {
         const ej = p.ejercicio || p.datosEjercicio;
         const ant2 = p.antecedentes || {};
         setExpediente({
-          objetivo: ej?.objetivo || '',
-          nivelActividad: ej?.nivelActividad || '',
-          gymOrigen: ej?.gymOrigen || '',
-          horaEntrenamiento: ej?.horaEntrenamiento || '',
-          disciplina: ej?.disciplina || '',
-          frecuencia: ej?.frecuencia || '',
-          tiempo: ej?.tiempo || '',
-          porcentajeSedentario: String(ej?.porcentajeSedentario ?? 10),
-          porcentajeLeve: String(ej?.porcentajeLeve ?? 20),
-          porcentajeModerado: String(ej?.porcentajeModerado ?? 30),
-          porcentajeIntenso: String(ej?.porcentajeIntenso ?? 40),
           patologia: ant2.patologia || '',
           cirugias: ant2.cirugias || '',
+          farmacos: ant2.farmacos || '',
           alergias: ant2.alergias || '',
           alimentosNoGustan: ant2.alimentosNoGustan || '',
           alimentosGustan: ant2.alimentosGustan || '',
@@ -320,15 +344,27 @@ const NewAssessment = () => {
           tabaco: ant2.tabaco || '',
           cicloMenstrual: ant2.cicloMenstrual || '',
           historialProductos: ant2.historialProductos || '',
-          recomendacionSuplementos: ant2.recomendacionSuplementos || '',
+          objetivo: p.datosEjercicio?.objetivo || ej?.objetivo || '',
+          nivelActividad: p.datosEjercicio?.nivelActividad || ej?.nivelActividad || 'Sedentario',
+          gymOrigen: p.datosEjercicio?.gymOrigen || ej?.gymOrigen || '',
+          horaEntrenamiento: p.datosEjercicio?.horaEntrenamiento || ej?.horaEntrenamiento || '',
+          disciplina: p.datosEjercicio?.disciplina || ej?.disciplina || '',
+          frecuencia: p.datosEjercicio?.frecuencia || ej?.frecuencia || '',
+          tiempo: p.datosEjercicio?.tiempo || ej?.tiempo || '',
+          porcentajeSedentario: String(p.datosEjercicio?.porcentajeSedentario ?? 10),
+          porcentajeLeve: String(p.datosEjercicio?.porcentajeLeve ?? 20),
+          porcentajeModerado: String(p.datosEjercicio?.porcentajeModerado ?? 30),
+          porcentajeIntenso: String(p.datosEjercicio?.porcentajeIntenso ?? 40),
         });
-        const h2 = p.habitos || {};
+        seedFarmacosDetalle(ant2);
+        seedHistorialSupDetalle(ant2);
+        const h2 = p.habitos || p.consumoCalorico || {};
         setHabitos({
-          desayuno:  { hora: h2.desayuno?.hora || '',  ayer: h2.desayuno?.ayer || '',  usualmente: h2.desayuno?.usualmente || '' },
-          colacion1: { hora: h2.colacion1?.hora || '', ayer: h2.colacion1?.ayer || '', usualmente: h2.colacion1?.usualmente || '' },
-          almuerzo:  { hora: h2.almuerzo?.hora || '',  ayer: h2.almuerzo?.ayer || '',  usualmente: h2.almuerzo?.usualmente || '' },
-          colacion2: { hora: h2.colacion2?.hora || '', ayer: h2.colacion2?.ayer || '', usualmente: h2.colacion2?.usualmente || '' },
-          cena:      { hora: h2.cena?.hora || '',      ayer: h2.cena?.ayer || '',      usualmente: h2.cena?.usualmente || '' },
+          desayuno: { hora: h2.desayuno?.hora || h2.horaDesayuno || '', ayer: h2.desayuno?.ayer || h2.ayerDesayuno || '', usualmente: h2.desayuno?.usualmente || h2.usalmenteDesayuno || '' },
+          colacion1: { hora: h2.colacion1?.hora || h2.horaColacion1 || '', ayer: h2.colacion1?.ayer || h2.ayerColacion1 || '', usualmente: h2.colacion1?.usualmente || h2.usalmenteColacion1 || '' },
+          almuerzo: { hora: h2.almuerzo?.hora || h2.horaAlmuerzo || '', ayer: h2.almuerzo?.ayer || h2.ayerAlmuerzo || '', usualmente: h2.almuerzo?.usualmente || h2.usalmenteAlmuerzo || '' },
+          colacion2: { hora: h2.colacion2?.hora || h2.horaColacion2 || '', ayer: h2.colacion2?.ayer || h2.ayerColacion2 || '', usualmente: h2.colacion2?.usualmente || h2.usalmenteColacion2 || '' },
+          cena: { hora: h2.cena?.hora || h2.horaCena || '', ayer: h2.cena?.ayer || h2.ayerCena || '', usualmente: h2.cena?.usualmente || h2.usalmenteCena || '' },
         });
 
         if (isEdit) {
@@ -346,8 +382,9 @@ const NewAssessment = () => {
                 setEstatura(String(eNum < 10 ? Math.round(eNum * 100) : eNum));
               }
               setPctGrasa(val.pctGrasa ? String(val.pctGrasa) : '');
-              setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : '');
+              setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : (val.kgGrasa2comp ? String(val.kgGrasa2comp) : ''));
               setComentarios(val.comentarios || '');
+              setPlanVinculadoId(val.plan?.id || null);
 
               const rawItems = (val.temarioConsulta && Array.isArray(val.temarioConsulta))
                 ? val.temarioConsulta
@@ -362,7 +399,7 @@ const NewAssessment = () => {
                 setEvitar(avoidArray.map((valor: string) => ({ id: Math.random().toString(), valor })));
               }
 
-              if (val.notasLibres) setNotasLibres(val.notasLibres);
+              if (val.notasLibres) { setNotasLibres(val.notasLibres); setNotasLibresOpen(true); }
               if (val.adjuntosJson && Array.isArray(val.adjuntosJson)) setAdjuntos(val.adjuntosJson);
 
               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
@@ -509,7 +546,7 @@ const NewAssessment = () => {
     if (!estatura) { toast({ title: 'Campo requerido', description: 'La estatura es obligatoria.', variant: 'destructive' }); return; }
 
     setSaving(true);
-    
+
     // Asignar fechas al esquema de suplementos justo al guardar (estrategia de mutación en frío)
     const suplementosParaGuardar = suplementacionActiva ? suplementosDetalle.map(sup => {
       const s = { ...sup };
@@ -552,7 +589,9 @@ const NewAssessment = () => {
     };
 
     if (pctGrasa) {
-      body.pctGrasaCorp = parseFloat(pctGrasa);
+      // pctGrasa (no pctGrasaCorp): backend lo destructura para calcular pctGrasa2comp/kgGrasa2comp/kgMasaMagra2comp
+      // y getById lo regresa como val.pctGrasa para precargar este campo al editar.
+      body.pctGrasa = parseFloat(pctGrasa);
       if (masaMagra !== null) body.masaMagra = parseFloat(masaMagra.toFixed(2));
       if (kgGrasa) body.masaGrasaReal = parseFloat(kgGrasa);
     }
@@ -574,9 +613,9 @@ const NewAssessment = () => {
           } catch (updateErr: any) {
             const msg = updateErr.response?.data?.error || updateErr.response?.data?.message || updateErr.message || '';
             if (updateErr.response?.status === 409 || msg.toLowerCase().includes('telefono') || msg.toLowerCase().includes('teléfono') || msg.toLowerCase().includes('correo') || msg.toLowerCase().includes('email')) {
-               toast({ title: 'Dato Duplicado en Contacto', description: msg, variant: 'destructive', duration: 8000 });
-               setSaving(false);
-               return; // Detenemos la ejecución si hay un duplicado crítico
+              toast({ title: 'Dato Duplicado en Contacto', description: msg, variant: 'destructive', duration: 8000 });
+              setSaving(false);
+              return; // Detenemos la ejecución si hay un duplicado crítico
             }
             console.error('Error actualizando paciente:', updateErr);
             toast({ title: 'Error de Contacto', description: msg, variant: 'destructive' });
@@ -587,7 +626,9 @@ const NewAssessment = () => {
         }
       }
 
-      if (expedienteModified || habitosModified) {
+      // En modo edición siempre guardamos el expediente para asegurar que cambios
+      // como cicloMenstrual o historial de suplementación se persistan correctamente.
+      if (expedienteModified || habitosModified || isEdit) {
         try {
           await api.put(`/api/pacientes/${pacienteId}`, {
             ejercicio: {
@@ -617,7 +658,9 @@ const NewAssessment = () => {
               tabaco: expediente.tabaco,
               cicloMenstrual: expediente.cicloMenstrual,
               historialProductos: expediente.historialProductos,
-              recomendacionSuplementos: expediente.recomendacionSuplementos,
+              farmacosDetalle,
+              // Historial de suplementación (registro permanente del expediente)
+              suplementosDetalle: historialSupDetalle.filter(s => s.nombre.trim()),
             },
             habitos,
           });
@@ -657,8 +700,8 @@ const NewAssessment = () => {
           console.error('Error al agendar cita:', bookingErr);
           let errorMsg = 'Intenta agendar manualmente o revisa la configuración de Cal.com.';
           if (bookingErr.response?.data?.details) {
-            errorMsg = typeof bookingErr.response.data.details === 'string' 
-              ? bookingErr.response.data.details 
+            errorMsg = typeof bookingErr.response.data.details === 'string'
+              ? bookingErr.response.data.details
               : JSON.stringify(bookingErr.response.data.details);
           } else if (bookingErr.response?.data?.error) {
             errorMsg = bookingErr.response.data.error;
@@ -673,6 +716,10 @@ const NewAssessment = () => {
       }
 
       if (!isEdit) clearDraft();
+
+      // IMPORTANT: Invalidate the cache so the Profile page fetches fresh data
+      queryClient.invalidateQueries({ queryKey: ['paciente', pacienteId] });
+      queryClient.invalidateQueries({ queryKey: ['valoraciones', pacienteId] });
 
       if (redirectAPlan && valoracionResId) {
         setValoracionIdGuardada(valoracionResId);
@@ -868,11 +915,11 @@ const NewAssessment = () => {
                           </thead>
                           <tbody className="divide-y divide-[#1e1e1e]">
                             {([
-                              { key: 'desayuno',  label: 'Desayuno' },
+                              { key: 'desayuno', label: 'Desayuno' },
                               { key: 'colacion1', label: 'Colación 1' },
-                              { key: 'almuerzo',  label: 'Comida' },
+                              { key: 'almuerzo', label: 'Comida' },
                               { key: 'colacion2', label: 'Colación 2' },
-                              { key: 'cena',      label: 'Cena' },
+                              { key: 'cena', label: 'Cena' },
                             ] as { key: keyof typeof habitos; label: string }[]).map(({ key, label }) => (
                               <tr key={key}>
                                 <td className="py-2 pr-3 text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider">{label}</td>
@@ -901,7 +948,7 @@ const NewAssessment = () => {
                         {([
                           { label: 'Patología / Enfermedades', field: 'patologia' },
                           { label: 'Cirugías / Traumas', field: 'cirugias' },
-                          { label: 'Fármacos', field: 'farmacos' },
+                          { label: 'Fármacos / Medicamentos', field: 'farmacos' },
                           { label: 'Alergias', field: 'alergias' },
                           { label: 'Alimentos que gusta', field: 'alimentosGustan' },
                           { label: 'Alimentos que no gusta', field: 'alimentosNoGustan' },
@@ -911,8 +958,6 @@ const NewAssessment = () => {
                           { label: 'Tabaco', field: 'tabaco' },
                           { label: 'Ciclo Menstrual', field: 'cicloMenstrual' },
                           { label: 'Signos y Síntomas', field: 'signosYSintomas' },
-                          { label: 'Historial Suplementos', field: 'historialProductos' },
-                          { label: 'Recomendación Suplementos', field: 'recomendacionSuplementos' },
                         ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
                           <div key={field} className="space-y-1">
                             <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
@@ -924,6 +969,93 @@ const NewAssessment = () => {
                             />
                           </div>
                         ))}
+                      </div>
+                    </div>
+
+
+                    {/* Historial de Suplementación */}
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0">Historial de Suplementación</p>
+                          <p className="text-[10px] text-[#555] m-0 mt-0.5">Se captura en el expediente y se usa como base para la consulta</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => { setHistorialSupDetalle(prev => [...prev, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }]); setExpedienteModified(true); }}
+                          className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#1a1a1a] hover:bg-[#222] border border-[#333] px-3 py-1.5 rounded-[6px] transition-colors uppercase tracking-wider shrink-0"
+                        >
+                          <Plus className="w-3 h-3" /> Agregar
+                        </button>
+                      </div>
+                      {historialSupDetalle.length > 0 && (
+                        <div className="grid grid-cols-[1fr_1fr_70px_36px] gap-2 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
+                          <div>Suplemento</div>
+                          <div>Indicaciones / Dosis</div>
+                          <div className="text-center">Activo</div>
+                          <div></div>
+                        </div>
+                      )}
+                      <div className="space-y-2 mt-2">
+                        {historialSupDetalle.map((sup, idx) => (
+                          <div
+                            key={sup.id}
+                            draggable
+                            onDragStart={() => setDragHistSupIdx(idx)}
+                            onDragOver={(e) => { e.preventDefault(); }}
+                            onDrop={() => {
+                              if (dragHistSupIdx === null || dragHistSupIdx === idx) return;
+                              setHistorialSupDetalle(prev => {
+                                const arr = [...prev];
+                                const [moved] = arr.splice(dragHistSupIdx, 1);
+                                arr.splice(idx, 0, moved);
+                                return arr;
+                              });
+                              setDragHistSupIdx(null);
+                              setExpedienteModified(true);
+                            }}
+                            onDragEnd={() => setDragHistSupIdx(null)}
+                            className={`grid grid-cols-[1fr_1fr_70px_36px] gap-2 items-center bg-[#181818] p-2 rounded-[8px] border transition-colors ${dragHistSupIdx === idx ? 'opacity-40 border-brand-primary' : 'border-[#2a2a2a] hover:border-[#444]'}`}
+                          >
+                            <input
+                              type="text"
+                              value={sup.nombre}
+                              onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, nombre: e.target.value } : s)); setExpedienteModified(true); }}
+                              placeholder="Ej. Creatina"
+                              className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                            />
+                            <input
+                              type="text"
+                              value={sup.indicaciones}
+                              onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, indicaciones: e.target.value } : s)); setExpedienteModified(true); }}
+                              placeholder="Ej. 1 scoop post-entreno"
+                              className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
+                            />
+                            <div className="flex items-center justify-center">
+                              <label className="relative inline-flex items-center cursor-pointer">
+                                <input
+                                  type="checkbox"
+                                  className="sr-only peer"
+                                  checked={sup.activo}
+                                  onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, activo: e.target.checked } : s)); setExpedienteModified(true); }}
+                                />
+                                <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
+                              </label>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => { setHistorialSupDetalle(prev => prev.filter((_, i) => i !== idx)); setExpedienteModified(true); }}
+                              className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center ml-auto"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        ))}
+                        {historialSupDetalle.length === 0 && (
+                          <div className="py-6 text-center border border-dashed border-[#333] rounded-[8px] bg-[#141414]">
+                            <p className="text-[12px] text-[#8a8a8a] m-0">Sin historial de suplementos registrado.</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -946,8 +1078,8 @@ const NewAssessment = () => {
                 </button>
                 {showNotasConsulta && (
                   <div className="px-5 pb-5 space-y-4 border-t border-[#2a2a2a] pt-4">
-                    <div>
-                      <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1.5 uppercase tracking-widest">Notas Clínicas</label>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">¿Qué se habló en la consulta?</label>
                       <textarea
                         value={comentarios}
                         onChange={(e) => setComentarios(e.target.value)}
@@ -1081,6 +1213,59 @@ const NewAssessment = () => {
                         <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{suplementacionActiva ? 'Habilitado' : 'Deshabilitado'}</span>
                       </label>
                     </div>
+                    {(() => {
+                      const norm = (s?: string) => (s || '').toLowerCase().trim();
+
+                      // Fusionar suplementos ya guardados en BD + los que el usuario
+                      // acaba de registrar en "Fármacos" en esta sesión (sin duplicados)
+                      const guardados: any[] = paciente?.antecedentes?.suplementosDetalle || [];
+                      const enSesion: any[] = historialSupDetalle.filter(s => s.nombre?.trim());
+                      const guardadosNombres = new Set(guardados.map(s => norm(s.nombre)));
+                      const soloSesion = enSesion.filter(s => !guardadosNombres.has(norm(s.nombre)));
+                      const registroSuplementos = [...guardados, ...soloSesion].filter(s => s.activo !== false && s.nombre?.trim());
+
+                      if (registroSuplementos.length === 0) return null;
+                      return (
+                        <div className="mb-4 p-3 bg-[#141414] border border-dashed border-[#333] rounded-[8px]">
+                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-2">Sumplementos — selecciona para agregar al esquema</p>
+                          <div className="flex flex-wrap gap-2">
+                            {registroSuplementos.map((s: any, sIdx: number) => {
+                              const yaAgregado = suplementosDetalle.some(sd => norm(sd.nombre) === norm(s.nombre));
+                              if (yaAgregado) {
+                                return (
+                                  <span
+                                    key={s.id || sIdx}
+                                    className="flex items-center gap-1.5 text-[12px] font-semibold text-[#666] bg-[#181818] border border-[#2a2a2a] px-3 py-1.5 rounded-[8px] cursor-default"
+                                  >
+                                    <Check className="w-3 h-3" /> {s.nombre}
+                                  </span>
+                                );
+                              }
+                              return (
+                                <button
+                                  key={s.id || sIdx}
+                                  type="button"
+                                  onClick={() => {
+                                    setSuplementosDetalle(prev => [...prev, {
+                                      id: Date.now().toString() + Math.random(),
+                                      nombre: s.nombre,
+                                      indicaciones: s.indicaciones || '',
+                                      activo: true,
+                                      fechaInicio: new Date().toISOString(),
+                                    }]);
+                                    setSuplementacionActiva(true);
+                                  }}
+                                  className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-[#1a1a1a] hover:bg-[#222] border border-[#333] hover:border-brand-primary px-3 py-1.5 rounded-[8px] transition-colors"
+                                >
+                                  <Plus className="w-3 h-3" /> {s.nombre}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
                     {suplementacionActiva && (
                       <div className="space-y-4 animate-fade-in">
                         <div className="grid grid-cols-[20px_1fr_36px] xs:grid-cols-[20px_1fr_1fr_36px] md:grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-2 md:gap-4 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
@@ -1164,14 +1349,27 @@ const NewAssessment = () => {
                 >
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas Libres / Lineamientos</span>
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas Libres / Seguimiento</span>
                     {(notasLibres || adjuntos.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${notasLibresOpen ? 'rotate-180' : ''}`} />
                 </button>
                 {notasLibresOpen && (
                   <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
-                    <p className="text-[12px] text-[#8a8a8a] m-0 mb-4">Rutinas de entrenamiento, notas extensas, instrucciones especiales.</p>
+                    <div className="flex items-center justify-between mb-4 gap-3">
+                      <p className="text-[12px] text-[#8a8a8a] m-0">Rutinas de entrenamiento, notas extensas, instrucciones especiales o seguimiento posterior a la consulta.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const d = new Date();
+                          const sep = `--- ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ---`;
+                          setNotasLibres(prev => prev ? `${prev.replace(/\n+$/, '')}\n\n${sep}\n` : `${sep}\n`);
+                        }}
+                        className="flex items-center gap-1.5 text-[10px] font-bold text-[#8a8a8a] hover:text-white border border-[#333] hover:border-[#555] px-2.5 py-1.5 rounded-[6px] transition-colors uppercase tracking-wider whitespace-nowrap shrink-0"
+                      >
+                        <Plus className="w-3 h-3" /> Nota con fecha
+                      </button>
+                    </div>
                     <textarea
                       value={notasLibres}
                       onChange={(e) => setNotasLibres(e.target.value)}
@@ -1315,6 +1513,7 @@ const NewAssessment = () => {
             <div className="space-y-4 animate-slide-up mt-4">
               <CreateEditPlanForm
                 pacienteId={pacienteId}
+                planId={planVinculadoId || undefined}
                 valoracionId={valoracionIdGuardada || undefined}
                 initialProximaSesion={proximaSesion || undefined}
                 onSaved={(planId) => {
@@ -1337,9 +1536,9 @@ const NewAssessment = () => {
             </div>
           )}
 
-          {/* BOTTOM NAVIGATION - ONLY FOR STEPS 1 AND 2 */}
+          {/* BOTTOM NAVIGATION - ONLY FOR STEPS 1 AND 2 (sticky: Guardar siempre visible al hacer scroll) */}
           {step <= 2 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between py-2 shrink-0 border-t border-[#1a1a1a]">
+            <div className="sticky bottom-0 z-20 bg-[#0a0a0a]/95 backdrop-blur-md flex flex-col sm:flex-row items-center justify-between py-2 shrink-0 border-t border-[#1a1a1a]">
               {step > 1 ? (
                 <button
                   onClick={() => setStep(step - 1)}
@@ -1394,7 +1593,7 @@ const NewAssessment = () => {
                     className="px-5 py-2.5 bg-[#f0f0f0] text-[#0a0a0a] rounded-[8px] text-[12px] font-bold hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 w-full sm:w-auto justify-center shadow-sm uppercase tracking-wide"
                     style={{ minWidth: '220px' }}
                   >
-                    {saving ? <div className="w-4 h-4 border-2 border-[#0a0a0a]/20 border-t-[#0a0a0a] rounded-full animate-spin" /> : <>Guardar y Crear Plan →</>}
+                    {saving ? <div className="w-4 h-4 border-2 border-[#0a0a0a]/20 border-t-[#0a0a0a] rounded-full animate-spin" /> : <>{planVinculadoId ? 'Guardar y Editar Plan' : 'Guardar y Crear Plan'} →</>}
                   </button>
                 </div>
               )}

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText } from 'lucide-react';
+import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText, RotateCcw, ArchiveRestore } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
 import { formatDate, formatDateShort, formatDecimal, getBadgeForValuation } from '@/lib/format';
@@ -12,6 +12,10 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+
+// Soft delete: la restauración queda implementada pero oculta de momento (a propósito
+// debe parecer que la consulta se borró; se reactiva poniendo esto en true si hace falta).
+const SHOW_ARCHIVADAS = false;
 
 // --- Sub-componentes Estilo Moderno & Premium ---
 
@@ -64,13 +68,14 @@ const ChartBox = ({ title, children, extra, onExpand }: { title: string, childre
   </div>
 );
 
-const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onEditPlan }: {
+const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onEditPlan, onArchive }: {
   val: Valoracion,
   index: number,
   onVerDetalles: (id: string) => void,
   onVerPlan: (id: string) => void,
   onAsignarPlan: (id: string) => void,
-  onEditPlan: (id: string) => void
+  onEditPlan: (id: string) => void,
+  onArchive: (id: string) => void
 }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
   const planId = (val as any).planId;
@@ -185,6 +190,12 @@ const AccordionRow = ({ val, index, onVerDetalles, onVerPlan, onAsignarPlan, onE
                 </div>
               );
             })()}
+            <button
+              onClick={() => onArchive(val.id)}
+              className="flex items-center gap-2 px-[18px] py-[10px] bg-[#1a0f0f] text-accent-red text-[12px] font-medium border border-accent-red/20 rounded-[8px] hover:bg-[#2e1a1a] transition-colors ml-auto"
+            >
+              <Trash2 className="h-[18px] w-[18px]" /> Archivar
+            </button>
           </div>
         </div>
       )}
@@ -229,7 +240,7 @@ const ClinicalSection = ({ title, data, icon: Icon, className = "" }: { title: s
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {Object.entries(data).map(([key, value]) => (
           <div key={key} className="space-y-2 group">
-            <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{key.replace(/([A-Z])/g, ' $1').trim()}</p>
+            <p className="text-[10px] font-medium text-text-muted uppercase tracking-widest leading-none">{key}</p>
             {renderValue(value)}
           </div>
         ))}
@@ -278,7 +289,17 @@ const PatientProfile = () => {
     placeholderData: (prev) => prev,
   });
 
-  const loading = loadingPaciente || loadingValoraciones;
+  // B9: Query para consultas archivadas
+  const { data: archivadas = [], isLoading: loadingArchivadas, refetch: refetchArchivadas } = useQuery({
+    queryKey: ['valoraciones-archivadas', id],
+    queryFn: async () => {
+      const res = await api.get(`/api/pacientes/${id}/valoraciones/archivadas`);
+      return res.data?.data || res.data || [];
+    },
+    enabled: !!id,
+  });
+
+  const loading = loadingPaciente || loadingValoraciones || loadingArchivadas;
 
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
@@ -340,6 +361,37 @@ const PatientProfile = () => {
     }
   };
 
+  // B9: Archivar consulta (soft delete) con confirmación
+  const [archiveTarget, setArchiveTarget] = useState<Valoracion | null>(null);
+  const [archiving, setArchiving] = useState(false);
+  const handleArchive = async () => {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    try {
+      await api.delete(`/api/pacientes/${id}/valoraciones/${archiveTarget.id}`);
+      toast({ title: 'Consulta Archivada', description: 'Se ocultó del historial.' });
+      queryClient.invalidateQueries({ queryKey: ['valoraciones', id] });
+      refetchArchivadas();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.response?.data?.error || 'No se pudo archivar la consulta.', variant: 'destructive' });
+    } finally {
+      setArchiving(false);
+      setArchiveTarget(null);
+    }
+  };
+
+  // B9: Handler para restaurar consulta
+  const handleRestore = async (valoracionId: string) => {
+    try {
+      await api.patch(`/api/pacientes/${id}/valoraciones/${valoracionId}/restore`);
+      toast({ title: 'Consulta Restaurada', description: 'La consulta vuelve a estar activa en el expediente.' });
+      queryClient.invalidateQueries({ queryKey: ['valoraciones', id] });
+      refetchArchivadas();
+    } catch (err: any) {
+      toast({ title: 'Error', description: err.response?.data?.error || 'No se pudo restaurar la consulta.', variant: 'destructive' });
+    }
+  };
+
   if (loading || !paciente) return (
     <div className="flex flex-col items-center justify-center h-[calc(100vh-120px)]">
       <NutritionLoader text="Cargando expediente..." />
@@ -359,6 +411,36 @@ const PatientProfile = () => {
 
   return (
     <>
+      {/* B9: Modal confirmación archivar consulta */}
+      {archiveTarget && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#111] border border-[#2e1a1a] rounded-[16px] p-8 max-w-sm w-full shadow-2xl text-center">
+            <div className="w-14 h-14 rounded-full bg-[#2e1a1a] flex items-center justify-center mx-auto mb-5">
+              <Trash2 className="w-6 h-6 text-accent-red" />
+            </div>
+            <h3 className="text-[18px] font-bold text-white m-0 mb-2">¿Archivar esta consulta?</h3>
+            <p className="text-[13px] text-[#8a8a8a] mb-6 leading-relaxed">
+              La consulta #{(archiveTarget as any).numeroValoracion} del {formatDate(archiveTarget.fecha)} quedará oculta del expediente. Los planes y citas vinculados se conservan y puedes restaurarla después.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={handleArchive}
+                disabled={archiving}
+                className="w-full py-3 bg-accent-red text-white rounded-[10px] text-[14px] font-bold hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {archiving ? <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                Sí, archivar consulta
+              </button>
+              <button
+                onClick={() => setArchiveTarget(null)}
+                className="w-full py-3 bg-[#1a1a1a] text-[#8a8a8a] border border-[#333] rounded-[10px] text-[14px] font-medium hover:text-white transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="min-h-screen bg-bg-base text-text-primary font-sans pb-24 animate-fade-in selection:bg-brand-primary selection:text-bg-base">
         {/* HEADER */}
         <header className="w-full border-b border-border-subtle pt-4 pb-6 flex flex-col md:flex-row justify-between items-start gap-4 bg-bg-base">
@@ -429,11 +511,10 @@ const PatientProfile = () => {
           {/* NORDER HEALTH PORTAL */}
           <section className="flex items-center justify-between px-5 py-3.5 bg-bg-surface border border-border-subtle rounded-[14px]">
             <div className="flex items-center gap-3">
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border uppercase tracking-wider ${
-                paciente.portalActivo
+              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border uppercase tracking-wider ${paciente.portalActivo
                   ? 'bg-[#0f2e1a] text-[#4ade80] border-[#4ade80]/20'
                   : 'bg-bg-elevated text-text-muted border-border-subtle'
-              }`}>
+                }`}>
                 {paciente.portalActivo ? 'Activo' : 'Inactivo'}
               </span>
               <span className="text-[12px] text-text-secondary font-medium">Norder Health</span>
@@ -486,7 +567,9 @@ const PatientProfile = () => {
                 <ClinicalSection title="Perfil Clínico y Patologías" icon={Heart} data={{
                   'Patología': paciente.antecedentes?.patologia || 'N/A',
                   'Cirugías / Traumas': paciente.antecedentes?.cirugias || 'N/A',
-                  'Fármacos': paciente.antecedentes?.farmacos || 'N/A',
+                  'Fármacos': (paciente.antecedentes?.farmacosDetalle && paciente.antecedentes.farmacosDetalle.length > 0)
+                    ? paciente.antecedentes.farmacosDetalle.map(f => `${f.nombre}${f.tiempoTomando ? ` (${f.tiempoTomando})` : ''}${f.activo === false ? ' — ya no' : ''}`).join('\n')
+                    : (paciente.antecedentes?.farmacos || 'N/A'),
                   'Alergias': paciente.antecedentes?.alergias || 'N/A',
                   'Tránsito Intestinal': paciente.antecedentes?.estrenimiento || 'N/A',
                   'Agua al día': paciente.antecedentes?.agua || 'N/A',
@@ -519,6 +602,7 @@ const PatientProfile = () => {
                       )}
                     </div>
                     {[
+                      { label: 'Historial Suplementos', value: paciente.antecedentes?.historialProductos },
                       { label: 'Preferencias (Gusta)', value: paciente.antecedentes?.alimentosGustan },
                       { label: 'Aversiones (No gusta)', value: paciente.antecedentes?.alimentosNoGustan },
                       { label: 'Signos y Síntomas', value: paciente.antecedentes?.signosYSintomas },
@@ -577,11 +661,11 @@ const PatientProfile = () => {
                         </thead>
                         <tbody className="divide-y divide-border-subtle/30">
                           {([
-                            { key: 'desayuno',  label: 'Desayuno' },
+                            { key: 'desayuno', label: 'Desayuno' },
                             { key: 'colacion1', label: 'Colación 1' },
-                            { key: 'almuerzo',  label: 'Comida' },
+                            { key: 'almuerzo', label: 'Comida' },
                             { key: 'colacion2', label: 'Colación 2' },
-                            { key: 'cena',      label: 'Cena' },
+                            { key: 'cena', label: 'Cena' },
                           ] as { key: string; label: string }[]).map(({ key, label }) => {
                             const row = (paciente.habitos as any)[key];
                             if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
@@ -774,6 +858,7 @@ const PatientProfile = () => {
                     onVerPlan={(planId) => navigate(`/pacientes/${id}/planes/${planId}`)}
                     onAsignarPlan={(valId) => navigate(`/pacientes/${id}/planes/nuevo?valoracionId=${valId}`)}
                     onEditPlan={(pId) => navigate(`/pacientes/${id}/planes/${pId}/editar?valoracionId=${v.id}`)}
+                    onArchive={() => setArchiveTarget(v)}
                   />
                 ))}
               </div>
@@ -784,6 +869,44 @@ const PatientProfile = () => {
               </div>
             )}
           </section>
+
+          {/* B9: CONSULTAS ARCHIVADAS — oculto a propósito, ver SHOW_ARCHIVADAS */}
+          {SHOW_ARCHIVADAS && archivadas.length > 0 && (
+            <section className="space-y-6 pt-4 border-t border-border-subtle/50 mt-8">
+              <div className="flex items-center gap-4">
+                <h2 className="text-[18px] font-semibold text-text-muted m-0 flex items-center gap-2">
+                  <ArchiveRestore className="w-5 h-5" /> Consultas Archivadas
+                </h2>
+                <div className="flex-1 h-[1px] bg-border-subtle" />
+              </div>
+              <div className="space-y-3">
+                {archivadas.map((v: any) => (
+                  <div key={v.id} className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-3 mb-1">
+                        <span className="px-2 py-0.5 rounded-[4px] bg-[#2a2a2a] text-[#8a8a8a] text-[10px] font-bold uppercase">
+                          #{v.numeroValoracion}
+                        </span>
+                        <h4 className="text-[15px] font-bold text-[#8a8a8a] m-0">
+                          {formatDate(v.fecha)}
+                        </h4>
+                      </div>
+                      <p className="text-[12px] text-text-muted m-0">
+                        Archivada el {formatDateShort(v.deletedAt)} · ID: {v.id.slice(-8).toUpperCase()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleRestore(v.id)}
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-bg-surface border border-border-subtle text-text-primary text-[12px] font-bold rounded-[8px] hover:bg-bg-elevated transition-colors whitespace-nowrap"
+                    >
+                      <RotateCcw className="w-4 h-4" /> Restaurar
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
         </div>
       </div>
 

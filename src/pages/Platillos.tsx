@@ -295,8 +295,8 @@ const Platillos = () => {
           )}
         </>
       ) : (
-        <Card className="p-0 bg-bg-surface border-border-subtle max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 shadow-2xl overflow-hidden">
-          <div className="sticky top-0 z-10 p-6 md:p-8 flex items-center justify-between bg-bg-surface border-b border-border-subtle">
+        <Card className="p-0 bg-bg-surface border-border-subtle max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4 shadow-2xl overflow-visible">
+          <div className="sticky top-0 z-10 p-6 md:p-8 flex items-center justify-between bg-bg-surface border-b border-border-subtle rounded-t-[inherit]">
             <div className="flex items-center gap-4">
                <button 
                 onClick={() => setIsEditing(false)}
