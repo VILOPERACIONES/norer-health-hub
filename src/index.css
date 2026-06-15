@@ -130,6 +130,10 @@
     }
   }
 
+  /* Clase utilitaria explícita para ocultar scrollbar en cualquier contenedor */
+  .no-scrollbar::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+
   @keyframes slide-up {
     from {
       opacity: 0;

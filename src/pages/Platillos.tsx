@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown, ChevronDown } from 'lucide-react';
+import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown, ChevronDown, Copy } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +65,17 @@ const Platillos = () => {
       ingredientes: (p.ingredientes || []).map(i => ({ ...i, id: i.id || Math.random().toString(36).substr(2, 9) }))
     });
     setIsEditing(true);
+  };
+
+  const handleDuplicate = (p: Platillo) => {
+    setCurrentPlatillo({
+      ...p,
+      id: undefined, // Quitamos el ID para que se guarde como nuevo
+      nombre: p.nombre + ' (Copia)',
+      ingredientes: (p.ingredientes || []).map(i => ({ ...i, id: Math.random().toString(36).substr(2, 9) }))
+    });
+    setIsEditing(true);
+    setPreviewPlatillo(null);
   };
 
   const handleDelete = async (id: string) => {
@@ -248,8 +259,18 @@ const Platillos = () => {
                                 <Button 
                                   variant="ghost" 
                                   size="sm" 
+                                  onClick={(e) => { e.stopPropagation(); handleDuplicate(p); }}
+                                  className="h-8 w-8 p-0 text-[#90c2ff] hover:bg-[#90c2ff]/10"
+                                  title="Duplicar Platillo"
+                                >
+                                  <Copy className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
                                   onClick={(e) => { e.stopPropagation(); handleEdit(p); }}
                                   className="h-8 w-8 p-0"
+                                  title="Editar"
                                 >
                                   <Edit2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -258,6 +279,7 @@ const Platillos = () => {
                                   size="sm" 
                                   onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
                                   className="h-8 w-8 p-0 text-accent-red hover:bg-accent-red/10"
+                                  title="Eliminar"
                                 >
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
@@ -491,16 +513,25 @@ const Platillos = () => {
                >
                  <Trash2 className="w-4 h-4 mr-2" /> Eliminar
                </Button>
-               <Button 
-                 variant="default"
-                 onClick={() => { 
-                   setPreviewPlatillo(null);
-                   handleEdit(previewPlatillo); 
-                 }}
-                 className="bg-brand-primary text-bg-base hover:bg-white"
-               >
-                 <Edit2 className="w-4 h-4 mr-2" /> Editar Platillo
-               </Button>
+               <div className="flex items-center gap-3">
+                 <Button 
+                   variant="outline"
+                   onClick={() => handleDuplicate(previewPlatillo)}
+                   className="border-[#90c2ff]/30 text-[#90c2ff] hover:bg-[#90c2ff]/10"
+                 >
+                   <Copy className="w-4 h-4 mr-2" /> Duplicar
+                 </Button>
+                 <Button 
+                   variant="default"
+                   onClick={() => { 
+                     setPreviewPlatillo(null);
+                     handleEdit(previewPlatillo); 
+                   }}
+                   className="bg-brand-primary text-bg-base hover:bg-white"
+                 >
+                   <Edit2 className="w-4 h-4 mr-2" /> Editar Platillo
+                 </Button>
+               </div>
             </div>
           </div>
         </div>
