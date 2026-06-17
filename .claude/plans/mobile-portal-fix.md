@@ -155,7 +155,7 @@ O con clase compuesta si el plugin la soporta:
 
 ```tsx
 // ANTES:
-<div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-12 pb-3 flex items-center gap-3">
+<div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-6 pb-3 flex items-center gap-3">
 
 // DESPUÉS — usar max() para garantizar cobertura en todos los devices:
 <div 
@@ -171,6 +171,7 @@ Además, cuando aparece el teclado virtual en iOS, el layout no se ajusta autom�
 
 **Solución CSS:**
 ```tsx
+
 // ANTES:
 <div className="flex-shrink-0 bg-[#0d0d0d] px-3 pb-8 pt-3 border-t border-[#1c1c1c]">
 

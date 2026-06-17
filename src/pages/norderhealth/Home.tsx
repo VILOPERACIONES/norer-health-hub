@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -6,7 +6,7 @@ import {
   Flame, MessageCircle, LogOut, ChevronRight,
   Scale, Dumbbell, TrendingUp, TrendingDown, Minus,
   Lock, Droplets, Crown, ClipboardList, Activity, Percent,
-  RefreshCw,
+  RefreshCw, Sparkles, Target, Infinity,
 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
@@ -78,8 +78,8 @@ function Delta({ value, positiveIsGood = true, unit = '' }: {
 // Modos del card switcheable (izquierda)
 type BodyMode = 'grasa' | 'magra';
 const BODY_MODES: { key: BodyMode; label: string; unit: string; posGood: boolean; icon: LucideIcon }[] = [
-  { key: 'grasa', label: '% Grasa',    unit: '%',  posGood: false, icon: Percent  },
-  { key: 'magra', label: 'Masa Magra', unit: 'kg', posGood: true,  icon: Dumbbell },
+  { key: 'grasa', label: '% Grasa', unit: '%', posGood: false, icon: Percent },
+  { key: 'magra', label: 'Masa Magra', unit: 'kg', posGood: true, icon: Dumbbell },
 ];
 
 // ─── Card mitad: peso (estático) ─────────────────────────────────────────────
@@ -90,29 +90,33 @@ function PesoCard({ value, delta, locked }: {
 }) {
   return (
     <div className="relative flex-1 bg-[#141414] border border-[#1e1e1e] rounded-[18px] p-4 flex flex-col justify-between min-h-[110px] overflow-hidden">
+      {/* Content — blurred when locked */}
+      <div style={locked ? { filter: 'blur(7px)', userSelect: 'none', pointerEvents: 'none' } : undefined}>
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+            <Scale size={12} className="text-[#22c55e]" strokeWidth={2} />
+          </div>
+          <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">Peso</p>
+        </div>
+        <div className="mt-auto pt-4">
+          <p className="text-[28px] font-black text-white leading-none tracking-tight">
+            {fmt(value, 1)}
+            <span className="text-[11px] font-normal text-[#444] ml-0.5">kg</span>
+          </p>
+          {delta != null && (
+            <div className="mt-1.5">
+              <Delta value={delta} positiveIsGood={false} unit="kg" />
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Lock overlay */}
       {locked && (
-        <div className="absolute inset-0 bg-[#0d0d0d]/80 backdrop-blur-[2px] rounded-[18px] flex flex-col items-center justify-center gap-1.5 z-10">
-          <Lock size={13} className="text-[#444]" />
-          <p className="text-[9px] text-[#444] font-bold uppercase tracking-widest text-center px-2 leading-tight">Plan Health</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 z-10">
+          <Lock size={14} className="text-[#888]" strokeWidth={2} />
+          <p className="text-[9px] text-[#666] font-bold uppercase tracking-widest text-center leading-tight">Plan Health</p>
         </div>
       )}
-      <div className="flex items-center gap-2">
-        <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-          <Scale size={12} className="text-[#22c55e]" strokeWidth={2} />
-        </div>
-        <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">Peso</p>
-      </div>
-      <div className="mt-auto">
-        <p className="text-[28px] font-black text-white leading-none tracking-tight">
-          {fmt(value, 1)}
-          <span className="text-[11px] font-normal text-[#444] ml-0.5">kg</span>
-        </p>
-        {delta != null && (
-          <div className="mt-1.5">
-            <Delta value={delta} positiveIsGood={false} unit="kg" />
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -127,12 +131,12 @@ function SwitchableCard({ progreso, locked }: {
   const Icon = mode.icon;
 
   const getValue = (key: BodyMode): number | null => {
-    if (key === 'grasa') return progreso?.pctGrasa  ?? null;
+    if (key === 'grasa') return progreso?.pctGrasa ?? null;
     if (key === 'magra') return progreso?.masaMagra ?? null;
     return null;
   };
   const getDelta = (key: BodyMode): number | null => {
-    if (key === 'grasa') return progreso?.delta?.pctGrasa  ?? null;
+    if (key === 'grasa') return progreso?.delta?.pctGrasa ?? null;
     if (key === 'magra') return progreso?.delta?.masaMagra ?? null;
     return null;
   };
@@ -149,41 +153,36 @@ function SwitchableCard({ progreso, locked }: {
       role="button"
       aria-label={`Ver ${BODY_MODES[(modeIdx + 1) % BODY_MODES.length].label}`}
     >
-      {locked && (
-        <div className="absolute inset-0 bg-[#0d0d0d]/80 backdrop-blur-[2px] rounded-[18px] flex flex-col items-center justify-center gap-1.5 z-10">
-          <Lock size={13} className="text-[#444]" />
-          <p className="text-[9px] text-[#444] font-bold uppercase tracking-widest text-center px-2 leading-tight">Plan Health</p>
-        </div>
-      )}
-
-      {/* Header: icono + label + switch hint */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-            <Icon size={12} className="text-[#22c55e]" strokeWidth={2} />
+      {/* Content — blurred when locked */}
+      <div
+        className="flex flex-col justify-between h-full"
+        style={locked ? { filter: 'blur(7px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
+      >
+        {/* Header: icono + label + switch hint */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+              <Icon size={12} className="text-[#22c55e]" strokeWidth={2} />
+            </div>
+            <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">{mode.label}</p>
           </div>
-          <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">{mode.label}</p>
-        </div>
-        {!locked && (
           <RefreshCw size={10} className="text-[#2a2a2a]" strokeWidth={2.5} />
-        )}
-      </div>
+        </div>
 
-      {/* Valor */}
-      <div className="mt-auto">
-        <p className="text-[28px] font-black text-white leading-none tracking-tight">
-          {fmt(value, value != null && mode.unit === '%' ? 1 : 1)}
-          <span className="text-[11px] font-normal text-[#444] ml-0.5">{mode.unit}</span>
-        </p>
-        {delta != null && (
-          <div className="mt-1.5">
-            <Delta value={delta} positiveIsGood={mode.posGood} unit={mode.unit} />
-          </div>
-        )}
-      </div>
+        {/* Valor */}
+        <div className="mt-auto pt-4">
+          <p className="text-[28px] font-black text-white leading-none tracking-tight">
+            {fmt(value, value != null && mode.unit === '%' ? 1 : 1)}
+            <span className="text-[11px] font-normal text-[#444] ml-0.5">{mode.unit}</span>
+          </p>
+          {delta != null && (
+            <div className="mt-1.5">
+              <Delta value={delta} positiveIsGood={mode.posGood} unit={mode.unit} />
+            </div>
+          )}
+        </div>
 
-      {/* Dots indicadores */}
-      {!locked && (
+        {/* Dots indicadores */}
         <div className="flex gap-1 mt-3">
           {BODY_MODES.map((_, i) => (
             <span
@@ -195,6 +194,14 @@ function SwitchableCard({ progreso, locked }: {
               }}
             />
           ))}
+        </div>
+      </div>
+
+      {/* Lock overlay */}
+      {locked && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 z-10">
+          <Lock size={14} className="text-[#888]" strokeWidth={2} />
+          <p className="text-[9px] text-[#666] font-bold uppercase tracking-widest text-center leading-tight">Plan Health</p>
         </div>
       )}
     </div>
@@ -260,12 +267,52 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`bg-[#1a1a1a] animate-pulse rounded-[12px] ${className ?? ''}`} />;
 }
 
+// ─── Intro splash (non-premium, auto-dismiss) ─────────────────────────────────
+const INTRO_FEATURES = [
+  { Icon: Sparkles, text: 'Eyder responde según tu plan nutricional personal' },
+  { Icon: Infinity, text: 'Consultas ilimitadas sin límite diario' },
+  { Icon: Target, text: 'Equivalencias SMAE adaptadas a tus macros asignados' },
+  { Icon: Activity, text: 'Seguimiento de composición corporal' },
+];
+
+function PlanHealthIntro({ visible }: { visible: boolean }) {
+  return (
+    <div
+      className="transition-opacity duration-500"
+      style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
+    >
+      <div className="bg-[#111] border border-[#22c55e]/15 rounded-[20px] px-5 py-5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-[10px] bg-[#0f2e1a] border border-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
+            <Crown size={14} className="text-[#22c55e]" strokeWidth={2} />
+          </div>
+          <div>
+            <p className="text-[10px] text-[#22c55e] font-bold uppercase tracking-widest leading-none">Norder Health</p>
+            <p className="text-[15px] font-bold text-white leading-tight mt-0.5">Plan Health</p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-3">
+          {INTRO_FEATURES.map(({ Icon, text }) => (
+            <div key={text} className="flex items-start gap-3">
+              <div className="w-5 h-5 rounded-[6px] bg-[#0f2e1a] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Icon size={11} className="text-[#22c55e]" strokeWidth={2} />
+              </div>
+              <p className="text-[12px] text-[#666] leading-snug">{text}</p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-[#333] mt-4 text-center">Habla con tu nutriólogo para activarlo</p>
+      </div>
+    </div>
+  );
+}
+
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function NorderHealthHome() {
   const navigate = useNavigate();
   const { paciente: stored, token, clearPortalAuth } = usePortalAuthStore();
   const [menuActivo, setMenuActivo] = useState(0);
-  // bodyMode state vive en SwitchableCard (local al componente)
+  const [introVisible, setIntroVisible] = useState(true);
 
   const { data: me, isLoading: loadingMe } = useQuery({
     queryKey: ['portal', 'me'],
@@ -288,6 +335,14 @@ export default function NorderHealthHome() {
   const nivel: string = me?.nivelMembresia || stored?.nivelMembresia || 'ninguna';
   const isPremium = nivel !== 'ninguna';
 
+  // Auto-dismiss intro after 1.8s once data is ready
+  useEffect(() => {
+    if (!loadingMe && !isPremium) {
+      const t = setTimeout(() => setIntroVisible(false), 1800);
+      return () => clearTimeout(t);
+    }
+  }, [loadingMe, isPremium]);
+
   const progreso = me?.progreso ?? null;
   const plan = planData?.plan ?? null;
   const menus: any[] = plan?.menus ?? [];
@@ -300,7 +355,7 @@ export default function NorderHealthHome() {
     <div className="flex flex-col h-[100dvh] bg-[#0d0d0d]">
 
       {/* ── Header (fijo arriba, no hace scroll) ──────────────────────── */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-12 pb-4 flex items-start justify-between">
+      <div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-4 pb-4 flex items-start justify-between">
         <div>
           <p className="text-[11px] text-[#444] font-medium">{greeting()}</p>
           <h1 className="text-[20px] font-bold text-white tracking-tight mt-0.5 leading-tight">
@@ -330,196 +385,163 @@ export default function NorderHealthHome() {
       {/* ── Cuerpo scrollable ──────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-5" style={{ overscrollBehavior: 'contain' }}>
 
-        {/* ── Stats de progreso: 2 cards al 50% ────────────────────── */}
-        <div>
-          <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold mb-3">Tu progreso</p>
-          {loadingMe ? (
+        {/* ── Loading: skeletons ──────────────────────────────────────── */}
+        {loadingMe && (
+          <>
             <div className="flex gap-3">
               <Skeleton className="flex-1 h-[110px] rounded-[18px]" />
               <Skeleton className="flex-1 h-[110px] rounded-[18px]" />
             </div>
-          ) : (
-            <div className="flex gap-3">
-              {/* Izquierda: switcheable entre % Grasa / Masa Magra / KG Grasa */}
-              <SwitchableCard progreso={progreso} locked={!isPremium} />
-              {/* Derecha: Peso */}
-              <PesoCard
-                value={progreso?.peso ?? null}
-                delta={progreso?.delta?.peso ?? null}
-              />
-            </div>
-          )}
-          {!isPremium && !loadingMe && (
-            <p className="text-[11px] text-[#333] mt-2.5 leading-relaxed">
-              Activa <span className="text-[#22c55e] font-semibold">Plan Health</span> para ver análisis completo de composición corporal.
-            </p>
-          )}
-        </div>
+            <Skeleton className="h-[160px] rounded-[20px]" />
+          </>
+        )}
 
-        {/* ── Plan card ─────────────────────────────────────────────── */}
-        {loadingPlan ? (
-          <Skeleton className="h-[150px] rounded-[20px]" />
-        ) : plan ? (
-          <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5">
-            {/* Top row */}
-            <div className="flex items-start justify-between mb-5">
-              <div className="flex-1 min-w-0 pr-4">
-                <p className="text-[10px] text-[#22c55e] uppercase tracking-widest font-bold mb-1">Plan activo</p>
-                <p className="text-[16px] font-bold text-white leading-tight truncate">
-                  {plan.nombre || 'Plan Nutricional'}
-                </p>
-                {plan.tipoPlan && (
-                  <p className="text-[11px] text-[#555] mt-0.5">{plan.tipoPlan}</p>
-                )}
-              </div>
-              <div className="flex-shrink-0 text-right">
-                <div className="flex items-center justify-end gap-1.5 mb-0.5">
-                  <Flame size={13} className="text-[#f59e0b]" strokeWidth={2} />
-                  <p className="text-[28px] font-black text-white leading-none">{plan.calorias}</p>
-                </div>
-                <p className="text-[10px] text-[#555]">kcal / día</p>
-              </div>
-            </div>
-            {/* Macros */}
-            <div className="grid grid-cols-3 gap-4">
-              {([
-                { label: 'Proteínas', pct: plan.proteinasPct, gr: plan.proteinasGr, color: '#22c55e' },
-                { label: 'Carbos', pct: plan.carbohidratosPct, gr: plan.carbohidratosGr, color: '#60a5fa' },
-                { label: 'Grasas', pct: plan.grasasPct, gr: plan.grasasGr, color: '#f59e0b' },
-              ] as const).map(m => (
-                <div key={m.label}>
-                  <div className="flex items-baseline justify-between mb-1.5">
-                    <span className="text-[9px] text-[#444] font-semibold uppercase tracking-wider">{m.label}</span>
-                    <span className="text-[11px] font-bold" style={{ color: m.color }}>{m.pct}%</span>
-                  </div>
-                  <MacroBar pct={Number(m.pct) || 0} color={m.color} />
-                  {m.gr && <p className="text-[9px] text-[#3a3a3a] mt-1">{parseFloat(String(m.gr)).toFixed(0)}g</p>}
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : (
-          <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5 flex items-center gap-4">
-            <div className="w-10 h-10 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-              <ClipboardList size={17} className="text-[#333]" />
-            </div>
+        {/* ── Intro splash (non-premium, auto-dismiss 1.8s) ───────────── */}
+        {!loadingMe && !isPremium && introVisible && (
+          <PlanHealthIntro visible={introVisible} />
+        )}
+
+        {/* ── Contenido real (premium O intro ya dismisseado) ─────────── */}
+        {!loadingMe && (isPremium || !introVisible) && (
+          <>
+            {/* Stats de progreso */}
             <div>
-              <p className="text-[14px] font-semibold text-white">Sin plan asignado</p>
-              <p className="text-[12px] text-[#555] mt-0.5">Tu nutriólogo aún no ha publicado tu plan</p>
-            </div>
-          </div>
-        )}
-
-        {/* ── Sección de menús ──────────────────────────────────────── */}
-        {!loadingPlan && menus.length > 0 && (
-          <div>
-            {/* Label sección */}
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold">
-                {multiMenus ? 'Menús del plan' : 'Tiempos de comida'}
-              </p>
-              {multiMenus && (
-                <span className="text-[10px] text-[#3a3a3a]">{menus.length} opciones</span>
-              )}
+              <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold mb-3">Tu progreso</p>
+              <div className="flex gap-3">
+                <SwitchableCard progreso={progreso} locked={!isPremium} />
+                <PesoCard value={progreso?.peso ?? null} delta={progreso?.delta?.peso ?? null} />
+              </div>
             </div>
 
-            {/* Tabs de menú */}
-            {multiMenus && (
-              <div className="flex gap-2 overflow-x-auto mb-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
-                {menus.map((m: any, i: number) => (
-                  <button
-                    key={i}
-                    onClick={() => setMenuActivo(i)}
-                    className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold border transition-all duration-200 ${
-                      menuIdx === i
-                        ? 'bg-[#22c55e] border-transparent text-black shadow-lg shadow-[#22c55e]/15'
-                        : 'bg-[#141414] border-[#1e1e1e] text-[#555] hover:text-[#777]'
-                    }`}
-                  >
-                    {m.nombre || `Menú ${i + 1}`}
-                  </button>
-                ))}
+            {/* Plan card */}
+            {loadingPlan ? (
+              <Skeleton className="h-[150px] rounded-[20px]" />
+            ) : plan ? (
+              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5">
+                <div className="flex items-start justify-between mb-5">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <p className="text-[10px] text-[#22c55e] uppercase tracking-widest font-bold mb-1">Plan activo</p>
+                    <p className="text-[16px] font-bold text-white leading-tight truncate">
+                      {plan.nombre || 'Plan Nutricional'}
+                    </p>
+                    {plan.tipoPlan && <p className="text-[11px] text-[#555] mt-0.5">{plan.tipoPlan}</p>}
+                  </div>
+                  <div className="flex-shrink-0 text-right">
+                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
+                      <Flame size={13} className="text-[#f59e0b]" strokeWidth={2} />
+                      <p className="text-[28px] font-black text-white leading-none">{plan.calorias}</p>
+                    </div>
+                    <p className="text-[10px] text-[#555]">kcal / día</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  {([
+                    { label: 'Proteínas', pct: plan.proteinasPct, gr: plan.proteinasGr, color: '#22c55e' },
+                    { label: 'Carbos', pct: plan.carbohidratosPct, gr: plan.carbohidratosGr, color: '#60a5fa' },
+                    { label: 'Grasas', pct: plan.grasasPct, gr: plan.grasasGr, color: '#f59e0b' },
+                  ] as const).map(m => (
+                    <div key={m.label}>
+                      <div className="flex items-baseline justify-between mb-1.5">
+                        <span className="text-[9px] text-[#444] font-semibold uppercase tracking-wider">{m.label}</span>
+                        <span className="text-[11px] font-bold" style={{ color: m.color }}>{m.pct}%</span>
+                      </div>
+                      <MacroBar pct={Number(m.pct) || 0} color={m.color} />
+                      {m.gr && <p className="text-[9px] text-[#3a3a3a] mt-1">{parseFloat(String(m.gr)).toFixed(0)}g</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
+                  <ClipboardList size={17} className="text-[#333]" />
+                </div>
+                <div>
+                  <p className="text-[14px] font-semibold text-white">Sin plan asignado</p>
+                  <p className="text-[12px] text-[#555] mt-0.5">Tu nutriólogo aún no ha publicado tu plan</p>
+                </div>
               </div>
             )}
 
-            {/* Indicador del menú activo */}
-            {multiMenus && (
-              <div className="flex items-center gap-2 mb-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] flex-shrink-0" />
-                <p className="text-[12px] text-white font-semibold">
-                  {menus[menuIdx]?.nombre || `Menú ${menuIdx + 1}`}
-                </p>
-                <ChevronRight size={11} className="text-[#2a2a2a]" />
-                <p className="text-[11px] text-[#444]">{tiemposActivos.length} tiempos</p>
-              </div>
-            )}
-
-            {/* Tarjetas */}
-            <div className="flex flex-col gap-2">
-              {tiemposActivos.map((t: any, i: number) => (
-                <TiempoCard key={`${menuIdx}-${i}`} t={t} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ── Notas del nutriólogo ───────────────────────────────────── */}
-        {plan?.notasGenerales && (
-          <div className="bg-[#141414] border border-[#1e1e1e] rounded-[16px] px-4 py-4">
-            <p className="text-[10px] text-[#444] uppercase tracking-widest font-semibold mb-2.5">Notas de tu nutriólogo</p>
-            <p className="text-[13px] text-[#777] leading-relaxed">{plan.notasGenerales}</p>
-          </div>
-        )}
-
-        {/* ── Teaser upgrade (solo usuarios básicos con plan) ────────── */}
-        {!isPremium && plan && (
-          <div className="bg-[#141414] border border-[#22c55e]/15 rounded-[20px] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-9 h-9 rounded-[10px] bg-[#0f2e1a] border border-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
-                <Crown size={15} className="text-[#22c55e]" strokeWidth={2} />
-              </div>
+            {/* Menús */}
+            {!loadingPlan && menus.length > 0 && (
               <div>
-                <p className="text-[14px] font-bold text-white leading-none">Desbloquea Plan Health</p>
-                <p className="text-[11px] text-[#555] mt-0.5">Chat con IA · Análisis de composición</p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold">
+                    {multiMenus ? 'Menús del plan' : 'Tiempos de comida'}
+                  </p>
+                  {multiMenus && <span className="text-[10px] text-[#3a3a3a]">{menus.length} opciones</span>}
+                </div>
+                {multiMenus && (
+                  <div className="flex gap-2 overflow-x-auto mb-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                    {menus.map((m: any, i: number) => (
+                      <button
+                        key={i}
+                        onClick={() => isPremium && setMenuActivo(i)}
+                        className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold border transition-all duration-200 ${menuIdx === i
+                            ? 'bg-[#22c55e] border-transparent text-black shadow-lg shadow-[#22c55e]/15'
+                            : 'bg-[#141414] border-[#1e1e1e] text-[#555] hover:text-[#777]'
+                          }`}
+                      >
+                        {m.nombre || `Menú ${i + 1}`}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {multiMenus && (
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] flex-shrink-0" />
+                    <p className="text-[12px] text-white font-semibold">{menus[menuIdx]?.nombre || `Menú ${menuIdx + 1}`}</p>
+                    <ChevronRight size={11} className="text-[#2a2a2a]" />
+                    <p className="text-[11px] text-[#444]">{tiemposActivos.length} tiempos</p>
+                  </div>
+                )}
+                <div
+                  className="flex flex-col gap-2"
+                  style={!isPremium ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
+                >
+                  {tiemposActivos.map((t: any, i: number) => <TiempoCard key={`${menuIdx}-${i}`} t={t} />)}
+                </div>
               </div>
-            </div>
-            <ul className="space-y-1.5 pl-1 mb-3">
-              {[
-                'Pregunta sobre tus alimentos en tiempo real',
-                'Análisis completo de composición corporal',
-                'Historial de evolución física',
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-2">
-                  <span className="w-[5px] h-[5px] rounded-full bg-[#22c55e]/30 flex-shrink-0 mt-[5px]" />
-                  <span className="text-[12px] text-[#555]">{item}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-[11px] text-[#3a3a3a]">Habla con tu nutriólogo para activarlo.</p>
-          </div>
+            )}
+
+            {/* Notas */}
+            {plan?.notasGenerales && isPremium && (
+              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[16px] px-4 py-4">
+                <p className="text-[10px] text-[#444] uppercase tracking-widest font-semibold mb-2.5">Notas de tu nutriólogo</p>
+                <p className="text-[13px] text-[#777] leading-relaxed">{plan.notasGenerales}</p>
+              </div>
+            )}
+
+            <div className="h-6" />
+          </>
         )}
 
-        {/* Espacio final para que el último elemento no quede pegado al borde */}
-        <div className="h-2" />
       </div>
 
       {/* ── Footer fijo en el flujo normal (como Chat) ────────────────── */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] border-t border-[#1c1c1c] px-4 py-4 pb-8">
+      <div className="flex-shrink-0 bg-[#0d0d0d] border-t border-[#1c1c1c] px-4 py-4 pb-4">
         {isPremium ? (
           <button
             onClick={() => navigate('/norder-health/chat')}
-            className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black font-bold rounded-[14px] py-3.5 text-[14px] flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#22c55e]/15"
+            className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black rounded-[14px] py-3.5 flex flex-col items-center justify-center transition-all shadow-lg shadow-[#22c55e]/20"
           >
-            <MessageCircle size={16} strokeWidth={2.5} />
-            Hablar con tu nutriólogo
+            <div className="flex items-center gap-2.5">
+              <MessageCircle size={16} strokeWidth={2.5} />
+              <span className="text-[14px] font-bold">Pregúntale a Eyder</span>
+            </div>
+            <span className="text-[10px] font-medium opacity-70 mt-0.5">Equivalencias · Tu plan · Adaptaciones</span>
           </button>
         ) : (
           <button
-            disabled
-            className="w-full bg-[#141414] border border-[#1e1e1e] text-[#444] font-semibold rounded-[14px] py-3.5 text-[13px] flex items-center justify-center gap-2.5 cursor-not-allowed"
+            onClick={() => navigate('/norder-health/chat')}
+            className="w-full bg-[#141414] border border-[#1e1e1e] text-[#555] rounded-[14px] py-3.5 flex flex-col items-center justify-center transition-colors hover:border-[#2a2a2a]"
           >
-            <Lock size={14} strokeWidth={2} />
-            Chat disponible en Plan Health
+            <div className="flex items-center gap-2.5">
+              <MessageCircle size={14} strokeWidth={2} />
+              <span className="text-[13px] font-semibold">Consultar equivalencias</span>
+            </div>
+            <span className="text-[10px] text-[#3a3a3a] mt-0.5">Plan básico · conversiones generales</span>
           </button>
         )}
       </div>

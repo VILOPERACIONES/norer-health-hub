@@ -1,0 +1,682 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "portal-eyder",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [2352, 2848],
+      "id": "2d812e13-b047-4a60-8163-a621dcee306a",
+      "name": "Webhook Portal",
+      "webhookId": "portal-eyder"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-telefono",
+              "name": "Numero_Telefono",
+              "value": "={{ $json.body.Numero_Telefono }}",
+              "type": "string"
+            },
+            {
+              "id": "7880c810-fb29-48e8-b94b-10db93466197",
+              "name": "mensaje",
+              "value": "={{ $json.body.mensaje || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-imagen-b64",
+              "name": "imagen_base64",
+              "value": "={{ $json.body.imagen_base64 || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2576, 2848],
+      "id": "33024717-4913-4403-8c53-2c1a6c908205",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "url": "https://norder-crm-api-production-b70d.up.railway.app/api/agent/contexto",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "telefono",
+              "value": "={{ $('Edit Fields3').item.json.Numero_Telefono }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2800, 2848],
+      "id": "e96de727-992e-4d73-bdc0-42ee546453a6",
+      "name": "HTTP Get Contexto"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-acceso",
+              "leftValue": "={{ $json.acceso }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [3024, 2848],
+      "id": "ae01d01e-b50e-4a0f-9f1c-5ab4429e283a",
+      "name": "¿Tiene Acceso?"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"output\": $json.mensaje } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [3024, 3056],
+      "id": "ad9202b2-d2ea-4763-a4dc-2b8357540b00",
+      "name": "Respond Sin Acceso"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-imagen",
+              "leftValue": "={{ $('Edit Fields3').item.json.imagen_base64 }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [3248, 2848],
+      "id": "d67eb234-057d-42e6-8148-85c99965bbf9",
+      "name": "¿Tiene imagen?"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "restore-imagen",
+              "name": "imagen_base64",
+              "value": "={{ $('Edit Fields3').item.json.imagen_base64 }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3472, 2752],
+      "id": "66631ed7-10a0-4732-a342-390f828e9497",
+      "name": "Set Restore Imagen"
+    },
+    {
+      "parameters": {
+        "operation": "toBinary",
+        "sourceProperty": "imagen_base64",
+        "options": {
+          "fileName": "tabla_nutricional.jpg",
+          "mimeType": "image/jpeg"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [3696, 2752],
+      "id": "4f6ea646-faa9-47ed-8a29-12e4332add0c",
+      "name": "Convert to File Imagen"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "text": "Eres un asistente de nutrición clínica. Analiza esta tabla nutricional y extrae TODOS los datos con precisión. Devuelve SOLO: Nombre del producto, Porción (g o ml), Calorías (kcal), Proteínas (g), Grasas totales (g), Carbohidratos totales (g). Sin texto adicional.",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [3920, 2752],
+      "id": "13914373-2c4e-4bc7-b038-2ba835de9f69",
+      "name": "Analyze tabla nutricional",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iKIzYepf3K35kcXk",
+          "name": "GEMINI NUTRICIÓN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-mensaje-img",
+              "name": "mensaje",
+              "value": "={{ ($('Edit Fields3').item.json.mensaje ? $('Edit Fields3').item.json.mensaje + '\\n\\n' : '') + '[TABLA NUTRICIONAL DETECTADA EN IMAGEN]\\n' + $json.content.parts[0].text }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-nivel-img",
+              "name": "nivel_membresia",
+              "value": "={{ $('HTTP Get Contexto').item.json.nivelMembresia || 'ninguna' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-plan-img",
+              "name": "plan_texto",
+              "value": "={{ $('HTTP Get Contexto').item.json.planTexto || 'Sin plan activo.' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-resumen-img",
+              "name": "resumen_previo",
+              "value": "={{ $('HTTP Get Contexto').item.json.resumen_previo || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-nombre-img",
+              "name": "nombre_paciente",
+              "value": "={{ $('HTTP Get Contexto').item.json.paciente?.nombre || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [4144, 2752],
+      "id": "e3d6a8f0-1326-42bb-9416-9d0c82574745",
+      "name": "Edit Fields12 imagen"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "assign-mensaje",
+              "name": "mensaje",
+              "value": "={{ $('Edit Fields3').item.json.mensaje }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-nivel",
+              "name": "nivel_membresia",
+              "value": "={{ $('HTTP Get Contexto').item.json.nivelMembresia || 'ninguna' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-plan",
+              "name": "plan_texto",
+              "value": "={{ $('HTTP Get Contexto').item.json.planTexto || 'Sin plan activo.' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-resumen",
+              "name": "resumen_previo",
+              "value": "={{ $('HTTP Get Contexto').item.json.resumen_previo || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "assign-nombre",
+              "name": "nombre_paciente",
+              "value": "={{ $('HTTP Get Contexto').item.json.paciente?.nombre || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [3472, 2944],
+      "id": "fe3dd4e4-c129-4cbc-8e2c-894f22ea02b0",
+      "name": "Edit Fields12"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"output\": $json.output } }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [5392, 2848],
+      "id": "73005fc9-573f-4ec6-ba1b-27fe083af9bd",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ '=== CONTEXTO DEL PACIENTE ===\\nMembresía: ' + ($json.nivel_membresia || 'ninguna') + '\\n' + ($json.nombre_paciente ? 'Paciente: ' + $json.nombre_paciente + '\\n' : '') + ($json.resumen_previo ? '--- Historial previo ---\\n' + $json.resumen_previo + '\\n' : '') + '--- Plan nutricional ---\\n' + ($json.plan_texto || 'Sin plan activo.') + '\\n\\n=== MENSAJE DEL PACIENTE ===\\n' + $json.mensaje }}",
+        "needsFallback": true,
+        "options": {
+          "systemMessage": "=# 🧠 Sistema Eyder – Nutriólogo Digital (v5.1 · Control de Acceso)\n\n## Identidad y Tono\n\nEres **Eyder**, nutriólogo profesional certificado. Asistes a pacientes con planes basados en equivalentes (EQ). Tono: directo, profesional, seguro y servicial. Sin frases de duda ni relleno.\n\n---\n\n## 🔐 Nivel de Acceso por Membresía (leer PRIMERO antes de responder)\n\nCada mensaje incluye un bloque `=== CONTEXTO DEL PACIENTE ===` con el campo `Membresía`. Respeta estas reglas sin excepción:\n\n### 🟢 PLAN PREMIUM (`premium` o `norder_health`)\n- Acceso completo: plan personalizado, menú específico, equivalencias asignadas, recomendaciones personales.\n- Usa el plan e historial previo del paciente en cada respuesta.\n- Si el plan dice **\"Sin plan activo.\"** → informa que aún no tiene plan asignado.\n\n### 🔵 PLAN BÁSICO (`basico`)\n- Acceso a: cálculos generales de equivalencias, consultas nutricionales generales, SMAE.\n- **NO tienes plan personal del paciente.** No finjas tenerlo.\n- Si el paciente pregunta por su plan, menú o recomendaciones personales → responde EXACTAMENTE:\n  > \"Esa función está disponible en el Plan Premium. Consulta con tu nutriólogo para actualizar tu membresía.\"\n- Puedes ayudar con: '¿cuántos EQ tiene X alimento?', '¿qué puedo comer si tengo diabetes?', cálculos generales.\n\n### ⛔ SIN MEMBRESÍA (`ninguna`) — Este caso lo bloquea el sistema antes de llegar aquí.\n\nSi hay **historial previo** (en cualquier plan), úsalo para personalizar la respuesta.\n\n---\n\n## 🚫 Reglas Inviolables\n\n- **Identidad:** Nunca te presentes como IA, asistente o modelo de lenguaje.\n- **Fuentes:** No menciones herramientas, tablas ni bases de datos (SMAE, NORDER, etc.).\n- **Lenguaje prohibido:** \"según la base de datos\", \"aproximadamente\", \"parecido a\", \"no tengo registro/dato\".\n- **Resultados:** Sin decimales salvo `.5`. Aplica redondeo clínico estricto (ver sección de Redondeo).\n- **Rol:** Mantente siempre en el rol de nutriólogo certificado.\n- **Contexto:** No opines fuera del ámbito nutricional.\n- **Respuestas:** Puntuales, máximo 6 líneas, sin explicar procedimientos.\n- **Solicitud de tabla:** Si el paciente pide ayuda con un producto, responde:\n  > \"Claro, pásame la tabla nutrimental de [nombre del producto] para poder ayudarte.\"\n- **Confirmación de datos:** Si recibes solo los datos de una tabla nutricional, pide al usuario que confirme que la información es correcta. Si no lo es, pide que indique qué valores deben cambiarse y vuelve a confirmar. Repite este paso tantas veces como sea necesario. Solo después de la confirmación puedes calcular.\n\n---\n\n## 🧭 Fuente de Verdad y Orden de Herramientas (obligatorio)\n\n1. `equivalencias_norder` → siempre primero.\n2. `peso_neto_smae` → si el alimento no existe en NORDER y es natural.\n3. `aporte_nutrimental` → solo para productos procesados o platillos mixtos.\n\nNunca calcules sin haber consultado al menos una herramienta.\n\n---\n\n## 🛡️ Guardarraíl Anti-Memoria (Anti-RAG)\n\n- Cada cálculo es independiente. Usa solo los datos del mensaje actual.\n- **Regla anti-confusión:** antes de calcular, verifica que proteína, grasa y CHO coincidan con la tabla nutrimental recibida en este turno. Si detectas coincidencia con un producto previo, descártalo y solicita confirmación del alimento actual.\n- Si falta un dato clave (gramaje/porción), pídelo en una sola pregunta breve.\n\n---\n\n## 📊 Lógica 1 — Consultar Equivalencias\n\n**Paso 1 — NORDER:** busca coincidencia exacta.\n- Fruta → usa el peso neto exacto.\n- Verdura → \"libre\".\n\n**Paso 2 — No encontrado:**\n- Natural → `peso_neto_smae`.\n- Procesado → `aporte_nutrimental`.\n\n---\n\n## 🧮 Reglas de Cálculo Clínico (`aporte_nutrimental`)\n\n### 1) Datos que debes usar (solo 4)\n\n- Gramaje (porción o por 100 g)\n- Proteína (g)\n- Grasa total (g)\n- Carbohidratos totales (g)\n\n**Prohibido:** restar fibra, azúcares o polialcoholes. Trabaja siempre con CHO totales.\n\n### 2) Consulta de referencia obligatoria\n\nAntes de cualquier decisión, consulta `aporte_nutrimental` para los valores oficiales por 1 EQ de cada grupo:\n\n| Grupo | Proteína (g) | Grasa (g) | CHO (g) |\n|---|---|---|---|\n| AOA Muy bajo en grasa (MB) | 7 | 1 | 0 |\n| AOA Bajo (B) | 7 | 3 | 0 |\n| AOA Moderado (MOD) | 7 | 5 | 0 |\n| AOA Alto (ALTO) | 7 | 8 | 0 |\n| GS (Grasa sin proteína) | 0 | 5 | 0 |\n| CSG (Cereal sin grasa) | 2 | 0 | 15 |\n| GP (Grasa con proteína) | 3 | 5 | 0 |\n\nSi la herramienta no devuelve datos → detén el cálculo y solicita la tabla nutrimental.\n\n### 3) Jerarquía clínica de decisión\n\nCalcula primero:\n- **G/P** = grasa_total ÷ proteína_total\n- **CHO/P** = carbohidratos_total ÷ proteína_total\n\nAplica en este orden (el primero que coincida gana):\n\n| Orden | Condición | Estrategia | Descripción |\n|---|---|---|---|\n| 1 | Proteína ≥ 7 g **y** CHO ≥ 10 g | **AOA + GS + CSG** | Caso mixto: barras, snacks, fudge, galletas. **GP queda prohibido en este caso.** |\n| 2 | Proteína < 7 g **y** G/P ≥ 1.2 **y** CHO < 10 g | **GP** (+ CSG si CHO > 10 g) | Caso vegetal puro: cacahuate, soya, almendra, crema de nuez. |\n| 3 | Grasa > proteína **y** proteína < 3 g | **GS** | Graso puro, sin aporte proteico. |\n| 4 | CHO ≥ 15 g **y** proteína < 7 g | **CSG** | Cereal, dulce o golosina. |\n| 5 | Alimento vegetal natural (legumbre, fruta, verdura, leche) | **FR / LEG / VE / LE** | Asignación directa. |\n\n> Esta jerarquía bloquea el uso de GP cuando CHO ≥ 10 g, y obliga a usar la descomposición completa AOA + GS + CSG en casos mixtos.\n\n### 4) Selección del subgrupo AOA\n\n- Calcula: `grasa_real_por_EQ = grasa_total ÷ (proteína_total ÷ 7)`\n- Busca en `aporte_nutrimental` el subgrupo cuya grasa teórica sea **≤ grasa_real_por_EQ** y más cercana por debajo: MB (1 g) → B (3 g) → MOD (5 g) → ALTO (8 g).\n- Si ningún subgrupo coincide o el valor excede a todos → usa **MB** por defecto (el más magro). Esto evita que el sistema sobreestime grasa.\n\n### 5) Descuento y compensación\n\n- Resta del total la **grasa incluida** del subgrupo AOA elegido (MB 1 g / B 3 g / MOD 5 g / ALTO 8 g) antes de calcular GS.\n- La **grasa restante** se cubre con GS (5 g = 1 EQ).\n- El **CHO** se calcula aparte: CSG 15 g = 1 EQ | FR 15 g = 1 EQ | LEG 20 g = 1 EQ | VE 4 g = 1 EQ.\n- Ajustes de afinación:\n  - Si falta grasa frente a la teórica del AOA elegido (2.5–5 g) → agrega **+0.5 a +1 EQ GS**.\n  - Si sobra grasa → agrega **−0.5 a −1 EQ GS** según el exceso.\n  - Si el CHO está a ±5 g del múltiplo de 15 → ajusta ±0.5 EQ CSG.\n  - Si falta proteína (≤ 2 g) → agrega +0.5 EQ AOA MB.\n  - **Máximo 2 grupos combinados por producto.** El objetivo es acercarse al perfil real sin sobreestimar.\n\n### 6) Validación final (±10 %)\n\n- Antes de responder, recalcula proteína, grasa y CHO totales aportados según los EQ asignados.\n- Compara contra los valores reales de la tabla nutrimental:\n  - Si la desviación es ≤ ±10 % en cada macronutriente → confirma las equivalencias.\n  - Si excede ±10 % → ajusta con el grupo que reduzca la diferencia sin exceder, priorizando: ±3 g grasa → ±0.5 EQ GS · ±5 g CHO → ±0.5 EQ CSG · ±2 g proteína → ±0.5 EQ AOA MB.\n- Los cálculos internos nunca se redondean. El redondeo solo se aplica al resultado final.\n\n---\n\n## 🎯 Redondeo Clínico (estricto y obligatorio — solo en la salida)\n\n| Decimal | Acción |\n|---|---|\n| 0.01–0.49 | Redondea abajo (ej. 1.23 o 1.46 → **1 EQ**) |\n| 0.50–0.69 | Muestra como **.5** (ej. 1.58 → **1.5 EQ**) |\n| 0.70–0.99 | Redondea arriba (ej. 1.74 o 1.86 → **2 EQ**) |\n| < 0.5 total | **0 EQ** (despreciable) |\n\n**Nunca** muestres decimales distintos de `.5` (prohibido: 1.3, 2.4, 0.7).\n\n---\n\n## 🧩 Ejemplos guía (referencia interna de consistencia)\n\n- **Mazapán Sugar Free (100 g):** Prot 13.5 g | Grasa 22.2 g | CHO 54.3 g\n  → Perfil vegetal: grasa/5 = 4.44, prot/3 = 4.5 → promedio → **4 EQ GP**\n  → CHO 54.3/15 = 3.62 → **3.5 EQ CSG**\n  → Respuesta: *4 EQ Grasa con proteína + 3.5 EQ Cereal sin grasa*.\n\n- **Barra de proteína (60 g):** Prot 21 g | Grasa 6 g | CHO 22 g\n  → AOA: 21/7 = 3 EQ; grasa/EQ = 2 g → **AOA Muy bajo en grasa** + 0.5 EQ GS por subaporte\n  → CHO 22/15 = 1.46 → **1 EQ CSG**\n  → Respuesta: *3 EQ AOA Muy bajo en grasa + 0.5 EQ Grasa sin proteína + 1 EQ Cereal sin grasa*.\n\n---\n\n## 📄 Formato de Respuesta (obligatorio)\n\n```\n[Cantidad] g de [alimento] equivalen a:\n• [N] EQ [Grupo NORDER]\n• [M] EQ [Grupo NORDER]\n```\n\n---\n\n## 🍽️ Lógica 2 — Crear o Adaptar Platillo\n\n1. Pide tipo de comida, EQ asignadas y gramaje por ingrediente.\n2. Calcula EQ por ingrediente, suma por grupo y redondea.\n3. Responde en ≤ 6 líneas con nomenclatura NORDER.\n\n---\n\n## ❓ Lógica 3 — Preguntas Frecuentes\n\n- 1 tortilla (30 g) = 1 EQ CSG\n- Alcohol: cerveza light 355 ml = 1 EQ CSG | destilado 60 ml = 1 EQ CSG | vino tinto 125 ml = 1 EQ Fruta\n- No se intercambian grupos entre sí.\n- Verduras libres: pepino, jícama, zanahoria, gelatina light.\n- Ante una lesión breve, mantener el menú sin cambios.\n\n---\n\n## 💼 Lógica 4 — Administrativo\n\n📅 Citas | 💳 Pagos | 🧾 Facturación\n\n📲 WhatsApp: https://wa.me/5219994537182?text=Hola%2C%20quiero%20obtener%20una%20cita\n🕐 L-V 9:00–19:00 / Sábado 9:00–14:00\n🩺 Toda gestión se realiza por este canal.\n\n---\n\n## 📋 Datos Fijos de Referencia\n\n- Dátiles: 2 piezas = 1 EQ Fruta\n- Leche entera: 240 ml = 1 EQ AOA MB + 1 EQ Fruta\n- Fage (yogurt griego): 100 g = 1 EQ AOA MB\n- Res molida 85/15: 30 g = 1 EQ AOA Bajo\n- Pavo: 30 g = 1 EQ AOA MB\n- Queso de cabra: 20 g = 1 EQ AOA Moderado\n\n---\n\n## ✅ Auto-Cheque Antes de Enviar\n\n- Solo usé proteína, grasa y CHO totales.\n- Clasificación AOA/GP/GS/CSG aplicada correctamente (jerarquía respetada, GP bloqueado si corresponde).\n- Descuento de aportes cubiertos y compensación aplicados cuando procedía.\n- Validación final dentro de ±10 % verificada.\n- Redondeo clínico aplicado (enteros o `.5`).\n- Respuesta ≤ 6 líneas, sin explicaciones, con nomenclatura NORDER.\n\n---\n\n## 🗺️ Matriz de Decisión (uso interno, no se muestra al paciente)\n\n```\nIngresa datos (Prot / Gras / CHO)\n        │\nCalcular relaciones (G/P, CHO/P)\n        │\n   ┌────┴──────────────────────────────────────┐\n   │ Prot ≥7 & CHO ≥10      → Mixto             │ → AOA + GS + CSG\n   │ Prot <7 & G/P ≥1.2     → Vegetal           │ → GP (+CSG si CHO>10)\n   │ Grasa>Prot & Prot <3   → Graso puro        │ → GS\n   │ CHO ≥15 & Prot <7      → Cereal/dulce      │ → CSG\n   │ Vegetal natural        → FR/LEG/VE/LE      │\n   └─────────────────────────────────────────────┘\n```"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [4368, 2848],
+      "id": "74f1654d-dcdb-49c4-906e-7892555dee2f",
+      "name": "AI Agent",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Cuando te hable sobre realizar conversiones debes consultar esta herramienta para obtener los cálculos de manera precisa.",
+        "tableName": "aporte_nutrimental",
+        "topK": 13,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [4288, 3072],
+      "id": "8320e14e-de1d-4264-908b-535290de1194",
+      "name": "aporte_nutrimental1",
+      "credentials": {
+        "postgres": {
+          "id": "Cv0vPjsgOXqGLOhd",
+          "name": "Vector norder"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "retrieve-as-tool",
+        "toolDescription": "Usa esta herramienta **SIEMPRE** para buscar equivalencias o valores nutricionales de alimentos que recibas",
+        "tableName": "aporte_nutrmental",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStorePGVector",
+      "typeVersion": 1.3,
+      "position": [4576, 3072],
+      "id": "a1d3e521-f500-4a54-af3b-d141a4f2f06c",
+      "name": "equivalencias_norder1",
+      "credentials": {
+        "postgres": {
+          "id": "Cv0vPjsgOXqGLOhd",
+          "name": "Vector norder"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash",
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [3904, 3072],
+      "id": "ba9553a4-249b-4b4e-89da-e46cd1535a16",
+      "name": "Google Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iKIzYepf3K35kcXk",
+          "name": "GEMINI NUTRICIÓN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Edit Fields3').item.json.Numero_Telefono }}",
+        "tableName": "historial_nutrcion_nueva_2026",
+        "contextWindowLength": 20
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryPostgresChat",
+      "typeVersion": 1.3,
+      "position": [4160, 3072],
+      "id": "749dd343-d46e-427c-b08b-df0f5fb659eb",
+      "name": "Postgres Chat Memory",
+      "credentials": {
+        "postgres": {
+          "id": "XszOQWIyzOwmPnro",
+          "name": "Postgres-agents"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Esta herramienta es para buscar cual es el peso neto (G) de un alimento o alimentos según el libro del SISTEMA MEXICANO DE ALIMENTOS EQUIVALENTES 4TA edición\n**NO PESO DE REDONDEO (G)**",
+        "query": "={{ $fromAI('Query', `Peso neto (g) de [Nombre fruta o alimento] en el Sistema Mexicano de Alimentos Equivalentes 4ta Edición`, 'string') }}",
+        "enableUrlContext": "",
+        "options": {
+          "systemInstruction": "Peso neto de [Nombre del producto] en el Sistema Mexicano de Alimentos Equivalentes 4ta Edición. No especificar de donde se obtuvo la información. Solo dar peso NETO EN G y la equivalencia. **NO USAR EL PESO DE REDONDEO**"
+        }
+      },
+      "type": "n8n-nodes-gemini-search.geminiSearchToolTool",
+      "typeVersion": 1,
+      "position": [4864, 3072],
+      "id": "e8a04b64-2a4d-408d-997d-1c8fc36046f6",
+      "name": "peso_neto_smae1",
+      "credentials": {
+        "geminiSearchApi": {
+          "id": "vQMJxeTi51OVsSXo",
+          "name": "Gemini Cloud Platform Nutrición"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-2-preview"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [4368, 3280],
+      "id": "de6142b2-6a8a-497e-9bf9-a50653860454",
+      "name": "Embeddings Google Gemini3",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iKIzYepf3K35kcXk",
+          "name": "GEMINI NUTRICIÓN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-embedding-2"
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [4656, 3280],
+      "id": "7f0401d4-aa33-4900-bd1c-1de078ef1c15",
+      "name": "Embeddings Google Gemini1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iKIzYepf3K35kcXk",
+          "name": "GEMINI NUTRICIÓN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-pro",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.1,
+      "position": [4032, 3072],
+      "id": "5b3f3c70-e33e-43a6-92ce-03c632d8331d",
+      "name": "Google Gemini Chat Model1",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "iKIzYepf3K35kcXk",
+          "name": "GEMINI NUTRICIÓN"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "mem-tel",
+              "name": "telefono",
+              "value": "={{ $('Edit Fields3').item.json.Numero_Telefono }}",
+              "type": "string"
+            },
+            {
+              "id": "mem-msg",
+              "name": "mensajeUsuario",
+              "value": "={{ $('Edit Fields3').item.json.mensaje || '[imagen enviada]' }}",
+              "type": "string"
+            },
+            {
+              "id": "mem-resp",
+              "name": "respuestaEyder",
+              "value": "={{ $json.output }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [4800, 3160],
+      "id": "mem-set-001-aaaa-bbbb-cccc-ddddeeee0001",
+      "name": "Set Para Memoria"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://norder-crm-api-production-b70d.up.railway.app/api/agent/actualizar-memoria",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-agent-key",
+              "value": "={{ $env.AGENT_API_KEY || '' }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "telefono",
+              "value": "={{ $json.telefono }}"
+            },
+            {
+              "name": "mensajeUsuario",
+              "value": "={{ $json.mensajeUsuario }}"
+            },
+            {
+              "name": "respuestaEyder",
+              "value": "={{ $json.respuestaEyder }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000,
+          "ignoreResponseCode": true
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [5200, 3160],
+      "id": "mem-http-001-aaaa-bbbb-cccc-ddddeeee0002",
+      "name": "HTTP Actualizar Memoria"
+    }
+  ],
+  "connections": {
+    "Webhook Portal": {
+      "main": [
+        [{"node": "Edit Fields3", "type": "main", "index": 0}]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [{"node": "HTTP Get Contexto", "type": "main", "index": 0}]
+      ]
+    },
+    "HTTP Get Contexto": {
+      "main": [
+        [{"node": "¿Tiene Acceso?", "type": "main", "index": 0}]
+      ]
+    },
+    "¿Tiene Acceso?": {
+      "main": [
+        [{"node": "Respond Sin Acceso", "type": "main", "index": 0}],
+        [{"node": "¿Tiene imagen?", "type": "main", "index": 0}]
+      ]
+    },
+    "¿Tiene imagen?": {
+      "main": [
+        [{"node": "Set Restore Imagen", "type": "main", "index": 0}],
+        [{"node": "Edit Fields12", "type": "main", "index": 0}]
+      ]
+    },
+    "Set Restore Imagen": {
+      "main": [
+        [{"node": "Convert to File Imagen", "type": "main", "index": 0}]
+      ]
+    },
+    "Convert to File Imagen": {
+      "main": [
+        [{"node": "Analyze tabla nutricional", "type": "main", "index": 0}]
+      ]
+    },
+    "Analyze tabla nutricional": {
+      "main": [
+        [{"node": "Edit Fields12 imagen", "type": "main", "index": 0}]
+      ]
+    },
+    "Edit Fields12 imagen": {
+      "main": [
+        [{"node": "AI Agent", "type": "main", "index": 0}]
+      ]
+    },
+    "Edit Fields12": {
+      "main": [
+        [{"node": "AI Agent", "type": "main", "index": 0}]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {"node": "Respond to Webhook", "type": "main", "index": 0},
+          {"node": "Set Para Memoria", "type": "main", "index": 0}
+        ]
+      ]
+    },
+    "Set Para Memoria": {
+      "main": [
+        [{"node": "HTTP Actualizar Memoria", "type": "main", "index": 0}]
+      ]
+    },
+    "aporte_nutrimental1": {
+      "ai_tool": [
+        [{"node": "AI Agent", "type": "ai_tool", "index": 0}]
+      ]
+    },
+    "equivalencias_norder1": {
+      "ai_tool": [
+        [{"node": "AI Agent", "type": "ai_tool", "index": 0}]
+      ]
+    },
+    "Google Gemini Chat Model": {
+      "ai_languageModel": [
+        [{"node": "AI Agent", "type": "ai_languageModel", "index": 0}]
+      ]
+    },
+    "Postgres Chat Memory": {
+      "ai_memory": [
+        [{"node": "AI Agent", "type": "ai_memory", "index": 0}]
+      ]
+    },
+    "peso_neto_smae1": {
+      "ai_tool": [
+        [{"node": "AI Agent", "type": "ai_tool", "index": 0}]
+      ]
+    },
+    "Embeddings Google Gemini3": {
+      "ai_embedding": [
+        [{"node": "aporte_nutrimental1", "type": "ai_embedding", "index": 0}]
+      ]
+    },
+    "Embeddings Google Gemini1": {
+      "ai_embedding": [
+        [{"node": "equivalencias_norder1", "type": "ai_embedding", "index": 0}]
+      ]
+    },
+    "Google Gemini Chat Model1": {
+      "ai_languageModel": [
+        [{"node": "AI Agent", "type": "ai_languageModel", "index": 1}]
+      ]
+    }
+  },
+  "pinData": {
+    "Webhook Portal": [
+      {
+        "headers": {
+          "host": "norder-ai-agent-n8n.rbvpuf.easypanel.host",
+          "user-agent": "axios/1.14.0",
+          "content-length": "75",
+          "accept": "application/json, text/plain, */*",
+          "accept-encoding": "gzip, compress, deflate, br",
+          "content-type": "application/json",
+          "x-forwarded-for": "187.155.30.87",
+          "x-forwarded-host": "norder-ai-agent-n8n.rbvpuf.easypanel.host",
+          "x-forwarded-port": "443",
+          "x-forwarded-proto": "https",
+          "x-forwarded-server": "b4456886afa5",
+          "x-real-ip": "187.155.30.87"
+        },
+        "params": {},
+        "query": {},
+        "body": {
+          "mensaje": "¿Puedo adaptar mi desayuno?",
+          "Numero_Telefono": "529993670065"
+        },
+        "webhookUrl": "https://norder-ai-agent-n8n.rbvpuf.easypanel.host/webhook/portal-eyder",
+        "executionMode": "production"
+      }
+    ]
+  },
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "4deed2737531e89c616bcffd822d31ecb6a47d183d502a1770320e3ed62750bc"
+  }
+}
