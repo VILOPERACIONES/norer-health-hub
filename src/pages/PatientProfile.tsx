@@ -304,6 +304,7 @@ const PatientProfile = () => {
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
   const [isActivatingPortal, setIsActivatingPortal] = useState(false);
+  const [isChangingTier, setIsChangingTier] = useState(false);
 
   const handleTogglePortal = async () => {
     if (!paciente || isActivatingPortal) return;
@@ -317,6 +318,21 @@ const PatientProfile = () => {
       toast({ title: 'Error', description: 'No se pudo cambiar el estado del portal', variant: 'destructive' });
     } finally {
       setIsActivatingPortal(false);
+    }
+  };
+
+  const handleChangeTier = async (tier: 'gratis' | 'basico' | 'premium') => {
+    if (!paciente || isChangingTier) return;
+    const nivelMap = { gratis: 'ninguna', basico: 'basico', premium: 'premium' } as const;
+    setIsChangingTier(true);
+    try {
+      await api.put(`/api/portal/activar/${id}`, { activar: true, nivelMembresia: nivelMap[tier] });
+      queryClient.invalidateQueries({ queryKey: ['paciente', id] });
+      toast({ title: `Plan cambiado a ${tier.charAt(0).toUpperCase() + tier.slice(1)}` });
+    } catch {
+      toast({ title: 'Error', description: 'No se pudo cambiar el plan', variant: 'destructive' });
+    } finally {
+      setIsChangingTier(false);
     }
   };
   const [fullChartModal, setFullChartModal] = useState<{
@@ -509,28 +525,59 @@ const PatientProfile = () => {
           </section>
 
           {/* NORDER HEALTH PORTAL */}
-          <section className="flex items-center justify-between px-5 py-3.5 bg-bg-surface border border-border-subtle rounded-[14px]">
-            <div className="flex items-center gap-3">
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border uppercase tracking-wider ${paciente.portalActivo
-                  ? 'bg-[#0f2e1a] text-[#4ade80] border-[#4ade80]/20'
-                  : 'bg-bg-elevated text-text-muted border-border-subtle'
-                }`}>
-                {paciente.portalActivo ? 'Activo' : 'Inactivo'}
-              </span>
-              <span className="text-[12px] text-text-secondary font-medium">Norder Health</span>
-              {paciente.suscripcionFin && (
-                <span className="text-[11px] text-text-muted hidden sm:inline">
-                  Vence: {formatDate(paciente.suscripcionFin)}
+          <section className="px-5 py-4 bg-bg-surface border border-border-subtle rounded-[14px] space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold border uppercase tracking-wider ${paciente.portalActivo
+                    ? 'bg-[#0f2e1a] text-[#4ade80] border-[#4ade80]/20'
+                    : 'bg-bg-elevated text-text-muted border-border-subtle'
+                  }`}>
+                  {paciente.portalActivo ? 'Activo' : 'Inactivo'}
                 </span>
-              )}
+                <span className="text-[12px] text-text-secondary font-medium">Norder Health</span>
+                {paciente.suscripcionFin && (
+                  <span className="text-[11px] text-text-muted hidden sm:inline">
+                    Vence: {formatDate(paciente.suscripcionFin)}
+                  </span>
+                )}
+              </div>
+              <button
+                onClick={handleTogglePortal}
+                disabled={isActivatingPortal}
+                className="flex items-center gap-2 px-[14px] py-[7px] text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-bg-elevated transition-colors disabled:opacity-50"
+              >
+                {isActivatingPortal ? '...' : (paciente.portalActivo ? 'Desactivar Portal' : 'Activar Portal')}
+              </button>
             </div>
-            <button
-              onClick={handleTogglePortal}
-              disabled={isActivatingPortal}
-              className="flex items-center gap-2 px-[14px] py-[7px] text-[12px] font-medium border border-border-subtle rounded-[8px] hover:bg-bg-elevated transition-colors disabled:opacity-50"
-            >
-              {isActivatingPortal ? '...' : (paciente.portalActivo ? 'Desactivar Portal' : 'Activar Portal')}
-            </button>
+
+            {paciente.portalActivo && (() => {
+              const nivel = (paciente as any).nivelMembresia || 'ninguna';
+              const currentTier = ['premium', 'norder_health'].includes(nivel) ? 'premium' : nivel === 'basico' ? 'basico' : 'gratis';
+              const tiers = [
+                { key: 'gratis', label: 'Gratis', desc: '5 preguntas/día', active: 'bg-[#1c1000] text-[#f59e0b] border-[#f59e0b]/40' },
+                { key: 'basico', label: 'Básico', desc: 'Equivalencias generales', active: 'bg-[#0a1628] text-[#60a5fa] border-[#60a5fa]/40' },
+                { key: 'premium', label: 'Premium', desc: 'Plan personalizado', active: 'bg-[#0f2e1a] text-[#4ade80] border-[#4ade80]/40' },
+              ] as const;
+              return (
+                <div className="grid grid-cols-3 gap-2">
+                  {tiers.map(t => (
+                    <button
+                      key={t.key}
+                      onClick={() => handleChangeTier(t.key)}
+                      disabled={isChangingTier || currentTier === t.key}
+                      className={`flex flex-col items-center py-2.5 px-2 rounded-[10px] border text-center transition-all disabled:cursor-default ${
+                        currentTier === t.key
+                          ? t.active
+                          : 'bg-bg-elevated border-border-subtle text-text-muted hover:border-[#444] hover:text-text-secondary'
+                      }`}
+                    >
+                      <span className="text-[12px] font-semibold leading-none">{t.label}</span>
+                      <span className="text-[10px] opacity-70 mt-0.5 leading-none">{t.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              );
+            })()}
           </section>
 
           {showFullExpediente && (

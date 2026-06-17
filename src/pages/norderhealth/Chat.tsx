@@ -1,7 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Camera, X, ArrowLeft, Send, Loader2 } from 'lucide-react';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import {
+  Camera, X, ArrowLeft, Send, Loader2, Crown,
+  Activity, Zap, ChevronDown, Sparkles,
+} from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
 
@@ -15,12 +20,83 @@ interface ChatMessage {
   imagePreview?: string;
 }
 
-const WELCOME: ChatMessage = {
-  id: 'welcome',
-  content: '¡Hola! Soy Eyder, tu nutriólogo digital 👋\n\n¿En qué te puedo ayudar?\n\n1️⃣  Equivalencias de un alimento\n2️⃣  Ideas para adaptar un platillo\n3️⃣  Dudas sobre tu plan\n\nPuedes escribirme o enviar la foto de una tabla nutricional 📷',
-  sender: 'eyder',
-  timestamp: new Date(),
+// ── Tier system ────────────────────────────────────────────────────────────────
+
+type Tier = 'gratis' | 'basico' | 'premium';
+
+function getTier(nivel: string): Tier {
+  if (['premium', 'norder_health'].includes(nivel)) return 'premium';
+  if (nivel === 'basico') return 'basico';
+  return 'gratis';
+}
+
+const TIER_META = {
+  gratis: {
+    label: 'Gratis',
+    accent: '#f59e0b',
+    accentDim: '#92400e',
+    headerBorder: 'border-[#2a1800]',
+    badge: 'bg-[#1c1000] text-[#f59e0b] border-[#f59e0b]/30',
+    userBubble: 'bg-[#92400e]',
+    eyderBorder: 'border-l-[#f59e0b]/40',
+    Icon: Zap,
+  },
+  basico: {
+    label: 'Básico',
+    accent: '#60a5fa',
+    accentDim: '#1e40af',
+    headerBorder: 'border-[#0a1628]',
+    badge: 'bg-[#0a1628] text-[#60a5fa] border-[#60a5fa]/30',
+    userBubble: 'bg-[#1d4ed8]',
+    eyderBorder: 'border-l-[#60a5fa]/40',
+    Icon: Activity,
+  },
+  premium: {
+    label: 'Premium',
+    accent: '#22c55e',
+    accentDim: '#15803d',
+    headerBorder: 'border-[#1c1c1c]',
+    badge: 'bg-[#0f2e1a] text-[#22c55e] border-[#22c55e]/30',
+    userBubble: 'bg-[#15803d]',
+    eyderBorder: 'border-l-[#22c55e]/40',
+    Icon: Crown,
+  },
 };
+
+const CHIPS: Record<Tier, string[]> = {
+  gratis: [
+    '¿Cuánto arroz es 1 EQ cereal?',
+    'Equivalencia del aguacate',
+    '¿Cuánta leche entera es 1 EQ?',
+    'Tortilla de maíz en equivalencias',
+    '¿Cuántas nueces es 1 EQ grasa?',
+  ],
+  basico: [
+    '¿Cuánto arroz es 1 EQ cereal?',
+    'Equivalencia del aguacate',
+    '¿Qué es el sistema NORDER?',
+    'Analiza esta tabla nutricional',
+    '¿Cuánta proteína tiene el pollo?',
+  ],
+  premium: [
+    '¿Puedo adaptar mi desayuno?',
+    '¿Esta comida cabe en mi plan?',
+    'Analiza esta tabla nutricional',
+    '¿Cuánto aguacate tengo asignado?',
+    '¿Qué puedo cenar hoy?',
+  ],
+};
+
+function welcomeMsg(tier: Tier, nombre: string, restantes?: number): string {
+  const n = nombre ? nombre.split(' ')[0] : '';
+  if (tier === 'gratis')
+    return `Hola ${n}, soy **Eyder** tu asesor nutricional.\n\nCon tu cuenta gratuita puedo ayudarte con:\n• Equivalencias SMAE y NORDER\n• Consultas nutricionales generales\n• Análisis de tablas nutricionales\n\n${restantes !== undefined ? `Tienes **${restantes} pregunta${restantes !== 1 ? 's' : ''}** disponible${restantes !== 1 ? 's' : ''} hoy.` : 'Tienes **5 preguntas** al día.'} ¿En qué te ayudo?`;
+  if (tier === 'basico')
+    return `Hola ${n}, soy **Eyder** tu asesor nutricional.\n\nCon tu **Plan Básico** puedo ayudarte con equivalencias SMAE, consultas generales y análisis de tablas nutricionales.\n\n¿En qué te ayudo hoy?`;
+  return `Hola ${n}, soy **Eyder** tu nutriólogo digital.\n\nCon tu **Plan Premium** tengo acceso a tu plan personalizado y puedo ayudarte con recomendaciones específicas para tu día.\n\n¿Qué quieres consultar?`;
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────────
 
 function formatTime(d: Date) {
   return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
@@ -35,107 +111,216 @@ async function compressImage(file: File, maxWidth = 1024, quality = 0.8): Promis
       const canvas = document.createElement('canvas');
       canvas.width = img.width * scale;
       canvas.height = img.height * scale;
-      const ctx = canvas.getContext('2d')!;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
       URL.revokeObjectURL(url);
-      const base64 = canvas.toDataURL('image/jpeg', quality);
-      resolve(base64.split(',')[1]); // solo el base64, sin el prefijo
+      resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1]);
     };
     img.onerror = reject;
     img.src = url;
   });
 }
 
-function Bubble({ msg }: { msg: ChatMessage }) {
+// ── Bubble ─────────────────────────────────────────────────────────────────────
+
+function Bubble({ msg, tier }: { msg: ChatMessage; tier: Tier }) {
   const isUser = msg.sender === 'user';
+  const meta = TIER_META[tier];
+
   return (
-    <div className={`flex items-end gap-2 mb-1 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex items-end gap-2.5 mb-2 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
       {!isUser && (
-        <div className="flex-shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-[#22c55e] to-[#16a34a] flex items-center justify-center mb-1">
+        <div
+          className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mb-0.5 shadow-sm"
+          style={{ background: `linear-gradient(135deg, ${meta.accent}cc, ${meta.accentDim})` }}
+        >
           <span className="text-[10px] font-bold text-white">E</span>
         </div>
       )}
-      <div className={`max-w-[78%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
+      <div className={`max-w-[80%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
         {msg.imagePreview && (
           <img
             src={msg.imagePreview}
-            alt="Imagen enviada"
-            className={`mb-1 rounded-[14px] max-w-[220px] object-cover ${isUser ? 'rounded-br-[4px]' : 'rounded-bl-[4px]'}`}
+            alt="img"
+            className={`mb-1.5 rounded-[14px] max-w-[200px] object-cover border border-white/5 ${isUser ? 'rounded-br-[4px]' : 'rounded-bl-[4px]'}`}
           />
         )}
         {(msg.pending || msg.content) && (
-          <div className={`px-4 py-2.5 text-[13.5px] leading-relaxed whitespace-pre-wrap break-words ${
+          <div className={`px-4 py-2.5 text-[13.5px] leading-relaxed break-words ${
             isUser
-              ? 'bg-[#22c55e] text-white rounded-[18px] rounded-br-[4px]'
+              ? `${meta.userBubble} text-white rounded-[18px] rounded-br-[4px]`
               : msg.error
-              ? 'bg-[#1a0f0f] text-[#f87171] border border-[#3a1515] rounded-[18px] rounded-bl-[4px]'
-              : 'bg-[#1a1a1a] text-[#e8e8e8] rounded-[18px] rounded-bl-[4px]'
+                ? 'bg-[#1a0f0f] text-[#f87171] border border-[#3a1515] rounded-[18px] rounded-bl-[4px]'
+                : `bg-[#161616] border border-[#252525] border-l-2 ${meta.eyderBorder} text-[#e2e2e2] rounded-[18px] rounded-bl-[4px]`
           }`}>
             {msg.pending ? (
               <span className="flex gap-1 items-center h-4">
-                <span className="w-1.5 h-1.5 bg-[#555] rounded-full animate-bounce [animation-delay:0ms]" />
-                <span className="w-1.5 h-1.5 bg-[#555] rounded-full animate-bounce [animation-delay:120ms]" />
-                <span className="w-1.5 h-1.5 bg-[#555] rounded-full animate-bounce [animation-delay:240ms]" />
+                {[0, 120, 240].map(d => (
+                  <span key={d} className="w-1.5 h-1.5 bg-[#555] rounded-full animate-bounce" style={{ animationDelay: `${d}ms` }} />
+                ))}
               </span>
-            ) : msg.content}
+            ) : isUser ? (
+              <span className="whitespace-pre-wrap">{msg.content}</span>
+            ) : (
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                components={{
+                  p: ({ children }) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
+                  strong: ({ children }) => <strong className="font-semibold" style={{ color: TIER_META[tier].accent }}>{children}</strong>,
+                  em: ({ children }) => <em className="italic text-[#aaa]">{children}</em>,
+                  ul: ({ children }) => <ul className="list-disc pl-5 my-2 space-y-2">{children}</ul>,
+                  ol: ({ children }) => <ol className="list-decimal pl-5 my-2 space-y-2">{children}</ol>,
+                  li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+                  code: ({ children, className }) =>
+                    className
+                      ? <code className="block bg-[#0d0d0d] rounded-lg px-3 py-2 text-[11.5px] my-3 overflow-x-auto border border-[#2a2a2a]">{children}</code>
+                      : <code className="bg-[#0d0d0d] rounded px-1.5 py-0.5 text-[11.5px] border border-[#2a2a2a]">{children}</code>,
+                  h1: ({ children }) => <h1 className="text-[15px] font-bold mt-3 mb-2">{children}</h1>,
+                  h2: ({ children }) => <h2 className="text-[14px] font-bold mt-3 mb-2">{children}</h2>,
+                  h3: ({ children }) => <h3 className="text-[13.5px] font-semibold mt-2 mb-1.5">{children}</h3>,
+                  hr: () => <hr className="border-[#2a2a2a] my-3" />,
+                  blockquote: ({ children }) => (
+                    <blockquote className="border-l-2 pl-3 italic text-[#999] my-2" style={{ borderColor: TIER_META[tier].accent }}>
+                      {children}
+                    </blockquote>
+                  ),
+                  table: ({ children }) => <table className="text-[12px] border-collapse my-3 w-full">{children}</table>,
+                  th: ({ children }) => <th className="border border-[#2a2a2a] px-2 py-1.5 text-left bg-[#1a1a1a] font-semibold">{children}</th>,
+                  td: ({ children }) => <td className="border border-[#2a2a2a] px-2 py-1.5">{children}</td>,
+                }}
+              >
+                {msg.content}
+              </ReactMarkdown>
+            )}
           </div>
         )}
-        <span className={`text-[10px] mt-1 px-1 ${isUser ? 'text-[#3a3a3a]' : 'text-[#444]'}`}>
-          {formatTime(msg.timestamp)}
-        </span>
+        <span className="text-[10px] mt-1 px-1 text-[#3a3a3a]">{formatTime(msg.timestamp)}</span>
       </div>
     </div>
   );
 }
 
+// ── Main ───────────────────────────────────────────────────────────────────────
+
 export default function NorderHealthChat() {
   const navigate = useNavigate();
-  const { paciente } = usePortalAuthStore();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [historialCargado, setHistorialCargado] = useState(false);
+  const { paciente: authPaciente } = usePortalAuthStore();
+  const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
+  const [chipsOpen, setChipsOpen] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const topSentinelRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
+  const prevScrollHeightRef = useRef(0);
+  const initialScrollDoneRef = useRef(false);
 
   const { data: me } = useQuery({
     queryKey: ['portal', 'me'],
     queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60_000,
   });
 
-  const { data: historialData, isLoading: loadingHistorial } = useQuery({
+  const {
+    data: historialPages,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading: loadingHistorial,
+  } = useInfiniteQuery({
     queryKey: ['portal', 'mensajes'],
-    queryFn: () => portalApi.get('/api/portal/mensajes').then(r => r.data),
+    queryFn: ({ pageParam }: { pageParam: string | undefined }) =>
+      portalApi.get('/api/portal/mensajes', { params: pageParam ? { cursor: pageParam } : {} }).then(r => r.data),
+    getNextPageParam: (firstPage: any) => firstPage.nextCursor ?? undefined,
+    initialPageParam: undefined as string | undefined,
     staleTime: Infinity,
   });
 
+  const nivelRaw: string = me?.nivelMembresia || authPaciente?.nivelMembresia || 'ninguna';
+  const tier = getTier(nivelRaw);
+  const meta = TIER_META[tier];
+  const nombre = me?.nombre || authPaciente?.nombre || '';
+  const preguntasHoy: number = me?.preguntasHoy ?? 0;
+  const preguntasRestantes: number = me?.preguntasRestantes ?? 5;
+  const limiteGratis: number = me?.limiteGratis ?? 5;
+
+  const historicalMessages: ChatMessage[] = historialPages
+    ? [...historialPages.pages].reverse().flatMap((page: any) =>
+        page.mensajes.map((m: any) => ({
+          id: m.id,
+          content: m.contenido,
+          sender: m.rol as 'user' | 'eyder',
+          timestamp: new Date(m.createdAt),
+        }))
+      )
+    : [];
+
+  const hasHistory = historicalMessages.length > 0;
+
+  const displayMessages: ChatMessage[] = [
+    ...historicalMessages,
+    ...(hasHistory ? [] : []),
+    ...sessionMessages,
+  ];
+
+  // Scroll tracking
   useEffect(() => {
-    if (historialCargado) return;
-    if (loadingHistorial) return;
-    const remotos: ChatMessage[] = (historialData?.mensajes ?? []).map((m: any) => ({
-      id: m.id,
-      content: m.contenido,
-      sender: m.rol as 'user' | 'eyder',
-      timestamp: new Date(m.createdAt),
-      imagePreview: m.tieneImagen ? undefined : undefined,
-    }));
-    setMessages(remotos.length > 0 ? remotos : [WELCOME]);
-    setHistorialCargado(true);
-  }, [historialData, loadingHistorial, historialCargado]);
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const check = () => {
+      const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      setIsAtBottom(atBottom);
+    };
+    el.addEventListener('scroll', check, { passive: true });
+    return () => el.removeEventListener('scroll', check);
+  }, []);
+
+  // Initial scroll to bottom
+  useEffect(() => {
+    if (!loadingHistorial && !initialScrollDoneRef.current) {
+      initialScrollDoneRef.current = true;
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' });
+    }
+  }, [loadingHistorial]);
 
   const scrollToBottom = useCallback(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  useEffect(() => { scrollToBottom(); }, [messages, scrollToBottom]);
+  useEffect(() => {
+    if (sessionMessages.length > 0) scrollToBottom();
+  }, [sessionMessages, scrollToBottom]);
+
+  useLayoutEffect(() => {
+    if (isFetchingNextPage || !scrollContainerRef.current) return;
+    if (prevScrollHeightRef.current > 0) {
+      const el = scrollContainerRef.current;
+      el.scrollTop = el.scrollHeight - prevScrollHeightRef.current;
+      prevScrollHeightRef.current = 0;
+    }
+  }, [historialPages?.pages.length, isFetchingNextPage]);
 
   useEffect(() => {
-    const handleResize = () => scrollToBottom();
-    window.visualViewport?.addEventListener('resize', handleResize);
-    return () => window.visualViewport?.removeEventListener('resize', handleResize);
+    const sentinel = topSentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasNextPage && !isFetchingNextPage && initialScrollDoneRef.current) {
+        if (scrollContainerRef.current) prevScrollHeightRef.current = scrollContainerRef.current.scrollHeight;
+        fetchNextPage();
+      }
+    }, { threshold: 0.1 });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+
+  useEffect(() => {
+    const handle = () => scrollToBottom();
+    window.visualViewport?.addEventListener('resize', handle);
+    return () => window.visualViewport?.removeEventListener('resize', handle);
   }, [scrollToBottom]);
 
   const growTextarea = (el: HTMLTextAreaElement) => {
@@ -148,17 +333,16 @@ export default function NorderHealthChat() {
     if (!file) return;
     try {
       const base64 = await compressImage(file);
-      const preview = `data:image/jpeg;base64,${base64}`;
-      setPendingImage({ base64, preview });
-    } catch {
-      // silently ignore compression errors
-    }
+      setPendingImage({ base64, preview: `data:image/jpeg;base64,${base64}` });
+    } catch { /* ignore */ }
     e.target.value = '';
   };
 
-  const sendMessage = async () => {
-    const text = input.trim();
+  const sendMessage = async (overrideText?: string) => {
+    const text = (overrideText ?? input).trim();
     if ((!text && !pendingImage) || sending) return;
+
+    setChipsOpen(false);
 
     const userMsg: ChatMessage = {
       id: crypto.randomUUID(),
@@ -167,15 +351,7 @@ export default function NorderHealthChat() {
       timestamp: new Date(),
       imagePreview: pendingImage?.preview,
     };
-    const pendingMsg: ChatMessage = {
-      id: 'pending',
-      content: '',
-      sender: 'eyder',
-      timestamp: new Date(),
-      pending: true,
-    };
-
-    setMessages(prev => [...prev, userMsg, pendingMsg]);
+    setSessionMessages(prev => [...prev, userMsg, { id: 'pending', content: '', sender: 'eyder', timestamp: new Date(), pending: true }]);
     setInput('');
     setPendingImage(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
@@ -184,41 +360,20 @@ export default function NorderHealthChat() {
     try {
       const body: Record<string, string> = {};
       if (text) body.mensaje = text;
-      if (userMsg.imagePreview) body.imagen_base64 = pendingImage?.base64 ?? '';
-
-      // re-attach base64 from the captured ref before clearing
-      const imageToSend = userMsg.imagePreview
-        ? userMsg.imagePreview.split(',')[1]
-        : undefined;
-
-      const finalBody: Record<string, string> = {};
-      if (text) finalBody.mensaje = text;
-      if (imageToSend) finalBody.imagen_base64 = imageToSend;
-
-      const res = await portalApi.post('/api/portal/chat', finalBody);
-      setMessages(prev => prev
-        .filter(m => m.id !== 'pending')
-        .concat({
-          id: crypto.randomUUID(),
-          content: res.data.respuesta,
-          sender: 'eyder',
-          timestamp: new Date(),
-        })
-      );
+      if (userMsg.imagePreview) body.imagen_base64 = userMsg.imagePreview.split(',')[1];
+      const res = await portalApi.post('/api/portal/chat', body, { timeout: 180_000 });
+      setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
+        id: crypto.randomUUID(), content: res.data.respuesta, sender: 'eyder', timestamp: new Date(),
+      }));
     } catch (err: any) {
-      const errMsg = err.response?.status === 429
-        ? 'Demasiados mensajes. Espera un momento.'
-        : err.response?.data?.error || 'No pude conectarme. Intenta de nuevo.';
-      setMessages(prev => prev
-        .filter(m => m.id !== 'pending')
-        .concat({
-          id: crypto.randomUUID(),
-          content: errMsg,
-          sender: 'eyder',
-          timestamp: new Date(),
-          error: true,
-        })
-      );
+      const msg = err.response?.status === 429
+        ? 'Demasiados mensajes seguidos. Espera un momento.'
+        : err.response?.status === 403
+          ? (err.response?.data?.error || 'No tienes acceso a esta función.')
+          : 'No pude conectarme. Intenta de nuevo.';
+      setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
+        id: crypto.randomUUID(), content: msg, sender: 'eyder', timestamp: new Date(), error: true,
+      }));
     } finally {
       setSending(false);
       setTimeout(() => textareaRef.current?.focus(), 100);
@@ -226,94 +381,205 @@ export default function NorderHealthChat() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   };
 
-  const nombre = me?.nombre || paciente?.nombre || '';
-
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0d0d0d] select-none">
+    <div className="flex flex-col h-[100dvh] bg-[#0a0a0a] select-none overflow-hidden">
 
-      {/* Header */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-12 pb-3 flex items-center gap-3">
-        <button
-          onClick={() => navigate('/norder-health')}
-          className="w-8 h-8 flex items-center justify-center text-[#555] hover:text-[#888] transition-colors flex-shrink-0"
-        >
-          <ArrowLeft size={18} strokeWidth={2.5} />
-        </button>
-        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#22c55e] to-[#16a34a] flex items-center justify-center flex-shrink-0">
-          <span className="text-[13px] font-bold text-white">E</span>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[15px] font-semibold text-white leading-none">Eyder</p>
-          <p className="text-[11px] text-[#22c55e] mt-0.5 leading-none">Nutriólogo Digital · En línea</p>
-        </div>
-        {nombre && (
-          <div className="w-8 h-8 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center flex-shrink-0">
-            <span className="text-[12px] font-semibold text-[#888]">{nombre.charAt(0).toUpperCase()}</span>
+      {/* ── Header ── */}
+      <div className={`flex-shrink-0 bg-[#0d0d0d] border-b ${meta.headerBorder} px-4 pt-6 pb-3`}>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/norder-health')}
+            className="w-8 h-8 flex items-center justify-center text-[#444] hover:text-[#888] transition-colors flex-shrink-0"
+          >
+            <ArrowLeft size={18} strokeWidth={2.5} />
+          </button>
+
+          {/* Avatar */}
+          <div
+            className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${meta.accent}cc, ${meta.accentDim})` }}
+          >
+            <span className="text-[13px] font-bold text-white">E</span>
           </div>
-        )}
+
+          <div className="flex-1 min-w-0">
+            <p className="text-[15px] font-semibold text-white leading-none">Eyder</p>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background: meta.accent }} />
+              <p className="text-[11px] text-[#484848] leading-none">Nutriólogo Digital</p>
+            </div>
+          </div>
+
+          {/* Tier badge */}
+          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9.5px] font-bold uppercase tracking-widest flex-shrink-0 ${meta.badge}`}>
+            <meta.Icon size={8} strokeWidth={2.5} />
+            {meta.label}
+          </span>
+        </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4" style={{ overscrollBehavior: 'contain' }}>
-        {!historialCargado ? (
+      {/* ── Gratis daily limit banner ── */}
+      {tier === 'gratis' && (
+        <div className="flex-shrink-0 px-4 py-2.5 bg-[#0f0900] border-b border-[#2a1500]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] text-[#888]">
+              {preguntasRestantes > 0
+                ? `${preguntasHoy}/${limiteGratis} preguntas usadas hoy · quedan ${preguntasRestantes}`
+                : '⚠️ Límite diario alcanzado · se renueva mañana'}
+            </span>
+            <button className="text-[11px] font-semibold" style={{ color: TIER_META.gratis.accent }}>
+              Actualizar →
+            </button>
+          </div>
+          <div className="h-1 bg-[#2a1200] rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.min(100, (preguntasHoy / limiteGratis) * 100)}%`, background: TIER_META.gratis.accent }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ── Basico feature strip ── */}
+      {tier === 'basico' && (
+        <div className="flex-shrink-0 px-4 py-2 bg-[#060d18] border-b border-[#0a1628] flex items-center gap-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+          {['Equivalencias SMAE', 'Consultas generales', 'Tablas nutricionales'].map(f => (
+            <span key={f} className="flex-shrink-0 flex items-center gap-1 text-[10.5px] text-[#4a7abf]">
+              <span className="text-[#60a5fa]">✓</span> {f}
+            </span>
+          ))}
+          <span className="flex-shrink-0 flex items-center gap-1 text-[10.5px] text-[#444]">
+            <span>✗</span> Plan personal
+          </span>
+        </div>
+      )}
+
+      {/* ── Messages ── */}
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4"
+        style={{ overscrollBehavior: 'contain' }}
+      >
+        <div ref={topSentinelRef} className="h-1" />
+
+        {isFetchingNextPage && (
+          <div className="flex justify-center py-3">
+            <Loader2 size={14} className="animate-spin text-[#333]" />
+          </div>
+        )}
+
+        {loadingHistorial ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 size={20} className="text-[#333] animate-spin" />
+            <Loader2 size={20} className="animate-spin" style={{ color: meta.accent }} />
           </div>
         ) : (
-          messages.map(msg => <Bubble key={msg.id} msg={msg} />)
+          <>
+            {/* Welcome message when no history */}
+            {!hasHistory && sessionMessages.length === 0 && (
+              <div className="mb-4">
+                <Bubble
+                  tier={tier}
+                  msg={{
+                    id: 'welcome',
+                    content: welcomeMsg(tier, nombre, tier === 'gratis' ? preguntasRestantes : undefined),
+                    sender: 'eyder',
+                    timestamp: new Date(),
+                  }}
+                />
+              </div>
+            )}
+            {displayMessages.map(msg => <Bubble key={msg.id} msg={msg} tier={tier} />)}
+          </>
         )}
+
         <div ref={bottomRef} className="h-2" />
       </div>
 
-      {/* Image preview chip */}
+      {/* ── Scroll to bottom FAB ── */}
+      {!isAtBottom && (
+        <div className="absolute bottom-[96px] right-4 z-10">
+          <button
+            onClick={scrollToBottom}
+            className="w-9 h-9 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center shadow-lg hover:bg-[#222] transition-colors"
+          >
+            <ChevronDown size={16} className="text-[#888]" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Quick action chips ── */}
+      {chipsOpen && (
+        <div className="flex-shrink-0 px-3 pb-2 animate-in slide-in-from-bottom-2 duration-150">
+          <div
+            className="flex gap-2 overflow-x-auto pb-0.5"
+            style={{ scrollbarWidth: 'none' }}
+          >
+            {CHIPS[tier].map(chip => (
+              <button
+                key={chip}
+                onClick={() => { sendMessage(chip); setChipsOpen(false); }}
+                className="flex-shrink-0 px-3 py-2 rounded-full bg-[#141414] border border-[#2a2a2a] text-[12px] text-[#888] whitespace-nowrap active:scale-95 transition-all hover:text-[#bbb]"
+                style={{ borderColor: chipsOpen ? `${meta.accent}25` : undefined }}
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Image preview ── */}
       {pendingImage && (
-        <div className="flex-shrink-0 px-4 pb-2">
-          <div className="relative inline-block">
+        <div className="flex-shrink-0 px-4 pb-2 flex items-end gap-2">
+          <div className="relative">
             <img
               src={pendingImage.preview}
-              alt="Previsualización"
+              alt="preview"
               className="h-20 w-20 object-cover rounded-[12px] border border-[#2a2a2a]"
             />
             <button
               onClick={() => setPendingImage(null)}
-              className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center"
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#1a1a1a] border border-[#333] flex items-center justify-center"
             >
-              <X size={10} className="text-[#888]" strokeWidth={3} />
+              <X size={10} className="text-[#aaa]" strokeWidth={3} />
             </button>
           </div>
-          <p className="text-[10px] text-[#444] mt-1.5">Tabla nutricional lista para enviar</p>
+          <p className="text-[10px] text-[#444] pb-1">Tabla nutricional lista</p>
         </div>
       )}
 
-      {/* Input */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] px-3 pb-8 pt-3 border-t border-[#1c1c1c]">
+      {/* ── Input bar ── */}
+      <div className="flex-shrink-0 bg-[#0d0d0d] px-3 pb-8 pt-2.5 border-t border-[#1a1a1a]">
         <div className="flex items-end gap-2">
 
-          {/* Camera button */}
+          {/* Camera */}
           <button
             onClick={() => imageInputRef.current?.click()}
             disabled={sending}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-[#888] hover:border-[#333] transition-colors disabled:opacity-30"
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border border-[#252525] flex items-center justify-center text-[#555] hover:text-[#777] transition-colors disabled:opacity-30"
           >
             <Camera size={16} strokeWidth={2} />
           </button>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            onChange={handleImageSelect}
-            className="hidden"
-          />
+          <input ref={imageInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+
+          {/* Chips toggle */}
+          <button
+            onClick={() => setChipsOpen(v => !v)}
+            disabled={sending}
+            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border flex items-center justify-center transition-all disabled:opacity-30"
+            style={{
+              borderColor: chipsOpen ? `${meta.accent}50` : '#252525',
+              color: chipsOpen ? meta.accent : '#555',
+            }}
+          >
+            <Sparkles size={14} strokeWidth={2} />
+          </button>
 
           {/* Text input */}
-          <div className="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-[22px] px-4 py-2.5 focus-within:border-[#333] transition-colors">
+          <div className="flex-1 bg-[#161616] border border-[#252525] rounded-[22px] px-4 py-2.5 focus-within:border-[#333] transition-colors">
             <textarea
               ref={textareaRef}
               value={input}
@@ -322,16 +588,17 @@ export default function NorderHealthChat() {
               placeholder={pendingImage ? 'Agrega un comentario (opcional)...' : 'Escribe un mensaje...'}
               rows={1}
               disabled={sending}
-              className="w-full bg-transparent text-[14px] text-[#e8e8e8] placeholder:text-[#3a3a3a] focus:outline-none resize-none leading-relaxed disabled:opacity-50"
+              className="w-full bg-transparent text-[14px] text-[#e0e0e0] placeholder:text-[#333] focus:outline-none resize-none leading-relaxed disabled:opacity-50"
               style={{ minHeight: '22px', maxHeight: '100px' }}
             />
           </div>
 
-          {/* Send button */}
+          {/* Send */}
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={(!input.trim() && !pendingImage) || sending}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#22c55e] flex items-center justify-center transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-[#16a34a]"
+            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
+            style={{ background: meta.accent }}
           >
             <Send size={15} strokeWidth={2.5} className="text-white ml-0.5" />
           </button>
