@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Camera, X, ArrowLeft, Send, Loader2, Crown,
-  Activity, Zap, ChevronDown, Sparkles,
+  Activity, Zap, ChevronDown, Sparkles, Lock,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -26,7 +26,7 @@ type Tier = 'gratis' | 'basico' | 'premium';
 
 function getTier(nivel: string): Tier {
   if (['premium', 'norder_health'].includes(nivel)) return 'premium';
-  if (nivel === 'basico') return 'basico';
+  if (nivel === 'basica' || nivel === 'basico') return 'basico';
   return 'gratis';
 }
 
@@ -203,6 +203,7 @@ function Bubble({ msg, tier }: { msg: ChatMessage; tier: Tier }) {
 
 export default function NorderHealthChat() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { paciente: authPaciente } = usePortalAuthStore();
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -210,6 +211,8 @@ export default function NorderHealthChat() {
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  // Optimistic counter for gratis tier (updates without waiting for /me refetch)
+  const [localRestantes, setLocalRestantes] = useState<number | null>(null);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -222,7 +225,8 @@ export default function NorderHealthChat() {
   const { data: me } = useQuery({
     queryKey: ['portal', 'me'],
     queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
-    staleTime: 60_000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -240,13 +244,22 @@ export default function NorderHealthChat() {
     staleTime: Infinity,
   });
 
-  const nivelRaw: string = me?.nivelMembresia || authPaciente?.nivelMembresia || 'ninguna';
+  const nivelRaw: string = me?.nivelMembresia || 'ninguna';
   const tier = getTier(nivelRaw);
   const meta = TIER_META[tier];
   const nombre = me?.nombre || authPaciente?.nombre || '';
   const preguntasHoy: number = me?.preguntasHoy ?? 0;
-  const preguntasRestantes: number = me?.preguntasRestantes ?? 5;
+  // Use localRestantes for optimistic updates; fall back to server value
+  const preguntasRestantes: number = localRestantes ?? me?.preguntasRestantes ?? 5;
   const limiteGratis: number = me?.limiteGratis ?? 5;
+  const sinPreguntas = tier === 'gratis' && preguntasRestantes <= 0;
+
+  // Sync localRestantes from /me on first load
+  useEffect(() => {
+    if (me?.preguntasRestantes != null && localRestantes === null) {
+      setLocalRestantes(me.preguntasRestantes);
+    }
+  }, [me?.preguntasRestantes]);
 
   const historicalMessages: ChatMessage[] = historialPages
     ? [...historialPages.pages].reverse().flatMap((page: any) =>
@@ -263,7 +276,6 @@ export default function NorderHealthChat() {
 
   const displayMessages: ChatMessage[] = [
     ...historicalMessages,
-    ...(hasHistory ? [] : []),
     ...sessionMessages,
   ];
 
@@ -365,12 +377,21 @@ export default function NorderHealthChat() {
       setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
         id: crypto.randomUUID(), content: res.data.respuesta, sender: 'eyder', timestamp: new Date(),
       }));
+      // Update gratis counter optimistically without waiting for /me refetch
+      if (res.data.preguntasRestantes != null) {
+        setLocalRestantes(res.data.preguntasRestantes);
+        queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
+      }
     } catch (err: any) {
+      const codigo = err.response?.data?.codigo;
       const msg = err.response?.status === 429
         ? 'Demasiados mensajes seguidos. Espera un momento.'
-        : err.response?.status === 403
-          ? (err.response?.data?.error || 'No tienes acceso a esta función.')
-          : 'No pude conectarme. Intenta de nuevo.';
+        : codigo === 'limite_gratis_diario'
+          ? '⚠️ Límite diario alcanzado. Regresa mañana o activa un plan.'
+          : err.response?.status === 403
+            ? (err.response?.data?.error || 'No tienes acceso a esta función.')
+            : 'No pude conectarme. Intenta de nuevo.';
+      if (codigo === 'limite_gratis_diario') setLocalRestantes(0);
       setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
         id: crypto.randomUUID(), content: msg, sender: 'eyder', timestamp: new Date(), error: true,
       }));
@@ -553,56 +574,66 @@ export default function NorderHealthChat() {
 
       {/* ── Input bar ── */}
       <div className="flex-shrink-0 bg-[#0d0d0d] px-3 pb-8 pt-2.5 border-t border-[#1a1a1a]">
-        <div className="flex items-end gap-2">
-
-          {/* Camera */}
-          <button
-            onClick={() => imageInputRef.current?.click()}
-            disabled={sending}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border border-[#252525] flex items-center justify-center text-[#555] hover:text-[#777] transition-colors disabled:opacity-30"
-          >
-            <Camera size={16} strokeWidth={2} />
-          </button>
-          <input ref={imageInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
-
-          {/* Chips toggle */}
-          <button
-            onClick={() => setChipsOpen(v => !v)}
-            disabled={sending}
-            className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border flex items-center justify-center transition-all disabled:opacity-30"
-            style={{
-              borderColor: chipsOpen ? `${meta.accent}50` : '#252525',
-              color: chipsOpen ? meta.accent : '#555',
-            }}
-          >
-            <Sparkles size={14} strokeWidth={2} />
-          </button>
-
-          {/* Text input */}
-          <div className="flex-1 bg-[#161616] border border-[#252525] rounded-[22px] px-4 py-2.5 focus-within:border-[#333] transition-colors">
-            <textarea
-              ref={textareaRef}
-              value={input}
-              onChange={e => { setInput(e.target.value); growTextarea(e.target); }}
-              onKeyDown={handleKeyDown}
-              placeholder={pendingImage ? 'Agrega un comentario (opcional)...' : 'Escribe un mensaje...'}
-              rows={1}
-              disabled={sending}
-              className="w-full bg-transparent text-[14px] text-[#e0e0e0] placeholder:text-[#333] focus:outline-none resize-none leading-relaxed disabled:opacity-50"
-              style={{ minHeight: '22px', maxHeight: '100px' }}
-            />
+        {sinPreguntas ? (
+          <div className="flex flex-col items-center gap-2 py-2">
+            <div className="flex items-center gap-2 text-[#f87171]">
+              <Lock size={14} strokeWidth={2} />
+              <span className="text-[13px] font-semibold">Límite diario alcanzado</span>
+            </div>
+            <p className="text-[11px] text-[#444] text-center">Regresa mañana o activa un plan sin límite</p>
           </div>
+        ) : (
+          <div className="flex items-end gap-2">
 
-          {/* Send */}
-          <button
-            onClick={() => sendMessage()}
-            disabled={(!input.trim() && !pendingImage) || sending}
-            className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
-            style={{ background: meta.accent }}
-          >
-            <Send size={15} strokeWidth={2.5} className="text-white ml-0.5" />
-          </button>
-        </div>
+            {/* Camera */}
+            <button
+              onClick={() => imageInputRef.current?.click()}
+              disabled={sending}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border border-[#252525] flex items-center justify-center text-[#555] hover:text-[#777] transition-colors disabled:opacity-30"
+            >
+              <Camera size={16} strokeWidth={2} />
+            </button>
+            <input ref={imageInputRef} type="file" accept="image/*" capture="environment" onChange={handleImageSelect} className="hidden" />
+
+            {/* Chips toggle */}
+            <button
+              onClick={() => setChipsOpen(v => !v)}
+              disabled={sending}
+              className="flex-shrink-0 w-10 h-10 rounded-full bg-[#161616] border flex items-center justify-center transition-all disabled:opacity-30"
+              style={{
+                borderColor: chipsOpen ? `${meta.accent}50` : '#252525',
+                color: chipsOpen ? meta.accent : '#555',
+              }}
+            >
+              <Sparkles size={14} strokeWidth={2} />
+            </button>
+
+            {/* Text input */}
+            <div className="flex-1 bg-[#161616] border border-[#252525] rounded-[22px] px-4 py-2.5 focus-within:border-[#333] transition-colors">
+              <textarea
+                ref={textareaRef}
+                value={input}
+                onChange={e => { setInput(e.target.value); growTextarea(e.target); }}
+                onKeyDown={handleKeyDown}
+                placeholder={pendingImage ? 'Agrega un comentario (opcional)...' : 'Escribe un mensaje...'}
+                rows={1}
+                disabled={sending}
+                className="w-full bg-transparent text-[14px] text-[#e0e0e0] placeholder:text-[#333] focus:outline-none resize-none leading-relaxed disabled:opacity-50"
+                style={{ minHeight: '22px', maxHeight: '100px' }}
+              />
+            </div>
+
+            {/* Send */}
+            <button
+              onClick={() => sendMessage()}
+              disabled={(!input.trim() && !pendingImage) || sending}
+              className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-95 disabled:opacity-25 disabled:cursor-not-allowed"
+              style={{ background: meta.accent }}
+            >
+              <Send size={15} strokeWidth={2.5} className="text-white ml-0.5" />
+            </button>
+          </div>
+        )}
       </div>
 
     </div>

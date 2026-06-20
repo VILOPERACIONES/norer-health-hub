@@ -28,6 +28,8 @@ import NotFound from "@/pages/NotFound";
 import NorderHealthLogin from "@/pages/norderhealth/Login";
 import NorderHealthHome from "@/pages/norderhealth/Home";
 import NorderHealthChat from "@/pages/norderhealth/Chat";
+import PaymentSuccess from "@/pages/norderhealth/PaymentSuccess";
+import PaymentError from "@/pages/norderhealth/PaymentError";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -137,6 +139,8 @@ const App = () => {
             </Route>
             {/* Norder Health — Portal paciente (PWA, fuera del CRM) */}
             <Route path="/norder-health/login" element={<NorderHealthLogin />} />
+            <Route path="/norder-health/activado" element={<PaymentSuccess />} />
+            <Route path="/norder-health/cancelado" element={<PaymentError />} />
             <Route path="/norder-health" element={<PortalRoute><NorderHealthHome /></PortalRoute>} />
             <Route path="/norder-health/chat" element={<PortalRoute><NorderHealthChat /></PortalRoute>} />
 

@@ -6,17 +6,13 @@ import {
   Flame, MessageCircle, LogOut, ChevronRight,
   Scale, Dumbbell, TrendingUp, TrendingDown, Minus,
   Lock, Droplets, Crown, ClipboardList, Activity, Percent,
-  RefreshCw, Sparkles, Target, Infinity,
+  RefreshCw, Zap, Star, ChevronDown,
 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
-type LucideIcon = React.ComponentType<{
-  className?: string;
-  size?: number;
-  strokeWidth?: number;
-}>;
+type LucideIcon = React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function greeting() {
@@ -41,24 +37,18 @@ function fmt(n: number | null, dec = 1): string {
   return Number(n).toFixed(dec);
 }
 
-// ─── MacroBar ─────────────────────────────────────────────────────────────────
-function MacroBar({ pct, color }: { pct: number; color: string }) {
+// ─── Sección label ────────────────────────────────────────────────────────────
+function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
   return (
-    <div className="h-[3px] rounded-full bg-white/5 overflow-hidden">
-      <div
-        className="h-full rounded-full transition-all duration-700"
-        style={{ width: `${Math.min(Number(pct) || 0, 100)}%`, backgroundColor: color }}
-      />
+    <div className="flex items-center justify-between mb-3">
+      <p className="text-[10px] text-[#3a3a3a] uppercase tracking-[0.15em] font-bold">{children}</p>
+      {right && <span className="text-[10px] text-[#2a2a2a]">{right}</span>}
     </div>
   );
 }
 
 // ─── Delta inline ─────────────────────────────────────────────────────────────
-function Delta({ value, positiveIsGood = true, unit = '' }: {
-  value: number | null;
-  positiveIsGood?: boolean;
-  unit?: string;
-}) {
+function Delta({ value, positiveIsGood = true, unit = '' }: { value: number | null; positiveIsGood?: boolean; unit?: string }) {
   if (value == null) return null;
   const isZero = value === 0;
   const isPos = value > 0;
@@ -68,241 +58,158 @@ function Delta({ value, positiveIsGood = true, unit = '' }: {
   return (
     <span className="flex items-center gap-0.5" style={{ color }}>
       <Icon size={10} strokeWidth={2.5} />
-      <span className="text-[10px] font-semibold leading-none">
-        {isPos && !isZero ? '+' : ''}{value}{unit}
-      </span>
+      <span className="text-[10px] font-semibold leading-none">{isPos && !isZero ? '+' : ''}{value}{unit}</span>
     </span>
   );
 }
 
-// Modos del card switcheable (izquierda)
-type BodyMode = 'grasa' | 'magra';
-const BODY_MODES: { key: BodyMode; label: string; unit: string; posGood: boolean; icon: LucideIcon }[] = [
-  { key: 'grasa', label: '% Grasa', unit: '%', posGood: false, icon: Percent },
-  { key: 'magra', label: 'Masa Magra', unit: 'kg', posGood: true, icon: Dumbbell },
-];
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`bg-[#161616] animate-pulse rounded-[12px] ${className ?? ''}`} />;
+}
 
-// ─── Card mitad: peso (estático) ─────────────────────────────────────────────
-function PesoCard({ value, delta, locked }: {
-  value: number | null;
-  delta: number | null;
-  locked?: boolean;
-}) {
+// ─── MacroBar ─────────────────────────────────────────────────────────────────
+function MacroBar({ pct, color }: { pct: number; color: string }) {
   return (
-    <div className="relative flex-1 bg-[#141414] border border-[#1e1e1e] rounded-[18px] p-4 flex flex-col justify-between min-h-[110px] overflow-hidden">
-      {/* Content — blurred when locked */}
-      <div style={locked ? { filter: 'blur(7px)', userSelect: 'none', pointerEvents: 'none' } : undefined}>
-        <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-            <Scale size={12} className="text-[#22c55e]" strokeWidth={2} />
-          </div>
-          <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">Peso</p>
-        </div>
-        <div className="mt-auto pt-4">
-          <p className="text-[28px] font-black text-white leading-none tracking-tight">
-            {fmt(value, 1)}
-            <span className="text-[11px] font-normal text-[#444] ml-0.5">kg</span>
-          </p>
-          {delta != null && (
-            <div className="mt-1.5">
-              <Delta value={delta} positiveIsGood={false} unit="kg" />
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Lock overlay */}
-      {locked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 z-10">
-          <Lock size={14} className="text-[#888]" strokeWidth={2} />
-          <p className="text-[9px] text-[#666] font-bold uppercase tracking-widest text-center leading-tight">Plan Health</p>
-        </div>
-      )}
+    <div className="h-[3px] rounded-full bg-white/5 overflow-hidden mt-1.5">
+      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(Number(pct) || 0, 100)}%`, backgroundColor: color }} />
     </div>
   );
 }
 
-// ─── Card mitad: switcheable (grasa / masa magra / kg grasa) ─────────────────
-function SwitchableCard({ progreso, locked }: {
-  progreso: any;
-  locked?: boolean;
-}) {
+// ─── Cards de stats ───────────────────────────────────────────────────────────
+type BodyMode = 'grasa' | 'magra';
+const BODY_MODES: { key: BodyMode; label: string; unit: string; posGood: boolean; Icon: LucideIcon }[] = [
+  { key: 'grasa', label: '% Grasa', unit: '%', posGood: false, Icon: Percent },
+  { key: 'magra', label: 'Masa Magra', unit: 'kg', posGood: true, Icon: Dumbbell },
+];
+
+function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
   const [modeIdx, setModeIdx] = useState(0);
   const mode = BODY_MODES[modeIdx];
-  const Icon = mode.icon;
-
-  const getValue = (key: BodyMode): number | null => {
-    if (key === 'grasa') return progreso?.pctGrasa ?? null;
-    if (key === 'magra') return progreso?.masaMagra ?? null;
-    return null;
-  };
-  const getDelta = (key: BodyMode): number | null => {
-    if (key === 'grasa') return progreso?.delta?.pctGrasa ?? null;
-    if (key === 'magra') return progreso?.delta?.masaMagra ?? null;
-    return null;
-  };
-
-  const value = getValue(mode.key);
-  const delta = getDelta(mode.key);
-
-  const next = () => setModeIdx(i => (i + 1) % BODY_MODES.length);
+  const Icon = mode.Icon;
+  const value = mode.key === 'grasa' ? (progreso?.pctGrasa ?? null) : (progreso?.masaMagra ?? null);
+  const delta = mode.key === 'grasa' ? (progreso?.delta?.pctGrasa ?? null) : (progreso?.delta?.masaMagra ?? null);
 
   return (
     <div
-      className="relative flex-1 bg-[#141414] border border-[#1e1e1e] rounded-[18px] p-4 flex flex-col justify-between min-h-[110px] overflow-hidden cursor-pointer select-none active:scale-[0.97] transition-transform"
-      onClick={!locked ? next : undefined}
-      role="button"
-      aria-label={`Ver ${BODY_MODES[(modeIdx + 1) % BODY_MODES.length].label}`}
+      className="relative flex-1 bg-[#111] border border-[#1c1c1c] rounded-[16px] p-4 overflow-hidden cursor-pointer select-none active:scale-[0.97] transition-transform"
+      onClick={() => !locked && setModeIdx(i => (i + 1) % BODY_MODES.length)}
     >
-      {/* Content — blurred when locked */}
-      <div
-        className="flex flex-col justify-between h-full"
-        style={locked ? { filter: 'blur(7px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
-      >
-        {/* Header: icono + label + switch hint */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-[7px] bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-              <Icon size={12} className="text-[#22c55e]" strokeWidth={2} />
-            </div>
-            <p className="text-[9px] text-[#555] font-semibold uppercase tracking-widest leading-none">{mode.label}</p>
+      <div style={locked ? { filter: 'blur(6px)', userSelect: 'none', pointerEvents: 'none' } : undefined}>
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-1.5">
+            <Icon size={11} className="text-[#22c55e]" strokeWidth={2} />
+            <p className="text-[9px] text-[#444] font-bold uppercase tracking-widest">{mode.label}</p>
           </div>
-          <RefreshCw size={10} className="text-[#2a2a2a]" strokeWidth={2.5} />
+          <RefreshCw size={9} className="text-[#222]" />
         </div>
-
-        {/* Valor */}
-        <div className="mt-auto pt-4">
-          <p className="text-[28px] font-black text-white leading-none tracking-tight">
-            {fmt(value, value != null && mode.unit === '%' ? 1 : 1)}
-            <span className="text-[11px] font-normal text-[#444] ml-0.5">{mode.unit}</span>
-          </p>
-          {delta != null && (
-            <div className="mt-1.5">
-              <Delta value={delta} positiveIsGood={mode.posGood} unit={mode.unit} />
-            </div>
-          )}
-        </div>
-
-        {/* Dots indicadores */}
+        <p className="text-[30px] font-black text-white leading-none tracking-tight">
+          {fmt(value)}<span className="text-[11px] font-normal text-[#333] ml-0.5">{mode.unit}</span>
+        </p>
+        {delta != null && <div className="mt-2"><Delta value={delta} positiveIsGood={mode.posGood} unit={mode.unit} /></div>}
         <div className="flex gap-1 mt-3">
           {BODY_MODES.map((_, i) => (
-            <span
-              key={i}
-              className="h-[3px] rounded-full transition-all duration-300"
-              style={{
-                width: i === modeIdx ? '14px' : '4px',
-                backgroundColor: i === modeIdx ? '#22c55e' : '#2a2a2a',
-              }}
-            />
+            <span key={i} className="h-[2px] rounded-full transition-all duration-300" style={{ width: i === modeIdx ? '12px' : '4px', backgroundColor: i === modeIdx ? '#22c55e' : '#222' }} />
           ))}
         </div>
       </div>
-
-      {/* Lock overlay */}
       {locked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 z-10">
-          <Lock size={14} className="text-[#888]" strokeWidth={2} />
-          <p className="text-[9px] text-[#666] font-bold uppercase tracking-widest text-center leading-tight">Plan Health</p>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
+          <Lock size={13} className="text-[#333]" strokeWidth={2} />
+          <p className="text-[8px] text-[#333] font-bold uppercase tracking-widest">Premium</p>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Tiempo de comida card ────────────────────────────────────────────────────
+function PesoCard({ value, delta }: { value: number | null; delta: number | null }) {
+  return (
+    <div className="flex-1 bg-[#111] border border-[#1c1c1c] rounded-[16px] p-4">
+      <div className="flex items-center gap-1.5 mb-3">
+        <Scale size={11} className="text-[#22c55e]" strokeWidth={2} />
+        <p className="text-[9px] text-[#444] font-bold uppercase tracking-widest">Peso</p>
+      </div>
+      <p className="text-[30px] font-black text-white leading-none tracking-tight">
+        {fmt(value)}<span className="text-[11px] font-normal text-[#333] ml-0.5">kg</span>
+      </p>
+      {delta != null && <div className="mt-2"><Delta value={delta} positiveIsGood={false} unit="kg" /></div>}
+    </div>
+  );
+}
+
+// ─── Tiempo card (grid 2 cols) ─────────────────────────────────────────────────
 function TiempoCard({ t }: { t: any }) {
   const Icon = mealIcon(t.nombre);
   const ings: any[] = t.ingredientes || [];
   return (
-    <div className="bg-[#141414] border border-[#1e1e1e] rounded-[14px] px-4 py-3.5">
-      {/* Nombre del tiempo */}
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-[10px] bg-[#1e1e1e] border border-[#242424] flex items-center justify-center flex-shrink-0">
-          <Icon size={14} className="text-[#22c55e]" strokeWidth={2} />
+    <div className="bg-[#111] border border-[#1c1c1c] rounded-[14px] p-3.5">
+      <div className="flex items-center gap-2 mb-2.5">
+        <div className="w-7 h-7 rounded-[8px] bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
+          <Icon size={13} className="text-[#22c55e]" strokeWidth={2} />
         </div>
-        <p className="text-[13px] font-semibold text-white capitalize leading-none">
+        <p className="text-[12px] font-bold text-white capitalize leading-none truncate">
           {t.nombre.charAt(0) + t.nombre.slice(1).toLowerCase()}
         </p>
       </div>
-
-      {/* Lista de alimentos */}
       {ings.length > 0 && (
-        <ul className="mt-3 space-y-1.5 pl-11">
+        <ul className="space-y-1.5">
           {ings.map((ing: any, j: number) => (
-            <li key={j} className="flex items-start gap-2">
-              <span className="w-[5px] h-[5px] rounded-full bg-[#22c55e]/25 flex-shrink-0 mt-[5px]" />
-              <span className="text-[12px] text-[#888] leading-snug">
+            <li key={j} className="flex items-start gap-1.5">
+              <span className="w-1 h-1 rounded-full bg-[#22c55e]/20 flex-shrink-0 mt-1.5" />
+              <span className="text-[10.5px] text-[#555] leading-snug">
                 {ing.descripcion}
-                {ing.cantidad != null && (
-                  <span className="text-[#555]">
-                    {' '}— {ing.cantidad}{ing.unidad ? ` ${ing.unidad}` : ''}
-                  </span>
-                )}
-                {ing.nota && <span className="text-[#444]"> ({ing.nota})</span>}
+                {ing.cantidad != null && <span className="text-[#3a3a3a]"> · {ing.cantidad}{ing.unidad ? ` ${ing.unidad}` : ''}</span>}
               </span>
             </li>
           ))}
         </ul>
       )}
-
-      {/* Bebida / nota al pie */}
-      {(t.bebida || t.nota) && (
-        <div className="mt-2.5 pl-11 flex flex-wrap gap-3">
-          {t.bebida && (
-            <span className="flex items-center gap-1.5 text-[11px] text-[#444]">
-              <Droplets size={11} strokeWidth={2} className="text-[#444]" />
-              {t.bebida}
-            </span>
-          )}
-          {t.nota && (
-            <span className="text-[10px] text-[#3a3a3a] italic leading-snug">{t.nota}</span>
-          )}
+      {t.bebida && (
+        <div className="mt-2 flex items-center gap-1.5">
+          <Droplets size={10} className="text-[#333]" strokeWidth={2} />
+          <span className="text-[10px] text-[#333]">{t.bebida}</span>
         </div>
       )}
     </div>
   );
 }
 
-// ─── Skeleton loader ──────────────────────────────────────────────────────────
-function Skeleton({ className }: { className?: string }) {
-  return <div className={`bg-[#1a1a1a] animate-pulse rounded-[12px] ${className ?? ''}`} />;
-}
+// ─── Upgrade button ────────────────────────────────────────────────────────────
+function UpgradeButton({ nivel, label, color = 'green' }: { nivel: 'basica' | 'premium'; label: string; color?: 'green' | 'blue' | 'ghost' }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-// ─── Intro splash (non-premium, auto-dismiss) ─────────────────────────────────
-const INTRO_FEATURES = [
-  { Icon: Sparkles, text: 'Eyder responde según tu plan nutricional personal' },
-  { Icon: Infinity, text: 'Consultas ilimitadas sin límite diario' },
-  { Icon: Target, text: 'Equivalencias SMAE adaptadas a tus macros asignados' },
-  { Icon: Activity, text: 'Seguimiento de composición corporal' },
-];
+  const handleUpgrade = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await portalApi.post('/api/portal/checkout', { nivel });
+      if (res.data?.url) window.location.href = res.data.url;
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Error al generar el pago. Intenta de nuevo.');
+      setLoading(false);
+    }
+  };
 
-function PlanHealthIntro({ visible }: { visible: boolean }) {
+  const base = 'w-full font-bold rounded-[12px] py-3 text-[13px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50';
+  const styles = {
+    green: `${base} bg-[#22c55e] hover:bg-[#16a34a] text-black`,
+    blue: `${base} bg-[#3b82f6] hover:bg-[#2563eb] text-white`,
+    ghost: `${base} border border-[#1e1e1e] text-[#444] hover:text-[#666]`,
+  };
+
   return (
-    <div
-      className="transition-opacity duration-500"
-      style={{ opacity: visible ? 1 : 0, pointerEvents: visible ? 'auto' : 'none' }}
-    >
-      <div className="bg-[#111] border border-[#22c55e]/15 rounded-[20px] px-5 py-5">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-8 h-8 rounded-[10px] bg-[#0f2e1a] border border-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
-            <Crown size={14} className="text-[#22c55e]" strokeWidth={2} />
-          </div>
-          <div>
-            <p className="text-[10px] text-[#22c55e] font-bold uppercase tracking-widest leading-none">Norder Health</p>
-            <p className="text-[15px] font-bold text-white leading-tight mt-0.5">Plan Health</p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3">
-          {INTRO_FEATURES.map(({ Icon, text }) => (
-            <div key={text} className="flex items-start gap-3">
-              <div className="w-5 h-5 rounded-[6px] bg-[#0f2e1a] flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Icon size={11} className="text-[#22c55e]" strokeWidth={2} />
-              </div>
-              <p className="text-[12px] text-[#666] leading-snug">{text}</p>
-            </div>
-          ))}
-        </div>
-        <p className="text-[10px] text-[#333] mt-4 text-center">Habla con tu nutriólogo para activarlo</p>
-      </div>
+    <div>
+      <button onClick={handleUpgrade} disabled={loading} className={styles[color]}>
+        {loading ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          : color === 'green' ? <Crown size={14} strokeWidth={2.5} />
+          : color === 'blue' ? <Zap size={14} strokeWidth={2.5} />
+          : <Star size={14} strokeWidth={2.5} />}
+        {label}
+      </button>
+      {error && <p className="text-[10px] text-[#f87171] mt-1.5 text-center">{error}</p>}
     </div>
   );
 }
@@ -312,12 +219,12 @@ export default function NorderHealthHome() {
   const navigate = useNavigate();
   const { paciente: stored, token, clearPortalAuth } = usePortalAuthStore();
   const [menuActivo, setMenuActivo] = useState(0);
-  const [introVisible, setIntroVisible] = useState(true);
 
   const { data: me, isLoading: loadingMe } = useQuery({
     queryKey: ['portal', 'me'],
     queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
-    staleTime: 5 * 60 * 1000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
     enabled: !!token,
   });
 
@@ -332,16 +239,16 @@ export default function NorderHealthHome() {
   const nombre = me?.nombre || stored?.nombre || '';
   const apellido = me?.apellido || stored?.apellido || '';
   const nombreCompleto = [nombre, apellido].filter(Boolean).join(' ') || 'Bienvenido';
-  const nivel: string = me?.nivelMembresia || stored?.nivelMembresia || 'ninguna';
-  const isPremium = nivel !== 'ninguna';
+  const nivel: string = loadingMe ? (stored?.nivelMembresia || 'ninguna') : (me?.nivelMembresia || 'ninguna');
 
-  // Auto-dismiss intro after 1.8s once data is ready
-  useEffect(() => {
-    if (!loadingMe && !isPremium) {
-      const t = setTimeout(() => setIntroVisible(false), 1800);
-      return () => clearTimeout(t);
-    }
-  }, [loadingMe, isPremium]);
+  const isGratis = !nivel || nivel === 'ninguna';
+  const isBasica = nivel === 'basica';
+  const isPremium = nivel === 'premium' || nivel === 'norder_health';
+
+  const preguntasRestantes: number = me?.preguntasRestantes ?? 0;
+  const limiteGratis: number = me?.limiteGratis ?? 5;
+  const pctRestantes = limiteGratis > 0 ? Math.min(1, preguntasRestantes / limiteGratis) : 0;
+  const sinPreguntas = isGratis && preguntasRestantes <= 0 && !loadingMe;
 
   const progreso = me?.progreso ?? null;
   const plan = planData?.plan ?? null;
@@ -351,87 +258,96 @@ export default function NorderHealthHome() {
   const multiMenus = menus.length > 1;
 
   return (
-    /* Layout idéntico a Chat: flex col h-[100dvh] */
-    <div className="flex flex-col h-[100dvh] bg-[#0d0d0d]">
+    <div className="flex flex-col h-[100dvh] bg-[#0a0a0a]">
 
-      {/* ── Header (fijo arriba, no hace scroll) ──────────────────────── */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] border-b border-[#1c1c1c] px-4 pt-4 pb-4 flex items-start justify-between">
-        <div>
-          <p className="text-[11px] text-[#444] font-medium">{greeting()}</p>
-          <h1 className="text-[20px] font-bold text-white tracking-tight mt-0.5 leading-tight">
-            {loadingMe ? <Skeleton className="h-6 w-36" /> : nombreCompleto}
+      {/* ── Header ──────────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-[#0a0a0a] px-5 pt-6 pb-5 flex items-start justify-between border-b border-[#141414]">
+        <div className="flex-1 min-w-0 pr-3">
+          <p className="text-[11px] text-[#333] font-medium tracking-wide">{greeting()}</p>
+          <h1 className="text-[22px] font-black text-white tracking-tight mt-0.5 leading-tight truncate">
+            {loadingMe ? <Skeleton className="h-7 w-44 mt-0.5" /> : nombreCompleto}
           </h1>
+
           {/* Badge de membresía */}
-          <div className="mt-2">
+          <div className="mt-2.5 flex items-center gap-2">
             {isPremium ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0f2e1a] border border-[#22c55e]/20 text-[9px] font-bold text-[#22c55e] uppercase tracking-widest">
-                <Crown size={8} strokeWidth={2.5} /> Health
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0f2e1a] border border-[#22c55e]/20 text-[9.5px] font-bold text-[#22c55e] uppercase tracking-widest">
+                <Crown size={9} strokeWidth={2.5} /> Plan Premium
+              </span>
+            ) : isBasica ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#0f1e35] border border-[#3b82f6]/20 text-[9.5px] font-bold text-[#60a5fa] uppercase tracking-widest">
+                <Zap size={9} strokeWidth={2.5} /> Plan Básico
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#1a1a1a] border border-[#242424] text-[9px] font-semibold text-[#555] uppercase tracking-widest">
-                <Activity size={8} strokeWidth={2.5} /> Básico
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#141414] border border-[#222] text-[9.5px] font-semibold text-[#444] uppercase tracking-widest">
+                <Activity size={9} strokeWidth={2.5} /> Gratis
               </span>
+            )}
+
+            {/* Barra de preguntas gratis */}
+            {isGratis && !loadingMe && (
+              <div className="flex items-center gap-1.5">
+                <div className="w-16 h-[3px] rounded-full bg-[#1e1e1e] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${pctRestantes * 100}%`, backgroundColor: pctRestantes > 0.4 ? '#22c55e' : pctRestantes > 0.2 ? '#f59e0b' : '#f87171' }}
+                  />
+                </div>
+                <span className="text-[9px] font-semibold" style={{ color: pctRestantes > 0.4 ? '#22c55e' : pctRestantes > 0.2 ? '#f59e0b' : '#f87171' }}>
+                  {preguntasRestantes}/{limiteGratis}
+                </span>
+              </div>
             )}
           </div>
         </div>
+
         <button
           onClick={() => { clearPortalAuth(); navigate('/norder-health/login', { replace: true }); }}
-          className="mt-1 w-9 h-9 rounded-full bg-[#1a1a1a] border border-[#242424] flex items-center justify-center text-[#555] hover:text-[#888] transition-colors flex-shrink-0"
+          className="w-9 h-9 rounded-full bg-[#141414] border border-[#1e1e1e] flex items-center justify-center text-[#333] hover:text-[#666] transition-colors flex-shrink-0 mt-1"
         >
           <LogOut size={14} strokeWidth={2} />
         </button>
       </div>
 
-      {/* ── Cuerpo scrollable ──────────────────────────────────────────── */}
-      <div className="flex-1 overflow-y-auto px-4 py-5 flex flex-col gap-5" style={{ overscrollBehavior: 'contain' }}>
+      {/* ── Cuerpo scrollable ────────────────────────────────────────── */}
+      <div className="flex-1 overflow-y-auto" style={{ overscrollBehavior: 'contain' }}>
+        <div className="px-5 py-6 flex flex-col gap-7">
 
-        {/* ── Loading: skeletons ──────────────────────────────────────── */}
-        {loadingMe && (
-          <>
-            <div className="flex gap-3">
-              <Skeleton className="flex-1 h-[110px] rounded-[18px]" />
-              <Skeleton className="flex-1 h-[110px] rounded-[18px]" />
-            </div>
-            <Skeleton className="h-[160px] rounded-[20px]" />
-          </>
-        )}
-
-        {/* ── Intro splash (non-premium, auto-dismiss 1.8s) ───────────── */}
-        {!loadingMe && !isPremium && introVisible && (
-          <PlanHealthIntro visible={introVisible} />
-        )}
-
-        {/* ── Contenido real (premium O intro ya dismisseado) ─────────── */}
-        {!loadingMe && (isPremium || !introVisible) && (
-          <>
-            {/* Stats de progreso */}
-            <div>
-              <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold mb-3">Tu progreso</p>
+          {/* ── Progreso ──────────────────────────────────────────────── */}
+          <section>
+            <SectionLabel>Tu progreso</SectionLabel>
+            {loadingMe ? (
               <div className="flex gap-3">
-                <SwitchableCard progreso={progreso} locked={!isPremium} />
+                <Skeleton className="flex-1 h-[100px]" />
+                <Skeleton className="flex-1 h-[100px]" />
+              </div>
+            ) : (
+              <div className="flex gap-3">
+                <StatCard progreso={progreso} locked={!isPremium} />
                 <PesoCard value={progreso?.peso ?? null} delta={progreso?.delta?.peso ?? null} />
               </div>
-            </div>
+            )}
+          </section>
 
-            {/* Plan card */}
+          {/* ── Plan activo ───────────────────────────────────────────── */}
+          <section>
+            <SectionLabel>Plan activo</SectionLabel>
             {loadingPlan ? (
-              <Skeleton className="h-[150px] rounded-[20px]" />
+              <Skeleton className="h-[140px]" />
             ) : plan ? (
-              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5">
+              <div className="bg-[#111] border border-[#1c1c1c] rounded-[18px] p-5">
                 <div className="flex items-start justify-between mb-5">
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-[10px] text-[#22c55e] uppercase tracking-widest font-bold mb-1">Plan activo</p>
-                    <p className="text-[16px] font-bold text-white leading-tight truncate">
-                      {plan.nombre || 'Plan Nutricional'}
-                    </p>
-                    {plan.tipoPlan && <p className="text-[11px] text-[#555] mt-0.5">{plan.tipoPlan}</p>}
+                  <div className="flex-1 min-w-0 pr-3">
+                    <p className="text-[9px] text-[#22c55e] uppercase tracking-widest font-bold mb-1.5">Norder Health</p>
+                    <p className="text-[15px] font-bold text-white leading-tight truncate">{plan.nombre || 'Plan Nutricional'}</p>
+                    {plan.tipoPlan && <p className="text-[11px] text-[#444] mt-0.5">{plan.tipoPlan}</p>}
                   </div>
-                  <div className="flex-shrink-0 text-right">
-                    <div className="flex items-center justify-end gap-1.5 mb-0.5">
-                      <Flame size={13} className="text-[#f59e0b]" strokeWidth={2} />
-                      <p className="text-[28px] font-black text-white leading-none">{plan.calorias}</p>
+                  <div className="text-right flex-shrink-0">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Flame size={14} className="text-[#f59e0b]" strokeWidth={2} />
+                      <p className="text-[30px] font-black text-white leading-none">{plan.calorias}</p>
                     </div>
-                    <p className="text-[10px] text-[#555]">kcal / día</p>
+                    <p className="text-[9px] text-[#333] mt-0.5 uppercase tracking-wider">kcal / día</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
@@ -441,107 +357,185 @@ export default function NorderHealthHome() {
                     { label: 'Grasas', pct: plan.grasasPct, gr: plan.grasasGr, color: '#f59e0b' },
                   ] as const).map(m => (
                     <div key={m.label}>
-                      <div className="flex items-baseline justify-between mb-1.5">
-                        <span className="text-[9px] text-[#444] font-semibold uppercase tracking-wider">{m.label}</span>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[9px] text-[#333] font-semibold uppercase tracking-wider">{m.label}</span>
                         <span className="text-[11px] font-bold" style={{ color: m.color }}>{m.pct}%</span>
                       </div>
                       <MacroBar pct={Number(m.pct) || 0} color={m.color} />
-                      {m.gr && <p className="text-[9px] text-[#3a3a3a] mt-1">{parseFloat(String(m.gr)).toFixed(0)}g</p>}
+                      {m.gr && <p className="text-[9px] text-[#2a2a2a] mt-1">{parseFloat(String(m.gr)).toFixed(0)}g</p>}
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[20px] p-5 flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-[#1e1e1e] flex items-center justify-center flex-shrink-0">
-                  <ClipboardList size={17} className="text-[#333]" />
+              <div className="bg-[#111] border border-[#1c1c1c] rounded-[18px] p-5 flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-[#161616] flex items-center justify-center flex-shrink-0">
+                  <ClipboardList size={16} className="text-[#2a2a2a]" />
                 </div>
                 <div>
                   <p className="text-[14px] font-semibold text-white">Sin plan asignado</p>
-                  <p className="text-[12px] text-[#555] mt-0.5">Tu nutriólogo aún no ha publicado tu plan</p>
+                  <p className="text-[11px] text-[#444] mt-0.5">Tu nutriólogo aún no ha publicado tu plan</p>
                 </div>
               </div>
             )}
+          </section>
 
-            {/* Menús */}
-            {!loadingPlan && menus.length > 0 && (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-semibold">
-                    {multiMenus ? 'Menús del plan' : 'Tiempos de comida'}
-                  </p>
-                  {multiMenus && <span className="text-[10px] text-[#3a3a3a]">{menus.length} opciones</span>}
+          {/* ── Menús ─────────────────────────────────────────────────── */}
+          {!loadingPlan && menus.length > 0 && (
+            <section>
+              <SectionLabel right={multiMenus ? `${menus.length} opciones` : undefined}>
+                Menús del plan
+              </SectionLabel>
+
+              {/* Tabs de menú */}
+              {multiMenus && (
+                <div className="flex gap-2 overflow-x-auto mb-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
+                  {menus.map((m: any, i: number) => (
+                    <button
+                      key={i}
+                      onClick={() => isPremium && setMenuActivo(i)}
+                      className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold border transition-all ${
+                        menuIdx === i
+                          ? 'bg-[#22c55e] border-transparent text-black'
+                          : 'bg-[#111] border-[#1c1c1c] text-[#444] hover:text-[#666]'
+                      }`}
+                    >
+                      {m.nombre || `Menú ${i + 1}`}
+                    </button>
+                  ))}
                 </div>
-                {multiMenus && (
-                  <div className="flex gap-2 overflow-x-auto mb-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
-                    {menus.map((m: any, i: number) => (
-                      <button
-                        key={i}
-                        onClick={() => isPremium && setMenuActivo(i)}
-                        className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold border transition-all duration-200 ${menuIdx === i
-                            ? 'bg-[#22c55e] border-transparent text-black shadow-lg shadow-[#22c55e]/15'
-                            : 'bg-[#141414] border-[#1e1e1e] text-[#555] hover:text-[#777]'
-                          }`}
-                      >
-                        {m.nombre || `Menú ${i + 1}`}
-                      </button>
-                    ))}
+              )}
+
+              {multiMenus && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
+                  <p className="text-[12px] text-white font-semibold">{menus[menuIdx]?.nombre || `Menú ${menuIdx + 1}`}</p>
+                  <ChevronRight size={10} className="text-[#2a2a2a]" />
+                  <p className="text-[10px] text-[#333]">{tiemposActivos.length} tiempos</p>
+                </div>
+              )}
+
+              {/* Grid 2 columnas */}
+              <div
+                className="grid grid-cols-2 gap-2.5"
+                style={!isPremium ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
+              >
+                {tiemposActivos.map((t: any, i: number) => (
+                  <TiempoCard key={`${menuIdx}-${i}`} t={t} />
+                ))}
+              </div>
+
+              {!isPremium && menus.length > 0 && (
+                <div className="mt-3 flex items-center justify-center gap-1.5">
+                  <Lock size={10} className="text-[#333]" />
+                  <p className="text-[10px] text-[#333]">Activa Premium para ver tu plan completo</p>
+                </div>
+              )}
+            </section>
+          )}
+
+          {/* ── Notas del nutriólogo (solo premium) ─────────────────── */}
+          {plan?.notasGenerales && isPremium && (
+            <section>
+              <SectionLabel>Notas de tu nutriólogo</SectionLabel>
+              <div className="bg-[#111] border border-[#1c1c1c] rounded-[14px] px-4 py-4">
+                <p className="text-[13px] text-[#666] leading-relaxed">{plan.notasGenerales}</p>
+              </div>
+            </section>
+          )}
+
+          {/* ── Teaser básico → premium ──────────────────────────────── */}
+          {isBasica && (
+            <section>
+              <div className="bg-[#111] border border-[#22c55e]/15 rounded-[18px] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-[10px] bg-[#0f2e1a] border border-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
+                    <Crown size={15} className="text-[#22c55e]" strokeWidth={2} />
                   </div>
-                )}
-                {multiMenus && (
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e] flex-shrink-0" />
-                    <p className="text-[12px] text-white font-semibold">{menus[menuIdx]?.nombre || `Menú ${menuIdx + 1}`}</p>
-                    <ChevronRight size={11} className="text-[#2a2a2a]" />
-                    <p className="text-[11px] text-[#444]">{tiemposActivos.length} tiempos</p>
+                  <div>
+                    <p className="text-[13px] font-bold text-white leading-none">Sube a Premium</p>
+                    <p className="text-[11px] text-[#444] mt-0.5">Plan personalizado · Análisis corporal</p>
                   </div>
-                )}
-                <div
-                  className="flex flex-col gap-2"
-                  style={!isPremium ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
-                >
-                  {tiemposActivos.map((t: any, i: number) => <TiempoCard key={`${menuIdx}-${i}`} t={t} />)}
+                </div>
+                <ul className="space-y-2 mb-4">
+                  {['Plan nutricional personalizado visible aquí', 'El agente responde según tu plan específico', 'Análisis completo de composición corporal'].map((item, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <ChevronRight size={10} className="text-[#22c55e]/40 flex-shrink-0" />
+                      <span className="text-[11.5px] text-[#555]">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <UpgradeButton nivel="premium" label="Subir a Premium" />
+              </div>
+            </section>
+          )}
+
+          {/* ── Teaser gratis → básico ───────────────────────────────── */}
+          {isGratis && (
+            <section>
+              <div className="bg-[#111] border border-[#3b82f6]/15 rounded-[18px] p-5">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-9 h-9 rounded-[10px] bg-[#0f1e35] border border-[#3b82f6]/20 flex items-center justify-center flex-shrink-0">
+                    <Zap size={15} className="text-[#60a5fa]" strokeWidth={2} />
+                  </div>
+                  <div>
+                    <p className="text-[13px] font-bold text-white leading-none">Chat ilimitado</p>
+                    <p className="text-[11px] text-[#444] mt-0.5">Plan Básico · Sin límite diario</p>
+                  </div>
+                </div>
+                <ul className="space-y-2 mb-4">
+                  {['Chat ilimitado con el agente nutricional', 'Consultas sobre equivalencias e imágenes', 'Sin restricción diaria'].map((item, i) => (
+                    <li key={i} className="flex items-center gap-2">
+                      <ChevronRight size={10} className="text-[#60a5fa]/40 flex-shrink-0" />
+                      <span className="text-[11.5px] text-[#555]">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-col gap-2">
+                  <UpgradeButton nivel="basica" label="Activar Plan Básico" color="blue" />
+                  <UpgradeButton nivel="premium" label="Ver Plan Premium" color="ghost" />
                 </div>
               </div>
-            )}
+            </section>
+          )}
 
-            {/* Notas */}
-            {plan?.notasGenerales && isPremium && (
-              <div className="bg-[#141414] border border-[#1e1e1e] rounded-[16px] px-4 py-4">
-                <p className="text-[10px] text-[#444] uppercase tracking-widest font-semibold mb-2.5">Notas de tu nutriólogo</p>
-                <p className="text-[13px] text-[#777] leading-relaxed">{plan.notasGenerales}</p>
-              </div>
-            )}
-
-            <div className="h-6" />
-          </>
-        )}
-
+          <div className="h-2" />
+        </div>
       </div>
 
-      {/* ── Footer fijo en el flujo normal (como Chat) ────────────────── */}
-      <div className="flex-shrink-0 bg-[#0d0d0d] border-t border-[#1c1c1c] px-4 py-4 pb-4">
+      {/* ── Footer fijo ──────────────────────────────────────────────── */}
+      <div className="flex-shrink-0 bg-[#0a0a0a] border-t border-[#141414] px-5 py-4 pb-8">
         {isPremium ? (
           <button
             onClick={() => navigate('/norder-health/chat')}
-            className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black rounded-[14px] py-3.5 flex flex-col items-center justify-center transition-all shadow-lg shadow-[#22c55e]/20"
+            className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black rounded-[14px] py-4 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#22c55e]/15"
           >
-            <div className="flex items-center gap-2.5">
-              <MessageCircle size={16} strokeWidth={2.5} />
-              <span className="text-[14px] font-bold">Pregúntale a Eyder</span>
-            </div>
-            <span className="text-[10px] font-medium opacity-70 mt-0.5">Equivalencias · Tu plan · Adaptaciones</span>
+            <Crown size={16} strokeWidth={2.5} />
+            <span className="text-[15px] font-bold">Chat con Eyder</span>
+          </button>
+        ) : isBasica ? (
+          <button
+            onClick={() => navigate('/norder-health/chat')}
+            className="w-full bg-[#3b82f6] hover:bg-[#2563eb] active:scale-[0.98] text-white rounded-[14px] py-4 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#3b82f6]/15"
+          >
+            <Zap size={16} strokeWidth={2.5} />
+            <span className="text-[15px] font-bold">Chat Ilimitado</span>
+          </button>
+        ) : sinPreguntas ? (
+          <button
+            disabled
+            className="w-full bg-[#111] border border-[#1c1c1c] text-[#333] rounded-[14px] py-4 flex items-center justify-center gap-2 cursor-not-allowed"
+          >
+            <Lock size={15} strokeWidth={2} />
+            <span className="text-[14px] font-semibold">Límite diario alcanzado</span>
           </button>
         ) : (
           <button
             onClick={() => navigate('/norder-health/chat')}
-            className="w-full bg-[#141414] border border-[#1e1e1e] text-[#555] rounded-[14px] py-3.5 flex flex-col items-center justify-center transition-colors hover:border-[#2a2a2a]"
+            className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black rounded-[14px] py-4 flex items-center justify-center gap-2.5 transition-all"
           >
-            <div className="flex items-center gap-2.5">
-              <MessageCircle size={14} strokeWidth={2} />
-              <span className="text-[13px] font-semibold">Consultar equivalencias</span>
-            </div>
-            <span className="text-[10px] text-[#3a3a3a] mt-0.5">Plan básico · conversiones generales</span>
+            <MessageCircle size={16} strokeWidth={2.5} />
+            <span className="text-[15px] font-bold">Chat · {preguntasRestantes} pregunta{preguntasRestantes !== 1 ? 's' : ''} hoy</span>
           </button>
         )}
       </div>
