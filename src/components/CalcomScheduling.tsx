@@ -95,20 +95,24 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
   const fetchMonthAvailability = async (mod: 'presencial' | 'online' | 'doble_presencial') => {
     try {
       const eventTypeId = EVENT_TYPES[mod];
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = addMonths(new Date(), 2);
-      
+      // Usar offset -06:00 (America/Merida = UTC-6, CST permanente desde 2022)
+      const todayStr = format(new Date(), 'yyyy-MM-dd');
+      const twoMonthsLater = addMonths(new Date(), 2);
+      const endStr = format(twoMonthsLater, 'yyyy-MM-dd');
+      const startTimeISO = `${todayStr}T00:00:00-06:00`;
+      const endTimeISO   = `${endStr}T23:59:59-06:00`;
+
       const { data } = await api.get('/api/citas/slots', {
         params: {
           eventTypeId,
-          startTime: start.toISOString(),
-          endTime: end.toISOString(),
+          startTime: startTimeISO,
+          endTime:   endTimeISO,
         }
       });
 
       const slotsObj = data.slots || {};
       const days = new Set<string>(Object.keys(slotsObj));
+      console.log('[fetchMonthAvailability] Días disponibles:', Array.from(days));
       setAvailableDays(days);
 
       // Auto-seleccionar el primer día disponible más próximo
@@ -132,17 +136,23 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
     setLoadingSlots(true);
     try {
       const eventTypeId = EVENT_TYPES[mod];
-      const startTime = new Date(selectedDate);
-      startTime.setHours(0, 0, 0, 0);
-      
-      const endTime = new Date(selectedDate);
-      endTime.setHours(23, 59, 59, 999);
+
+      // America/Merida = UTC-6 (CST permanente, sin horario de verano desde 2022).
+      // Usamos -06:00 explícito para que Cal.com reciba el día EXACTO sin
+      // desplazamiento causado por la zona del navegador.
+      const y  = selectedDate.getFullYear();
+      const mo = String(selectedDate.getMonth() + 1).padStart(2, '0');
+      const d  = String(selectedDate.getDate()).padStart(2, '0');
+      const startTimeISO = `${y}-${mo}-${d}T00:00:00-06:00`;
+      const endTimeISO   = `${y}-${mo}-${d}T23:59:59-06:00`;
+
+      console.log('[fetchSlots] Rango Mérida:', startTimeISO, '→', endTimeISO);
 
       const { data } = await api.get('/api/citas/slots', {
         params: {
           eventTypeId,
-          startTime: startTime.toISOString(),
-          endTime: endTime.toISOString(),
+          startTime: startTimeISO,
+          endTime:   endTimeISO,
         }
       });
 
@@ -153,7 +163,8 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
       } else if (Array.isArray(data)) {
         availableSlots = data;
       }
-      
+
+      console.log('[fetchSlots] Slots recibidos:', availableSlots.map((s: Slot) => s.time));
       setSlots(availableSlots);
     } catch (error) {
       console.error('Error fetching slots:', error);
@@ -310,7 +321,12 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
                 {eventDetails?.title || modalidad} — {format(new Date(selectedSlot), "d 'de' MMMM", { locale: es })}
               </p>
               <p className="text-[14px] font-black text-brand-primary mt-1">
-                {format(new Date(selectedSlot), "HH:mm 'hrs'")}
+                {new Intl.DateTimeFormat('es-MX', {
+                  timeZone: 'America/Mexico_City',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                }).format(new Date(selectedSlot))} hrs
               </p>
             </div>
           )}
@@ -330,8 +346,14 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
             ) : slots.length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
                 {slots.map((slot) => {
-                  const slotTime = new Date(slot.time);
                   const isSelected = selectedSlot === slot.time;
+                  // Mostrar la hora en America/Merida (UTC-6, CST permanente)
+                  const slotLabel = new Intl.DateTimeFormat('es-MX', {
+                    timeZone: 'America/Mexico_City',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  }).format(new Date(slot.time));
                   return (
                     <button
                       key={slot.time}
@@ -343,7 +365,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
                           : "bg-[#1f1f1f] border-[#333] text-[#8a8a8a] hover:border-[#555] hover:text-white"
                       )}
                     >
-                      {format(slotTime, 'HH:mm')}
+                      {slotLabel}
                     </button>
                   );
                 })}
