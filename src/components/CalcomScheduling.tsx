@@ -31,11 +31,12 @@ interface CalcomSchedulingProps {
 
 const EVENT_TYPES = {
   presencial: 4418629,
-  online: 4418611
+  online: 4418611,
+  doble_presencial: 4844702
 };
 
 const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) => {
-  const [modalidad, setModalidad] = useState<'presencial' | 'online' | null>('presencial');
+  const [modalidad, setModalidad] = useState<'presencial' | 'online' | 'doble_presencial' | null>('presencial');
   const [date, setDate] = useState<Date | undefined>(new Date());
   
   const stripLada = (phone?: string) => {
@@ -77,7 +78,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
     setSelectedSlot(null);
   }, [modalidad, date]);
 
-  const fetchEventDetails = async (mod: 'presencial' | 'online') => {
+  const fetchEventDetails = async (mod: 'presencial' | 'online' | 'doble_presencial') => {
     try {
       const { data } = await api.get(`/api/citas/event-type/${EVENT_TYPES[mod]}`);
       setEventDetails(data.eventType || data);
@@ -86,7 +87,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
     }
   };
 
-  const fetchMonthAvailability = async (mod: 'presencial' | 'online') => {
+  const fetchMonthAvailability = async (mod: 'presencial' | 'online' | 'doble_presencial') => {
     try {
       const eventTypeId = EVENT_TYPES[mod];
       const start = new Date();
@@ -102,14 +103,27 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
       });
 
       const slotsObj = data.slots || {};
-      const days = new Set(Object.keys(slotsObj));
+      const days = new Set<string>(Object.keys(slotsObj));
       setAvailableDays(days);
+
+      // Auto-seleccionar el primer día disponible más próximo
+      if (days.size > 0) {
+        const today = format(new Date(), 'yyyy-MM-dd');
+        const sortedDays = Array.from(days).sort();
+        const firstAvailable = days.has(today)
+          ? today
+          : sortedDays.find((d) => d >= today) || sortedDays[0];
+        if (firstAvailable) {
+          const [year, month, day] = firstAvailable.split('-').map(Number);
+          setDate(new Date(year, month - 1, day));
+        }
+      }
     } catch (error) {
       console.error('Error fetching month availability:', error);
     }
   };
 
-  const fetchSlots = async (selectedDate: Date, mod: 'presencial' | 'online') => {
+  const fetchSlots = async (selectedDate: Date, mod: 'presencial' | 'online' | 'doble_presencial') => {
     setLoadingSlots(true);
     try {
       const eventTypeId = EVENT_TYPES[mod];
@@ -231,13 +245,19 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
                 <SelectItem value="presencial">
                   <div className="flex items-center gap-2">
                     <MapPin className="h-3.5 w-3.5 text-text-muted" />
-                    <span>{eventDetails?.title || 'Presencial'}</span>
+                    <span>Presencial</span>
                   </div>
                 </SelectItem>
                 <SelectItem value="online">
                   <div className="flex items-center gap-2">
                     <Video className="h-3.5 w-3.5 text-text-muted" />
-                    <span>{eventDetails?.title || 'Online'}</span>
+                    <span>Online</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value="doble_presencial">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-3.5 w-3.5 text-brand-primary" />
+                    <span>Presencial — Doble cita de seguimiento</span>
                   </div>
                 </SelectItem>
               </SelectContent>
