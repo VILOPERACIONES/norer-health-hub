@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 
-const defaultTiempos = ['Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
+const defaultTiempos = ['Pre Entreno', 'Desayuno', 'Colacion', 'Almuerzo', 'Colacion', 'Cena'];
 
 const emptyMenu = (name: string): Menu => ({
   nombre: name,
@@ -137,9 +137,9 @@ export const CreateEditPlanForm = ({
           nota = rawNote.replace(/\n?<!--META:.*?-->/, '');
         }
         const rawBebida = t.bebida || metaBebida;
-        // B2/B3: Si la colación tiene el agua-por-defecto guardada en BD, limpiarla
-        const isThisColacion = /colaci[oó]n/i.test(t.nombre || '');
-        const bebidaFinal = (isThisColacion && rawBebida === 'Agua natural 500ml') ? '' : rawBebida;
+        // Si el tiempo no es comida principal (colación o pre-entreno) y tiene el agua por default guardada, limpiarla
+        const isThisNonMain = /colaci[oó]n/i.test(t.nombre || '') || /pre.?entreno/i.test(t.nombre || '');
+        const bebidaFinal = (isThisNonMain && rawBebida === 'Agua natural 500ml') ? '' : rawBebida;
         return {
           nombre: t.nombre,
           nota,
@@ -359,9 +359,9 @@ export const CreateEditPlanForm = ({
     }
   }, [valData]);
 
-  // Autofill agua natural — SOLO en comidas principales (no colaciones)
-  // B2+B3: Las colaciones no requieren bebida por defecto
-  const isColacion = (nombre: string) => /colaci[oó]n/i.test(nombre);
+  // Autofill agua natural — SOLO en comidas principales (no colaciones ni pre-entreno)
+  const isNonMainMeal = (nombre: string) =>
+    /colaci[oó]n/i.test(nombre) || /pre.?entreno/i.test(nombre);
   useEffect(() => {
     if (!aguaNaturalDefault) return;
     if (!menus.length) return;
@@ -369,8 +369,7 @@ export const CreateEditPlanForm = ({
     const next = menus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map(t => {
-        // Saltamos colaciones — no auto-rellenar bebida en ellas
-        if (isColacion(t.nombre)) return t;
+        if (isNonMainMeal(t.nombre)) return t;
         if (!t.bebida || t.bebida.trim() === '') {
           touched = true;
           return { ...t, bebida: 'Agua natural 500ml' };
@@ -1719,10 +1718,17 @@ export const CreateEditPlanForm = ({
                   </SidebarSeccion>
                 )}
 
-                {/* Agua */}
+                {/* Agua (reporte del paciente en entrevista) */}
                 {pacienteInfo?.antecedentes?.agua && (
-                  <SidebarSeccion titulo="Agua al día">
+                  <SidebarSeccion titulo="Agua al día (reporte paciente)">
                     <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.agua}</p>
+                  </SidebarSeccion>
+                )}
+
+                {/* Esquema de hidratación prescrito en consulta */}
+                {valData?.esqueHidratacion && (
+                  <SidebarSeccion titulo="Esquema de Hidratación">
+                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.esqueHidratacion}</p>
                   </SidebarSeccion>
                 )}
 
