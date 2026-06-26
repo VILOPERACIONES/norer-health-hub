@@ -386,37 +386,48 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                                             <Clock className="w-4 h-4 text-[#8a8a8a]" />
                                             <span className="text-[14px] font-semibold text-white m-0">{t.nombre}</span>
                                         </div>
-                                        <ul className="space-y-3">
-                                            {t.ingredientes.map((ing, k) => (
-                                                <li key={k} className="flex flex-col gap-1">
-                                                    <div className="flex items-start gap-2">
-                                                        <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-text-muted" />
-                                                        <span className="text-[14px] font-medium text-[#c0c0c0] m-0 leading-tight">
-                                                            {(parseFloat(String(ing.cantidad)) || 0) > 0 && <>{ing.cantidad} {ing.unidad} </>}
-                                                            <span className="text-white">{ing.descripcion}</span>
-                                                        </span>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-x-4 gap-y-1 ml-[14px]">
-                                                        {(() => {
-                                                            const eqs = ing.equivalencias && ing.equivalencias.length > 0
-                                                                ? ing.equivalencias.filter((e: any) => e.cantidad && parseFloat(String(e.cantidad)) > 0 && e.grupo)
-                                                                : (ing.eqCantidad && parseFloat(String(ing.eqCantidad)) > 0 ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
-                                                            if (eqs.length === 0) return null;
-                                                            return (
-                                                                <p className="text-[12px] font-medium text-[#8a8a8a] m-0">
-                                                                    Eq: {eqs.map((e: any) => `${e.cantidad} ${e.grupo}`).join(' + ')}
-                                                                </p>
-                                                            );
-                                                        })()}
-                                                        {ing.nota && (
-                                                            <p className="text-[12px] font-normal italic text-[#8a8a8a] m-0">
-                                                                * {ing.nota}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                </li>
+                                        <div className="space-y-3">
+                                            {Array.from(new Set(t.ingredientes.map((i: any) => i.platillo || ''))).map((pName: any, pIndex: number) => (
+                                                <div key={pIndex}>
+                                                    {pName && (
+                                                        <p className="text-[11px] font-bold text-white uppercase tracking-wider mb-2 mt-3 border-b border-[#2a2a2a] pb-1">
+                                                            {pName}
+                                                        </p>
+                                                    )}
+                                                    <ul className="space-y-3">
+                                                        {t.ingredientes.filter((i: any) => (i.platillo || '') === pName).map((ing: any, k: number) => (
+                                                            <li key={k} className="flex flex-col gap-1">
+                                                                <div className="flex items-start gap-2">
+                                                                    <div className="mt-1.5 min-w-[6px] h-[6px] rounded-full bg-text-muted" />
+                                                                    <span className="text-[14px] font-medium text-[#c0c0c0] m-0 leading-tight">
+                                                                        {(parseFloat(String(ing.cantidad)) || 0) > 0 && <>{ing.cantidad} {ing.unidad} </>}
+                                                                        <span className="text-white">{ing.descripcion}</span>
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-x-4 gap-y-1 ml-[14px]">
+                                                                    {(() => {
+                                                                        const eqs = ing.equivalencias && ing.equivalencias.length > 0
+                                                                            ? ing.equivalencias.filter((e: any) => e.cantidad && parseFloat(String(e.cantidad)) > 0 && e.grupo)
+                                                                            : (ing.eqCantidad && parseFloat(String(ing.eqCantidad)) > 0 ? [{ cantidad: ing.eqCantidad, grupo: ing.eqGrupo }] : []);
+                                                                        if (eqs.length === 0) return null;
+                                                                        return (
+                                                                            <p className="text-[12px] font-medium text-[#8a8a8a] m-0">
+                                                                                Eq: {eqs.map((e: any) => `${e.cantidad} ${e.grupo}`).join(' + ')}
+                                                                            </p>
+                                                                        );
+                                                                    })()}
+                                                                    {ing.nota && (
+                                                                        <p className="text-[12px] font-normal italic text-[#8a8a8a] m-0">
+                                                                            * {ing.nota}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                </div>
                                             ))}
-                                        </ul>
+                                        </div>
 
                                         {/* Renderizado de Bebida y Suplementación en UI */}
                                         {(t.bebida || t.suplTiempo) && (

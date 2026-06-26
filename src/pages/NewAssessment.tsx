@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
@@ -100,6 +100,8 @@ const NewAssessment = () => {
   const [dragSupIdx, setDragSupIdx] = useState<number | null>(null);
   const [notasLibres, setNotasLibres] = useState('');
   const [notasLibresOpen, setNotasLibresOpen] = useState(false);
+  const [esqueHidratacion, setEsqueHidratacion] = useState('');
+  const [esqueHidratacionOpen, setEsqueHidratacionOpen] = useState(false);
   const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; tipo: string; dataUrl: string }[]>([]);
 
   const [expediente, setExpediente] = useState({
@@ -400,6 +402,7 @@ const NewAssessment = () => {
               }
 
               if (val.notasLibres) { setNotasLibres(val.notasLibres); setNotasLibresOpen(true); }
+              if (val.esqueHidratacion) { setEsqueHidratacion(val.esqueHidratacion); setEsqueHidratacionOpen(true); }
               if (val.adjuntosJson && Array.isArray(val.adjuntosJson)) setAdjuntos(val.adjuntosJson);
 
               if (val.suplementosDetalle && Array.isArray(val.suplementosDetalle) && val.suplementosDetalle.length > 0) {
@@ -466,6 +469,12 @@ const NewAssessment = () => {
           } else {
             setSuplementosDetalle([]);
             setSuplementacionActiva(false);
+          }
+
+          // Esquema de hidratación (heredar de la consulta anterior si existe)
+          if (lastVal?.esqueHidratacion) {
+            setEsqueHidratacion(lastVal.esqueHidratacion);
+            setEsqueHidratacionOpen(true);
           }
         }
 
@@ -582,6 +591,7 @@ const NewAssessment = () => {
       })(),
       evitar: evitar.map(e => e.valor).filter(v => v.trim() !== '').join('\n'),
       notasLibres: notasLibres || null,
+      esqueHidratacion: esqueHidratacion || null,
       adjuntosJson: adjuntos.length > 0 ? adjuntos : null,
       suplementosDetalle: suplementosParaGuardar,
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
@@ -1340,7 +1350,35 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 4. NOTAS LIBRES / LINEAMIENTOS ── */}
+              {/* ── 4. ESQUEMA DE HIDRATACIÓN ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setEsqueHidratacionOpen(prev => !prev)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors text-left"
+                >
+                  <div className="flex items-center gap-2">
+                    <Droplets className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Esquema de Hidratación</span>
+                    {esqueHidratacion && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${esqueHidratacionOpen ? 'rotate-180' : ''}`} />
+                </button>
+                {esqueHidratacionOpen && (
+                  <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    <p className="text-[12px] text-[#8a8a8a] m-0 mb-3">Prescripción de hidratación para esta fase (separado del registro inicial del paciente).</p>
+                    <textarea
+                      value={esqueHidratacion}
+                      onChange={(e) => setEsqueHidratacion(e.target.value)}
+                      className="w-full bg-[#181818] rounded-[10px] px-4 py-3 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] resize-y transition-colors placeholder-[#555] leading-relaxed"
+                      placeholder="Ej. 2.5 L agua al día, 500 ml con cada comida principal..."
+                      rows={4}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* ── 5. NOTAS LIBRES / LINEAMIENTOS ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0">
                 <button
                   type="button"

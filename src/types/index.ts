@@ -159,6 +159,7 @@ export interface Valoracion {
   suplementacion?: string;
   suplementosDetalle?: Suplemento[];
   temario?: { tema: string; detalle: string }[];
+  esqueHidratacion?: string;
   plan?: Plan;
   medicionNumero?: number;
   deficitMusculo?: number;
