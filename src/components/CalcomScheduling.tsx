@@ -29,10 +29,15 @@ interface CalcomSchedulingProps {
   };
 }
 
+// IDs de event types del EQUIPO "NORDER Health" en Cal.com
+// (son distintos a los del perfil personal — el equipo es quien gestiona las citas)
+// Seguimiento presencial: 30 min → 4657665
+// Seguimiento online:     30 min → 4726502
+// Doble presencial:       60 min → 4844702
 const EVENT_TYPES = {
-  presencial: 4418629,
-  online: 4418611,
-  doble_presencial: 4844702
+  presencial: 4657665,       // PRESENCIAL - seguimiento SDC (30 min)
+  online: 4726502,           // ONLINE - seguimiento SDC (30 min)
+  doble_presencial: 4844702  // PRESENCIAL - DOBLE CITA seguimiento (60 min)
 };
 
 const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) => {
