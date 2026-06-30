@@ -21,7 +21,8 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
       showPageMenus: true,
       showPageIntercambio: true,
       showPageExtras: true,
-      showContacto: true,
+      showContacto: false,
+      showDistribucionPorciones: true,
       soloEquivalencias: false,
       ...defaultPrefs, // Aplica las que tengan guardadas en localStorage
       notaAmarilla: '',
@@ -98,8 +99,9 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
       showPageMenus: newMeta.showPageMenus !== false,
       showPageIntercambio: newMeta.showPageIntercambio !== false,
       showPageExtras: newMeta.showPageExtras !== false,
-      showContacto: newMeta.showContacto !== false,
+      showContacto: newMeta.showContacto === true,
       soloEquivalencias: newMeta.soloEquivalencias === true,
+      showDistribucionPorciones: newMeta.showDistribucionPorciones !== false,
     };
     localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
@@ -185,9 +187,10 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
             <h3 className="text-[12px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Selección de Hojas</h3>
             <div className="space-y-2.5">
               <ToggleItem label="1. Historial y Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
-              <ToggleItem label="Correo y Teléfono del paciente" active={meta.showContacto !== false} onChange={() => handleToggle('showContacto')} isSubItem />
+              <ToggleItem label="Correo y Teléfono del paciente" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
               <ToggleItem label="2. Menús de Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
               <ToggleItem label="Solo equivalencias (Sin platillos)" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
+              <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />
               <ToggleItem label="3. Lista de Intercambio (SMAE)" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />
               <ToggleItem label="4. Extras y Recomendaciones" active={meta.showPageExtras !== false} onChange={() => handleToggle('showPageExtras')} />
             </div>

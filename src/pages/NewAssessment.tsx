@@ -113,13 +113,15 @@ const NewAssessment = () => {
   });
   const [expedienteModified, setExpedienteModified] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
-  const [habitos, setHabitos] = useState({
-    desayuno: { hora: '', ayer: '', usualmente: '' },
-    colacion1: { hora: '', ayer: '', usualmente: '' },
-    almuerzo: { hora: '', ayer: '', usualmente: '' },
-    colacion2: { hora: '', ayer: '', usualmente: '' },
-    cena: { hora: '', ayer: '', usualmente: '' },
-  });
+  type HabitoRow = { label: string; hora: string; ayer: string; usualmente: string };
+  const DEFAULT_HABITOS: HabitoRow[] = [
+    { label: 'Desayuno',  hora: '', ayer: '', usualmente: '' },
+    { label: 'Colación',  hora: '', ayer: '', usualmente: '' },
+    { label: 'Comida',    hora: '', ayer: '', usualmente: '' },
+    { label: 'Colación',  hora: '', ayer: '', usualmente: '' },
+    { label: 'Cena',      hora: '', ayer: '', usualmente: '' },
+  ];
+  const [habitos, setHabitos] = useState<HabitoRow[]>(DEFAULT_HABITOS);
   const [habitosModified, setHabitosModified] = useState(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
   const [showSuplemantacion, setShowSuplemantacion] = useState(false);
@@ -171,9 +173,51 @@ const NewAssessment = () => {
     setExpedienteModified(true);
   };
 
-  const updateHabitos = (meal: keyof typeof habitos, field: 'hora' | 'ayer' | 'usualmente', value: string) => {
-    setHabitos(h => ({ ...h, [meal]: { ...h[meal], [field]: value } }));
+  const updateHabitos = (idx: number, field: 'hora' | 'ayer' | 'usualmente', value: string) => {
+    setHabitos(h => h.map((row, i) => i === idx ? { ...row, [field]: value } : row));
     setHabitosModified(true);
+  };
+
+  const updateHabitosLabel = (idx: number, label: string) => {
+    setHabitos(h => h.map((row, i) => i === idx ? { ...row, label } : row));
+    setHabitosModified(true);
+  };
+
+  const addHabitoRow = () => {
+    setHabitos(h => [...h, { label: 'Colación', hora: '', ayer: '', usualmente: '' }]);
+    setHabitosModified(true);
+  };
+
+  const removeHabitoRow = (idx: number) => {
+    setHabitos(h => h.filter((_, i) => i !== idx));
+    setHabitosModified(true);
+  };
+
+  const handleHabitoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number, field: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const fieldsOrder = ['label', 'hora', 'ayer', 'usualmente'];
+      const currentFieldIndex = fieldsOrder.indexOf(field);
+      
+      let nextIdx = idx;
+      let nextField = fieldsOrder[currentFieldIndex + 1];
+      
+      if (!nextField) {
+        nextIdx = idx + 1;
+        nextField = 'label';
+      }
+      
+      const nextInput = document.querySelector(`input[data-habito-idx="${nextIdx}"][data-habito-field="${nextField}"]`) as HTMLInputElement;
+      if (nextInput) {
+        nextInput.focus();
+      } else if (!nextInput && currentFieldIndex === fieldsOrder.length - 1) {
+        addHabitoRow();
+        setTimeout(() => {
+          const createdInput = document.querySelector(`input[data-habito-idx="${nextIdx}"][data-habito-field="${nextField}"]`) as HTMLInputElement;
+          if (createdInput) createdInput.focus();
+        }, 50);
+      }
+    }
   };
 
   const totalSteps = 4;
@@ -291,13 +335,18 @@ const NewAssessment = () => {
     seedFarmacosDetalle(ant);
     seedHistorialSupDetalle(ant);
     const h = p.habitos || {};
-    setHabitos({
-      desayuno: { hora: h.desayuno?.hora || '', ayer: h.desayuno?.ayer || '', usualmente: h.desayuno?.usualmente || '' },
-      colacion1: { hora: h.colacion1?.hora || '', ayer: h.colacion1?.ayer || '', usualmente: h.colacion1?.usualmente || '' },
-      almuerzo: { hora: h.almuerzo?.hora || '', ayer: h.almuerzo?.ayer || '', usualmente: h.almuerzo?.usualmente || '' },
-      colacion2: { hora: h.colacion2?.hora || '', ayer: h.colacion2?.ayer || '', usualmente: h.colacion2?.usualmente || '' },
-      cena: { hora: h.cena?.hora || '', ayer: h.cena?.ayer || '', usualmente: h.cena?.usualmente || '' },
-    });
+    if (Array.isArray(h)) {
+      setHabitos(h.length > 0 ? h : DEFAULT_HABITOS);
+    } else {
+      // Backward compat: convert old object format
+      const rows: HabitoRow[] = [];
+      if (h.desayuno) rows.push({ label: 'Desayuno', ...h.desayuno });
+      if (h.colacion1) rows.push({ label: 'Colación', ...h.colacion1 });
+      if (h.almuerzo)  rows.push({ label: 'Comida',   ...h.almuerzo });
+      if (h.colacion2) rows.push({ label: 'Colación', ...h.colacion2 });
+      if (h.cena)      rows.push({ label: 'Cena',     ...h.cena });
+      setHabitos(rows.length > 0 ? rows : DEFAULT_HABITOS);
+    }
     setExpedienteModified(false);
     setHabitosModified(false);
   };
@@ -361,13 +410,23 @@ const NewAssessment = () => {
         seedFarmacosDetalle(ant2);
         seedHistorialSupDetalle(ant2);
         const h2 = p.habitos || p.consumoCalorico || {};
-        setHabitos({
-          desayuno: { hora: h2.desayuno?.hora || h2.horaDesayuno || '', ayer: h2.desayuno?.ayer || h2.ayerDesayuno || '', usualmente: h2.desayuno?.usualmente || h2.usalmenteDesayuno || '' },
-          colacion1: { hora: h2.colacion1?.hora || h2.horaColacion1 || '', ayer: h2.colacion1?.ayer || h2.ayerColacion1 || '', usualmente: h2.colacion1?.usualmente || h2.usalmenteColacion1 || '' },
-          almuerzo: { hora: h2.almuerzo?.hora || h2.horaAlmuerzo || '', ayer: h2.almuerzo?.ayer || h2.ayerAlmuerzo || '', usualmente: h2.almuerzo?.usualmente || h2.usalmenteAlmuerzo || '' },
-          colacion2: { hora: h2.colacion2?.hora || h2.horaColacion2 || '', ayer: h2.colacion2?.ayer || h2.ayerColacion2 || '', usualmente: h2.colacion2?.usualmente || h2.usalmenteColacion2 || '' },
-          cena: { hora: h2.cena?.hora || h2.horaCena || '', ayer: h2.cena?.ayer || h2.ayerCena || '', usualmente: h2.cena?.usualmente || h2.usalmenteCena || '' },
-        });
+        if (Array.isArray(h2)) {
+          setHabitos(h2.length > 0 ? h2 : DEFAULT_HABITOS);
+        } else {
+          const rows: HabitoRow[] = [];
+          const mk = (label: string, obj: any, horaKey?: string, ayerKey?: string, usKey?: string): HabitoRow => ({
+            label,
+            hora: obj?.hora || (horaKey && h2[horaKey]) || '',
+            ayer: obj?.ayer || (ayerKey && h2[ayerKey]) || '',
+            usualmente: obj?.usualmente || (usKey && h2[usKey]) || '',
+          });
+          rows.push(mk('Desayuno', h2.desayuno, 'horaDesayuno', 'ayerDesayuno', 'usalmenteDesayuno'));
+          rows.push(mk('Colación', h2.colacion1, 'horaColacion1', 'ayerColacion1', 'usalmenteColacion1'));
+          rows.push(mk('Comida',   h2.almuerzo,  'horaAlmuerzo',  'ayerAlmuerzo',  'usalmenteAlmuerzo'));
+          rows.push(mk('Colación', h2.colacion2, 'horaColacion2', 'ayerColacion2', 'usalmenteColacion2'));
+          rows.push(mk('Cena',     h2.cena,      'horaCena',      'ayerCena',      'usalmenteCena'));
+          setHabitos(rows);
+        }
 
         if (isEdit) {
           try {
@@ -863,7 +922,6 @@ const NewAssessment = () => {
                       <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3">
                         {([
                           { label: 'Objetivo', field: 'objetivo' },
-                          { label: 'Nivel Actividad', field: 'nivelActividad' },
                           { label: 'Gym / Lugar', field: 'gymOrigen' },
                           { label: 'Hora Entrenamiento', field: 'horaEntrenamiento' },
                           { label: 'Disciplina', field: 'disciplina' },
@@ -912,38 +970,67 @@ const NewAssessment = () => {
 
                     {/* Recordatorio 24 horas */}
                     <div>
-                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Recordatorio 24 Horas</p>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Recordatorio 24 Horas</p>
+                        <button
+                          type="button"
+                          onClick={addHabitoRow}
+                          className="flex items-center gap-1 text-[10px] font-bold text-[#8a8a8a] hover:text-white bg-[#181818] border border-[#2a2a2a] hover:border-[#555] px-2.5 py-1 rounded-[6px] uppercase tracking-wider transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Agregar tiempo
+                        </button>
+                      </div>
                       <div className="overflow-x-auto">
                         <table className="w-full text-[12px]">
                           <thead>
                             <tr className="border-b border-[#2a2a2a]">
-                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3 w-28">Tiempo</th>
+                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3 w-32">Tiempo</th>
                               <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Hora</th>
                               <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Ayer</th>
                               <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2">Usualmente</th>
+                              <th className="pb-2 w-8"></th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-[#1e1e1e]">
-                            {([
-                              { key: 'desayuno', label: 'Desayuno' },
-                              { key: 'colacion1', label: 'Colación 1' },
-                              { key: 'almuerzo', label: 'Comida' },
-                              { key: 'colacion2', label: 'Colación 2' },
-                              { key: 'cena', label: 'Cena' },
-                            ] as { key: keyof typeof habitos; label: string }[]).map(({ key, label }) => (
-                              <tr key={key}>
-                                <td className="py-2 pr-3 text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider">{label}</td>
+                            {habitos.map((row, idx) => (
+                              <tr key={idx}>
+                                <td className="py-2 pr-3">
+                                  <input
+                                    type="text"
+                                    value={row.label}
+                                    onChange={(e) => updateHabitosLabel(idx, e.target.value)}
+                                    onKeyDown={(e) => handleHabitoKeyDown(e, idx, 'label')}
+                                    data-habito-idx={idx}
+                                    data-habito-field="label"
+                                    className="w-full bg-transparent text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider outline-none border-b border-transparent focus:border-[#555] transition-colors"
+                                  />
+                                </td>
                                 {(['hora', 'ayer', 'usualmente'] as const).map((field) => (
                                   <td key={field} className="py-2 pr-3">
                                     <input
                                       type="text"
-                                      value={habitos[key][field]}
-                                      onChange={(e) => updateHabitos(key, field, e.target.value)}
+                                      value={row[field]}
+                                      onChange={(e) => updateHabitos(idx, field, e.target.value)}
+                                      onKeyDown={(e) => handleHabitoKeyDown(e, idx, field)}
+                                      data-habito-idx={idx}
+                                      data-habito-field={field}
                                       className="w-full bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#2a2a2a] focus:border-[#555] transition-colors placeholder-[#444]"
                                       placeholder={field === 'hora' ? '7:00 am' : 'Descripción...'}
                                     />
                                   </td>
                                 ))}
+                                <td className="py-2">
+                                  {habitos.length > 1 && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeHabitoRow(idx)}
+                                      className="p-1 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors"
+                                      title="Eliminar tiempo"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                </td>
                               </tr>
                             ))}
                           </tbody>

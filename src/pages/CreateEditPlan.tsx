@@ -359,9 +359,9 @@ export const CreateEditPlanForm = ({
     }
   }, [valData]);
 
-  // Autofill agua natural — SOLO en comidas principales (no colaciones ni pre-entreno)
-  const isNonMainMeal = (nombre: string) =>
-    /colaci[oó]n/i.test(nombre) || /pre.?entreno/i.test(nombre);
+  // Autofill agua natural — SOLO en comidas principales (Desayuno, Almuerzo, Comida, Cena)
+  const isMainMeal = (nombre: string) =>
+    /desayuno|almuerzo|comida|cena/i.test(nombre);
   useEffect(() => {
     if (!aguaNaturalDefault) return;
     if (!menus.length) return;
@@ -369,7 +369,7 @@ export const CreateEditPlanForm = ({
     const next = menus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map(t => {
-        if (isNonMainMeal(t.nombre)) return t;
+        if (!isMainMeal(t.nombre)) return t;
         if (!t.bebida || t.bebida.trim() === '') {
           touched = true;
           return { ...t, bebida: 'Agua natural 500ml' };
@@ -1068,7 +1068,7 @@ export const CreateEditPlanForm = ({
                             setMenus(prev => prev.map(menu => ({
                               ...menu,
                               tiempos: menu.tiempos.map(t => {
-                                if (isColacion(t.nombre)) return t; // B3: colaciones sin bebida
+                                if (!isMainMeal(t.nombre)) return t; // B3: colaciones sin bebida
                                 if (!t.bebida || t.bebida.trim() === '') {
                                   return { ...t, bebida: 'Agua natural 500ml' };
                                 }
@@ -1184,7 +1184,7 @@ export const CreateEditPlanForm = ({
                               onChange={(e) => updateTiempo(mi, ti, t => ({ ...t, bebida: e.target.value }))}
                               onBlur={(e) => {
                                 // B3: solo restaurar agua en comidas principales, no en colaciones
-                                if (!e.target.value.trim() && aguaNaturalDefault && !isColacion(tiempo.nombre)) {
+                                if (!e.target.value.trim() && aguaNaturalDefault && isMainMeal(tiempo.nombre)) {
                                   updateTiempo(mi, ti, t => ({ ...t, bebida: 'Agua natural 500ml' }));
                                 }
                               }}
@@ -1628,7 +1628,7 @@ export const CreateEditPlanForm = ({
                       {pacienteInfo.ejercicio?.objetivo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Objetivo:</span> {pacienteInfo.ejercicio.objetivo}</p>}
                       {pacienteInfo.ejercicio?.disciplina && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Disciplina:</span> {pacienteInfo.ejercicio.disciplina}</p>}
                       {pacienteInfo.ejercicio?.frecuencia && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Frecuencia:</span> {pacienteInfo.ejercicio.frecuencia}</p>}
-                      {pacienteInfo.ejercicio?.nivelActividad && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Nivel:</span> {pacienteInfo.ejercicio.nivelActividad}</p>}
+
                     </div>
                   </SidebarSeccion>
                 )}
