@@ -23,7 +23,8 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
       showPageMenus: true,
       showPageIntercambio: true,
       showPageExtras: true,
-      showContacto: true,
+      showContacto: false,
+      showDistribucionPorciones: true,
       soloEquivalencias: false,
       ...defaultPrefs,
       ...planCustomMeta
@@ -99,8 +100,9 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
       showPageMenus: newMeta.showPageMenus !== false,
       showPageIntercambio: newMeta.showPageIntercambio !== false,
       showPageExtras: newMeta.showPageExtras !== false,
-      showContacto: newMeta.showContacto !== false,
+      showContacto: newMeta.showContacto === true,
       soloEquivalencias: newMeta.soloEquivalencias === true,
+      showDistribucionPorciones: newMeta.showDistribucionPorciones !== false,
     };
     localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
@@ -141,9 +143,10 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                   <h3 className="text-[11px] font-bold text-[#666] uppercase tracking-[0.2em] ml-1">Selección de Hojas</h3>
                   <div className="space-y-2">
                     <ToggleItem label="1. Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
-                    <ToggleItem label="Correo y Teléfono" active={meta.showContacto !== false} onChange={() => handleToggle('showContacto')} isSubItem />
+                    <ToggleItem label="Correo y Teléfono" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
                     <ToggleItem label="2. Menús Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
                     <ToggleItem label="Solo equivalencias" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
+                    <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />
                     <ToggleItem label="3. Lista SMAE" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />
                     <ToggleItem label="4. Extras" active={meta.showPageExtras !== false} onChange={() => handleToggle('showPageExtras')} />
                   </div>
