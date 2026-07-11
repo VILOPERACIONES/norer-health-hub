@@ -62,7 +62,7 @@ const GRUPOS: { key: string; label: string }[] = [
   { key: 'azConGr', label: 'Az con grasa' },
 ];
 
-const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colacion', 'Almuerzo', 'Colacion', 'Cena'];
+const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colación 1', 'Almuerzo', 'Colación 2', 'Cena'];
 
 // ─── Helpers: parsear número y limpiar input decimal ──────────────────────────
 const toNum = (v: any): number => {
@@ -399,7 +399,27 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   const addTiempo = () => {
-    const name = newTiempoName.trim() || `Tiempo ${tiempos.length + 1}`;
+    const base = newTiempoName.trim() || 'Tiempo';
+
+    // Buscar todos los tiempos que coincidan exactamente con "base" o "base N"
+    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const pattern = new RegExp(`^${escaped}(\\s+(\\d+))?$`);
+    const matches = tiempos.filter(t => pattern.test(t));
+
+    let name: string;
+    if (matches.length === 0) {
+      // Sin colisión — usar el nombre tal cual
+      name = base;
+    } else {
+      // Encontrar el número más alto en uso (base sin número cuenta como 1)
+      let highest = 1;
+      for (const t of matches) {
+        const m = t.match(/\s+(\d+)$/);
+        if (m) highest = Math.max(highest, parseInt(m[1], 10));
+      }
+      name = `${base} ${highest + 1}`;
+    }
+
     commit({ ...state, tiempos: [...tiempos, name] });
     setNewTiempoName('');
   };
@@ -441,9 +461,12 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     const oldName = tiempos[idx];
     if (oldName === name) return;
 
-    let newName = name;
-    if (tiempos.includes(newName) && tiempos.indexOf(newName) !== idx) {
-      newName = newName + '*';
+    // Auto-numerar si el nuevo nombre ya existe en otro índice
+    let newName = name.trim() || oldName;
+    if (tiempos.some((t, i) => i !== idx && t === newName)) {
+      let n = 2;
+      while (tiempos.some((t, i) => i !== idx && t === `${newName} ${n}`)) n++;
+      newName = `${newName} ${n}`;
     }
 
     const newTiempos = [...tiempos];
