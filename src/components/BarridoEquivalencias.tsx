@@ -121,8 +121,21 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
     if (rows.length === 0) return;
 
+    // Calcular cuántos tiempos se necesitan para absorber todos los datos pegados
+    // startColIdx=0 → primera columna es "Porciones", tiempos desde col 1
+    // startColIdx>0 → todas son tiempos
+    const maxPastedCols = Math.max(...rows.map(r => r.length));
+    // Cuántos tiempos necesitamos en total
+    const tiemposNeeded = (startColIdx === 0 ? maxPastedCols - 1 : startColIdx - 1 + maxPastedCols);
+    const currentTiempos = [...state.tiempos];
+
+    // Auto-crear tiempos faltantes para que todos los datos pegados quepan
+    while (currentTiempos.length < tiemposNeeded) {
+      currentTiempos.push(`Tiempo ${currentTiempos.length + 1}`);
+    }
+
     const nextPorciones = { ...state.porciones };
-    const nextDistribucion = JSON.parse(JSON.stringify(state.distribucion));
+    const nextDistribucion: Record<string, Record<string, number | string>> = JSON.parse(JSON.stringify(state.distribucion));
 
     for (let r = 0; r < rows.length; r++) {
       const targetRowIdx = startRowIdx + r;
@@ -137,11 +150,13 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
         const cleanedValue = cleanInputStr(rawValue);
 
         if (targetColIdx === 0) {
+          // Columna Porciones
           nextPorciones[groupKey] = cleanedValue;
         } else {
+          // Columna de tiempo de comida
           const tiempoIdx = targetColIdx - 1;
-          if (tiempoIdx >= tiempos.length) break;
-          const tiempo = tiempos[tiempoIdx];
+          if (tiempoIdx >= currentTiempos.length) break;
+          const tiempo = currentTiempos[tiempoIdx];
           if (!nextDistribucion[tiempo]) {
             nextDistribucion[tiempo] = {};
           }
@@ -152,6 +167,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
     commit({
       ...state,
+      tiempos: currentTiempos,
       porciones: nextPorciones,
       distribucion: nextDistribucion,
     });
