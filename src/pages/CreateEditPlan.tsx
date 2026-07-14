@@ -8,7 +8,7 @@ import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
-import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import BarridoEquivalenciasComp, { normalizeBarridoData, type BarridoData, type BarridoTiempo } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 
 const defaultTiempos = ['Pre Entreno', 'Desayuno', 'Colacion', 'Almuerzo', 'Colacion', 'Cena'];
@@ -142,6 +142,7 @@ export const CreateEditPlanForm = ({
         const bebidaFinal = (isThisNonMain && rawBebida === 'Agua natural 500ml') ? '' : rawBebida;
         return {
           nombre: t.nombre,
+          barridoTiempoId: t.barridoTiempoId || undefined,
           nota,
           bebida: bebidaFinal,
           suplTiempo: t.suplTiempo || metaSuplTiempo,
@@ -284,7 +285,8 @@ export const CreateEditPlanForm = ({
             try { barrido = JSON.parse(barrido); } catch (e) { }
           }
 
-          setValData({ ...v, barridoEquivalencias: barrido });
+          const normalizedBarrido = barrido ? normalizeBarridoData(barrido) : barrido;
+          setValData({ ...v, barridoEquivalencias: normalizedBarrido });
           // Siempre actualizar el último peso para los cálculos de G/kg (incluso en Edit)
           setPesoUltimo(v.peso || 0);
 
@@ -300,9 +302,10 @@ export const CreateEditPlanForm = ({
             });
             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
-            if (barrido?.tiempos?.length > 0) {
-              const assessmentTiempos = barrido.tiempos.map((t: string) => ({
-                nombre: t.toUpperCase(),
+            if (normalizedBarrido?.tiempos?.length > 0) {
+              const assessmentTiempos = normalizedBarrido.tiempos.map((t: BarridoTiempo) => ({
+                barridoTiempoId: t.id,
+                nombre: t.nombre.toUpperCase(),
                 ingredientes: [],
                 nota: ''
               }));
@@ -470,17 +473,22 @@ export const CreateEditPlanForm = ({
   // Match plan tiempo ↔ columna de barrido por nombre + índice de ocurrencia,
   // para soportar dos tiempos con el mismo nombre (p.ej. dos "Colación"):
   // la 1ª Colación del plan toma la 1ª columna "Colación" del barrido, la 2ª toma la 2ª.
-  const findBarridoTiempoKey = (barridoTiempos: string[], planTiempos: { nombre?: string }[], tiempoIdx: number): string | undefined => {
+  const findBarridoTiempo = (barridoTiempos: BarridoTiempo[], planTiempos: TiempoComida[], tiempoIdx: number): BarridoTiempo | undefined => {
     const norm = (s?: string) => (s || '').toLowerCase().trim();
-    const name = norm(planTiempos[tiempoIdx]?.nombre);
+    const planTiempo = planTiempos[tiempoIdx];
+    if (planTiempo?.barridoTiempoId) {
+      const byId = barridoTiempos.find(t => t.id === planTiempo.barridoTiempoId);
+      if (byId) return byId;
+    }
+    const name = norm(planTiempo?.nombre);
     if (!name) return undefined;
     const occurrence = planTiempos.slice(0, tiempoIdx).filter(t => norm(t.nombre) === name).length;
-    const candidates = barridoTiempos.filter(t => norm(t) === name);
+    const candidates = barridoTiempos.filter(t => norm(t.nombre) === name);
     if (candidates[occurrence]) return candidates[occurrence];
-    // 2da+ ocurrencia (ej. segunda "Colación") puede estar como columna "Colación 2" en el barrido
+    // Compatibilidad defensiva si un barrido histórico llega sin normalizar.
     if (occurrence > 0) {
       const altName = `${name} ${occurrence + 1}`;
-      return barridoTiempos.find(t => norm(t) === altName);
+      return barridoTiempos.find(t => norm(t.nombre) === altName);
     }
     return undefined;
   };
@@ -495,7 +503,7 @@ export const CreateEditPlanForm = ({
     setMenus(prevMenus => prevMenus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map((tiempo, tIdx) => {
-        const barridoTiempoKey = findBarridoTiempoKey(nextBarridoData.tiempos, menu.tiempos, tIdx);
+        const barridoTiempoKey = findBarridoTiempo(nextBarridoData.tiempos, menu.tiempos, tIdx)?.id;
 
         if (!barridoTiempoKey) return tiempo;
 
@@ -655,10 +663,8 @@ export const CreateEditPlanForm = ({
 
     // Con contexto del menú usamos matching por ocurrencia (soporta dos "Colación")
     const barridoTiempoKey = (planTiempos && tiempoIdx !== undefined)
-      ? findBarridoTiempoKey(barridoData.tiempos, planTiempos, tiempoIdx)
-      : barridoData.tiempos.find(
-        (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
-      );
+      ? findBarridoTiempo(barridoData.tiempos, planTiempos, tiempoIdx)?.id
+      : barridoData.tiempos.find((t: BarridoTiempo) => t.id === tiempo.barridoTiempoId)?.id;
     if (!barridoTiempoKey) return [];
     const dist = barridoData.distribucion[barridoTiempoKey] || {};
 
@@ -769,6 +775,11 @@ export const CreateEditPlanForm = ({
           }
           return {
             nombre: t.nombre,
+            barridoTiempoId: t.barridoTiempoId
+              || (valData?.barridoEquivalencias?.tiempos
+                ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, m.tiempos, tIdx)?.id
+                : undefined)
+              || null,
             orden: tIdx + 1,
             notaPie: injectedNota,
             bebida: t.bebida || '',
@@ -1468,10 +1479,10 @@ export const CreateEditPlanForm = ({
                                         onClick={() => {
                                           const d = valData?.barridoEquivalencias?.distribucion;
                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                          const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
-                                            (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
-                                          );
-                                          const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
+                                          const barridoTiempo = valData?.barridoEquivalencias?.tiempos
+                                            ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, menu.tiempos, ti)
+                                            : undefined;
+                                          const distTiempo = d && barridoTiempo ? d[barridoTiempo.id] : null;
 
                                           const ings = p.ingredientes.map((i: any, idx: number) => {
                                             let scaledCant = Number(i.cantidad);
@@ -1559,10 +1570,12 @@ export const CreateEditPlanForm = ({
 
                     {/* Importar tiempos desde el barrido (los que aún no están en este menú) */}
                     {(() => {
-                      const barridoTiempos: string[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
+                      const barridoTiempos: BarridoTiempo[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
                       if (!barridoTiempos.length) return null;
-                      const existing = new Set(menu.tiempos.map(t => (t.nombre || '').trim().toLowerCase()));
-                      const faltantes = barridoTiempos.filter(bt => !existing.has((bt || '').trim().toLowerCase()));
+                      const existingIds = new Set(menu.tiempos.map((t, idx) =>
+                        t.barridoTiempoId || findBarridoTiempo(barridoTiempos, menu.tiempos, idx)?.id
+                      ).filter(Boolean));
+                      const faltantes = barridoTiempos.filter(bt => !existingIds.has(bt.id));
                       if (!faltantes.length) return null;
                       return (
                         <div className="mt-4 p-3 rounded-[8px] border border-[#2a2a2a] bg-[#0f1620]">
@@ -1570,18 +1583,18 @@ export const CreateEditPlanForm = ({
                             Importar de barrido
                           </p>
                           <div className="flex flex-wrap gap-2">
-                            {faltantes.map((nombre) => (
+                            {faltantes.map((barridoTiempo) => (
                               <button
-                                key={nombre}
+                                key={barridoTiempo.id}
                                 type="button"
                                 onClick={() => updateMenu(mi, (m) => ({
                                   ...m,
-                                  tiempos: [...m.tiempos, { nombre: nombre.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' }]
+                                  tiempos: [...m.tiempos, { barridoTiempoId: barridoTiempo.id, nombre: barridoTiempo.nombre.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' }]
                                 }))}
                                 className="flex items-center gap-1 text-[11px] font-bold text-[#90c2ff] bg-[#1a2640] hover:bg-[#22324f] border border-[#3a5680] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
-                                title={`Agregar "${nombre}" desde el barrido`}
+                                title={`Agregar "${barridoTiempo.nombre}" desde el barrido`}
                               >
-                                <Plus className="w-3 h-3" /> {nombre}
+                                <Plus className="w-3 h-3" /> {barridoTiempo.nombre}
                               </button>
                             ))}
                           </div>
@@ -1616,7 +1629,7 @@ export const CreateEditPlanForm = ({
                 {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
                   <SidebarSeccion titulo="Número de comidas">
                     <p className="text-[12px] font-bold text-white leading-snug">
-                      {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.join(', ')}
+                      {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.map((t: BarridoTiempo) => t.nombre).join(', ')}
                     </p>
                   </SidebarSeccion>
                 )}
@@ -1769,9 +1782,9 @@ export const CreateEditPlanForm = ({
                     <div className="space-y-1.5 mt-1">
                       {([
                         { key: 'desayuno', label: 'Desayuno' },
-                        { key: 'colacion1', label: 'Colación 1' },
+                        { key: 'colacion1', label: 'Colación' },
                         { key: 'almuerzo', label: 'Comida' },
-                        { key: 'colacion2', label: 'Colación 2' },
+                        { key: 'colacion2', label: 'Colación' },
                         { key: 'cena', label: 'Cena' },
                       ] as { key: string; label: string }[]).map(({ key, label }) => {
                         const row = pacienteInfo.habitos[key];

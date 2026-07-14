@@ -211,6 +211,7 @@ export interface Menu {
 
 export interface TiempoComida {
   id?: string;
+  barridoTiempoId?: string;
   nombre: string;
   orden?: number;
   nota?: string;

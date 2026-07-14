@@ -709,9 +709,9 @@ const PatientProfile = () => {
                         <tbody className="divide-y divide-border-subtle/30">
                           {([
                             { key: 'desayuno', label: 'Desayuno' },
-                            { key: 'colacion1', label: 'Colación 1' },
+                            { key: 'colacion1', label: 'Colación' },
                             { key: 'almuerzo', label: 'Comida' },
-                            { key: 'colacion2', label: 'Colación 2' },
+                            { key: 'colacion2', label: 'Colación' },
                             { key: 'cena', label: 'Cena' },
                           ] as { key: string; label: string }[]).map(({ key, label }) => {
                             const row = (paciente.habitos as any)[key];

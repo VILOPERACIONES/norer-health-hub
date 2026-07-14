@@ -3,13 +3,21 @@ import { Plus, X, Check, AlertCircle, RotateCcw, Trash2, GripHorizontal } from '
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
+export interface BarridoTiempo {
+  id: string;
+  nombre: string;
+}
+
 export interface BarridoData {
-  tiempos: string[];
+  version?: 2;
+  tiempos: BarridoTiempo[];
   porciones: Record<string, number | string>;
   distribucion: Record<string, Record<string, number | string>>;
   kcalTotal: number;
   /** Kcal manuales por tiempo — si existe y es > 0, prevalece sobre el cálculo automático */
   kcalManuales?: Record<string, number>;
+  /** Porcentaje manual por ID de tiempo. */
+  porcentajesManuales?: Record<string, number | string>;
   /** Energía total manual — si está seteada, reemplaza la suma automática */
   energiaTotalManual?: number | null;
   /** Es válido cuando la distribución coincide con las porciones para TODOS los grupos. */
@@ -62,7 +70,63 @@ const GRUPOS: { key: string; label: string }[] = [
   { key: 'azConGr', label: 'Az con grasa' },
 ];
 
-const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colación 1', 'Almuerzo', 'Colación 2', 'Cena'];
+const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
+
+const newTiempoId = () =>
+  globalThis.crypto?.randomUUID?.() || `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+const normalizeColacionLabel = (value: string) => {
+  const label = value.trim();
+  return /^colaci[oó]n\s+\d+$/i.test(label) ? 'Colación' : label;
+};
+
+/** Convierte de forma defensiva el JSON histórico basado en nombres al formato v2 basado en IDs. */
+export const normalizeBarridoData = (value: BarridoData | any | null): BarridoData => {
+  const sourceTiempos = Array.isArray(value?.tiempos) && value.tiempos.length
+    ? value.tiempos
+    : DEFAULT_TIEMPOS.map(nombre => ({ id: newTiempoId(), nombre }));
+  const sourceDist = value?.distribucion && typeof value.distribucion === 'object' ? value.distribucion : {};
+  const sourceKcal = value?.kcalManuales || sourceDist._kcalManuales || {};
+  const sourcePct = value?.porcentajesManuales || sourceDist._porcentajesManuales || {};
+
+  const tiempos: BarridoTiempo[] = sourceTiempos.map((raw: string | Partial<BarridoTiempo>, index: number) => {
+    if (raw && typeof raw === 'object') {
+      return {
+        id: String(raw.id || `legacy-tiempo-${index + 1}`),
+        nombre: normalizeColacionLabel(String(raw.nombre || `Tiempo ${index + 1}`)),
+      };
+    }
+    return {
+      id: `legacy-tiempo-${index + 1}`,
+      nombre: normalizeColacionLabel(String(raw || `Tiempo ${index + 1}`)),
+    };
+  });
+
+  const distribucion: Record<string, Record<string, number | string>> = {};
+  const kcalManuales: Record<string, number> = {};
+  const porcentajesManuales: Record<string, number | string> = {};
+  tiempos.forEach((tiempo, index) => {
+    const raw = sourceTiempos[index];
+    const oldKey = typeof raw === 'object' ? String(raw?.id || raw?.nombre || '') : String(raw || '');
+    distribucion[tiempo.id] = sourceDist[tiempo.id] || sourceDist[oldKey] || {};
+    const kcal = sourceKcal[tiempo.id] ?? sourceKcal[oldKey];
+    if (kcal != null) kcalManuales[tiempo.id] = Number(kcal);
+    const pct = sourcePct[tiempo.id] ?? sourcePct[oldKey];
+    if (pct != null && pct !== '') porcentajesManuales[tiempo.id] = pct;
+  });
+
+  return {
+    version: 2,
+    tiempos,
+    porciones: value?.porciones ?? {},
+    distribucion,
+    kcalTotal: value?.kcalTotal ?? 0,
+    kcalManuales,
+    porcentajesManuales,
+    energiaTotalManual: value?.energiaTotalManual ?? null,
+    isValid: value?.isValid,
+  };
+};
 
 // ─── Helpers: parsear número y limpiar input decimal ──────────────────────────
 const toNum = (v: any): number => {
@@ -83,14 +147,7 @@ const cleanInputStr = (val: string): string => {
 };
 
 // ─── Estado inicial ───────────────────────────────────────────────────────────
-const buildInitial = (value: BarridoData | null): BarridoData => ({
-  tiempos: value?.tiempos?.length ? value.tiempos : [...DEFAULT_TIEMPOS],
-  porciones: value?.porciones ?? {},
-  distribucion: value?.distribucion ?? {},
-  kcalTotal: value?.kcalTotal ?? 0,
-  kcalManuales: {}, // Siempre limpiar — el feature fue eliminado de la UI
-  energiaTotalManual: value?.energiaTotalManual ?? null,
-});
+const buildInitial = (value: BarridoData | null): BarridoData => normalizeBarridoData(value);
 
 // ─── Estilos reutilizables tipo Excel ─────────────────────────────────────────
 const cellCls =
@@ -106,6 +163,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
   const { confirm, ConfirmDialogComponent } = useConfirm();
+
+  // Las valoraciones en edición pueden llegar después del primer render.
+  useEffect(() => {
+    if (value) setState(normalizeBarridoData(value));
+  }, [value]);
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>, startRowIdx: number, startColIdx: number) => {
     e.preventDefault();
@@ -131,7 +193,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
     // Auto-crear tiempos faltantes para que todos los datos pegados quepan
     while (currentTiempos.length < tiemposNeeded) {
-      currentTiempos.push(`Tiempo ${currentTiempos.length + 1}`);
+      currentTiempos.push({ id: newTiempoId(), nombre: `Tiempo ${currentTiempos.length + 1}` });
     }
 
     const nextPorciones = { ...state.porciones };
@@ -156,11 +218,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
           // Columna de tiempo de comida
           const tiempoIdx = targetColIdx - 1;
           if (tiempoIdx >= currentTiempos.length) break;
-          const tiempo = currentTiempos[tiempoIdx];
-          if (!nextDistribucion[tiempo]) {
-            nextDistribucion[tiempo] = {};
+          const tiempoId = currentTiempos[tiempoIdx].id;
+          if (!nextDistribucion[tiempoId]) {
+            nextDistribucion[tiempoId] = {};
           }
-          nextDistribucion[tiempo][groupKey] = cleanedValue;
+          nextDistribucion[tiempoId][groupKey] = cleanedValue;
         }
       }
     }
@@ -182,27 +244,24 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     if (lines.length === 0) return;
 
     const cols = lines[0].split('\t').map(c => c.trim());
-    const nextManual = { ...((distribucion as any)._porcentajesManuales || {}) };
+    const nextManual = { ...(state.porcentajesManuales || {}) };
 
     for (let c = 0; c < cols.length; c++) {
       const targetColIdx = startColIdx + c;
       if (targetColIdx >= tiempos.length) break;
-      const tiempo = tiempos[targetColIdx];
+      const tiempoId = tiempos[targetColIdx].id;
       const rawVal = cols[c].replace('%', '').trim();
       const cleaned = cleanInputStr(rawVal);
       if (cleaned === '') {
-        delete nextManual[tiempo];
+        delete nextManual[tiempoId];
       } else {
-        nextManual[tiempo] = cleaned;
+        nextManual[tiempoId] = cleaned;
       }
     }
 
     commit({
       ...state,
-      distribucion: {
-        ...distribucion,
-        _porcentajesManuales: nextManual
-      }
+      porcentajesManuales: nextManual
     });
   };
 
@@ -269,18 +328,18 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     }
   }, [focusCell]);
 
-  const { tiempos, porciones, distribucion, kcalManuales = {}, energiaTotalManual } = state;
+  const { tiempos, porciones, distribucion, kcalManuales = {}, porcentajesManuales = {}, energiaTotalManual } = state;
 
   // ─── Kcal automática por tiempo (desde distribución) ───────────────────────
-  const colKcalAuto = (tiempo: string) =>
+  const colKcalAuto = (tiempoId: string) =>
     GRUPOS.reduce(
-      (s, { key }) => s + toNum(distribucion[tiempo]?.[key]) * KCAL_POR_EQ[key],
+      (s, { key }) => s + toNum(distribucion[tiempoId]?.[key]) * KCAL_POR_EQ[key],
       0
     );
 
-  const colKcalEfectiva = (tiempo: string) => {
-    const manual = kcalManuales[tiempo];
-    return manual != null && manual > 0 ? manual : colKcalAuto(tiempo);
+  const colKcalEfectiva = (tiempoId: string) => {
+    const manual = kcalManuales[tiempoId];
+    return manual != null && manual > 0 ? manual : colKcalAuto(tiempoId);
   };
 
   // kcalFromPorciones: energía desde la columna Porciones — fuente primaria, tiempo real
@@ -291,7 +350,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   // kcalFromDistribucion: fallback si porciones están vacías
   const kcalFromDistribucion = useMemo(
-    () => tiempos.reduce((s, t) => s + colKcalAuto(t), 0),
+    () => tiempos.reduce((s, t) => s + colKcalAuto(t.id), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tiempos, distribucion]
   );
@@ -313,11 +372,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       : kcalTotalAuto;
 
 
-  const getCell = (tiempo: string, grupo: string) =>
-    distribucion[tiempo]?.[grupo] ?? 0;
+  const getCell = (tiempoId: string, grupo: string) =>
+    distribucion[tiempoId]?.[grupo] ?? 0;
 
   const rowTotal = (grupo: string) =>
-    tiempos.reduce((s, t) => s + toNum(getCell(t, grupo)), 0);
+    tiempos.reduce((s, t) => s + toNum(getCell(t.id, grupo)), 0);
 
   // ─── Commit ──────────────────────────────────────────────────────────────────
   const commit = (next: BarridoData) => {
@@ -332,7 +391,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     // Fallback: energía desde distribución si porciones están vacías
     const distTotal = next.tiempos.reduce((s, t) => {
       return s + GRUPOS.reduce(
-        (gs, { key }) => gs + toNum(next.distribucion[t]?.[key]) * KCAL_POR_EQ[key],
+        (gs, { key }) => gs + toNum(next.distribucion[t.id]?.[key]) * KCAL_POR_EQ[key],
         0
       );
     }, 0);
@@ -347,7 +406,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     // Validar si la distribución suma exactamente la porción para TODOS los grupos
     const isValid = GRUPOS.every(({ key }) => {
       const porcion = toNum(next.porciones[key]);
-      const total = next.tiempos.reduce((s, t) => s + toNum(next.distribucion[t]?.[key]), 0);
+      const total = next.tiempos.reduce((s, t) => s + toNum(next.distribucion[t.id]?.[key]), 0);
       return Math.abs(porcion - total) < 0.01;
     });
 
@@ -357,12 +416,12 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   // ─── Manejadores ─────────────────────────────────────────────────────────────
-  const setCell = (tiempo: string, grupo: string, val: string) => {
+  const setCell = (tiempoId: string, grupo: string, val: string) => {
     commit({
       ...state,
       distribucion: {
         ...distribucion,
-        [tiempo]: { ...(distribucion[tiempo] || {}), [grupo]: val },
+        [tiempoId]: { ...(distribucion[tiempoId] || {}), [grupo]: val },
       },
     });
   };
@@ -371,26 +430,23 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     commit({ ...state, porciones: { ...porciones, [grupo]: val } });
   };
 
-  const setManualPercentage = (tiempo: string, pctStr: string) => {
-    const nextManual = { ...((distribucion as any)._porcentajesManuales || {}) };
+  const setManualPercentage = (tiempoId: string, pctStr: string) => {
+    const nextManual = { ...porcentajesManuales };
     if (pctStr === '') {
-      delete nextManual[tiempo];
+      delete nextManual[tiempoId];
     } else {
-      nextManual[tiempo] = pctStr;
+      nextManual[tiempoId] = pctStr;
     }
     commit({
       ...state,
-      distribucion: {
-        ...distribucion,
-        _porcentajesManuales: nextManual
-      }
+      porcentajesManuales: nextManual
     });
   };
 
-  const setKcalManual = (tiempo: string, val: number | null) => {
+  const setKcalManual = (tiempoId: string, val: number | null) => {
     const next = { ...(kcalManuales || {}) };
-    if (val == null || val === 0) delete next[tiempo];
-    else next[tiempo] = val;
+    if (val == null || val === 0) delete next[tiempoId];
+    else next[tiempoId] = val;
     commit({ ...state, kcalManuales: next });
   };
 
@@ -399,28 +455,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   const addTiempo = () => {
-    const base = newTiempoName.trim() || 'Tiempo';
-
-    // Buscar todos los tiempos que coincidan exactamente con "base" o "base N"
-    const escaped = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const pattern = new RegExp(`^${escaped}(\\s+(\\d+))?$`);
-    const matches = tiempos.filter(t => pattern.test(t));
-
-    let name: string;
-    if (matches.length === 0) {
-      // Sin colisión — usar el nombre tal cual
-      name = base;
-    } else {
-      // Encontrar el número más alto en uso (base sin número cuenta como 1)
-      let highest = 1;
-      for (const t of matches) {
-        const m = t.match(/\s+(\d+)$/);
-        if (m) highest = Math.max(highest, parseInt(m[1], 10));
-      }
-      name = `${base} ${highest + 1}`;
-    }
-
-    commit({ ...state, tiempos: [...tiempos, name] });
+    const nombre = normalizeColacionLabel(newTiempoName.trim() || 'Tiempo');
+    commit({
+      ...state,
+      tiempos: [...tiempos, { id: newTiempoId(), nombre }],
+    });
     setNewTiempoName('');
   };
 
@@ -438,49 +477,37 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       porciones: {},
       distribucion: {},
       kcalManuales: {},
+      porcentajesManuales: {},
       energiaTotalManual: null,
     });
   };
 
   const removeTiempo = (idx: number) => {
     if (tiempos.length <= 1) return;
-    const t = tiempos[idx];
+    const tiempoId = tiempos[idx].id;
     const nextDist = { ...distribucion };
     const nextManuales = { ...kcalManuales };
-    delete nextDist[t];
-    delete nextManuales[t];
+    const nextPorcentajes = { ...porcentajesManuales };
+    delete nextDist[tiempoId];
+    delete nextManuales[tiempoId];
+    delete nextPorcentajes[tiempoId];
     commit({
       ...state,
       tiempos: tiempos.filter((_, i) => i !== idx),
       distribucion: nextDist,
       kcalManuales: nextManuales,
+      porcentajesManuales: nextPorcentajes,
     });
   };
 
   const renameTiempo = (idx: number, name: string) => {
-    const oldName = tiempos[idx];
-    if (oldName === name) return;
-
-    // Auto-numerar si el nuevo nombre ya existe en otro índice
-    let newName = name.trim() || oldName;
-    if (tiempos.some((t, i) => i !== idx && t === newName)) {
-      let n = 2;
-      while (tiempos.some((t, i) => i !== idx && t === `${newName} ${n}`)) n++;
-      newName = `${newName} ${n}`;
-    }
+    const current = tiempos[idx];
+    const newName = normalizeColacionLabel(name) || current.nombre;
+    if (current.nombre === newName) return;
 
     const newTiempos = [...tiempos];
-    newTiempos[idx] = newName;
-    const nextDist = { ...distribucion };
-    const nextManuales = { ...kcalManuales };
-
-    nextDist[newName] = nextDist[oldName] || {};
-    delete nextDist[oldName];
-    if (nextManuales[oldName] != null) {
-      nextManuales[newName] = nextManuales[oldName];
-      delete nextManuales[oldName];
-    }
-    commit({ ...state, tiempos: newTiempos, distribucion: nextDist, kcalManuales: nextManuales });
+    newTiempos[idx] = { ...current, nombre: newName };
+    commit({ ...state, tiempos: newTiempos });
   };
 
   // Evitar scroll que cambie valores
@@ -652,7 +679,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                     <div className="flex items-center justify-center gap-1 group/thead px-1 relative mt-[14px]">
                       <input
                         type="text"
-                        value={t}
+                        value={t.nombre}
                         onChange={(e) => renameTiempo(idx, e.target.value)}
                         className="text-[11px] font-bold bg-transparent border-0 border-b border-transparent hover:border-[#444] focus:border-[#90c2ff] outline-none w-full text-center text-[#c0c0c0] focus:text-[#90c2ff] uppercase transition-colors tracking-wider placeholder:text-[#444] m-0 p-0"
                         title="Editable"
@@ -744,7 +771,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
                     {/* Celda por tiempo */}
                     {tiempos.map((t, idx) => {
-                      const v = getCell(t, key);
+                      const v = getCell(t.id, key);
                       return (
                         <td
                           key={idx}
@@ -760,7 +787,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                             type="text"
                             inputMode="decimal"
                             value={v === 0 || v === '0' ? '' : (v ?? '')}
-                            onChange={(e) => setCell(t, key, cleanInputStr(e.target.value))}
+                            onChange={(e) => setCell(t.id, key, cleanInputStr(e.target.value))}
                             onPaste={(e) => handlePaste(e, rowIdx, idx + 1)}
                             onWheel={noScroll}
                             onKeyDown={(e) => handleCellKey(e, rowIdx, idx + 1, tiempos.length)}
@@ -836,16 +863,16 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 <td style={{ borderRight: '2px solid #333', textAlign: 'center', color: '#444', fontSize: '13px' }}>—</td>
 
                 {tiempos.map((t, idx) => {
-                  const kcalTiempo = colKcalAuto(t);
+                  const kcalTiempo = colKcalAuto(t.id);
                   const denominador = energiaTotalManual && energiaTotalManual > 0 ? energiaTotalManual : kcalTotalAuto;
                   const pct = denominador > 0 ? (kcalTiempo / denominador) * 100 : 0;
 
-                  const manualPct = (distribucion as any)._porcentajesManuales?.[t] ?? '';
+                  const manualPct = porcentajesManuales[t.id] ?? '';
                   const displayCalculated = pct > 0 ? `${pct.toFixed(1)}%` : '0%';
 
                   return (
                     <td
-                      key={t}
+                      key={t.id}
                       style={{
                         padding: '2px',
                         textAlign: 'center',
@@ -858,7 +885,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                           inputMode="decimal"
                           value={manualPct}
                           placeholder={displayCalculated}
-                          onChange={(e) => setManualPercentage(t, cleanInputStr(e.target.value))}
+                          onChange={(e) => setManualPercentage(t.id, cleanInputStr(e.target.value))}
                           onPaste={(e) => handlePastePercentages(e, idx)}
                           onWheel={noScroll}
                           className={cellCls}
