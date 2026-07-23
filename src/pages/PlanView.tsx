@@ -7,21 +7,22 @@ import type { Plan } from '@/types';
 import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
-import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { formatMealTimeName } from '@/lib/mealTimes';
 import { getMenuTimesForDisplay } from '@/lib/menuEquivalencias';
+import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
+import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
 export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const { confirm, ConfirmDialogComponent } = useConfirm();
 
     const pacienteId = propPacienteId;
     const planId = propPlanId;
     const [plan, setPlan] = useState<Plan | null>(null);
     const [loading, setLoading] = useState(true);
     const [pacienteNombre, setPacienteNombre] = useState('');
+    const [pacienteContacto, setPacienteContacto] = useState({ email: '', phone: '' });
 
     useEffect(() => {
         const fetch = async () => {
@@ -98,7 +99,10 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                 }
                 if (pacRes) {
                     const p = pacRes.data?.data || pacRes.data;
-                    if (p) setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim());
+                    if (p) {
+                        setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim());
+                        setPacienteContacto({ email: p.email || '', phone: p.telefono || '' });
+                    }
                 }
             } catch (err) {
                 console.error('Error cargando plan:', err);
@@ -164,48 +168,24 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
     };
 
     const [sending, setSending] = useState(false);
+    const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
     const sendingLock = useRef(false);
 
-    const handleEnviar = async () => {
+    const handleEnviar = async (channels: PlanDeliveryChannels) => {
         if (sendingLock.current || sending) return;
         sendingLock.current = true;
 
         try {
-            const ok = await confirm({
-                title: '¿Enviar Plan al Paciente?',
-                description: 'Se enviará el plan nutricional por correo electrónico y WhatsApp al paciente.',
-                confirmLabel: 'Sí, Enviar',
-                cancelLabel: 'Cancelar',
-                variant: 'info',
-            });
-            if (!ok) {
-                sendingLock.current = false;
-                return;
-            }
             setSending(true);
-            const { data } = await api.post(`/api/planes/${planId}/enviar`);
+            const { data } = await api.post(`/api/planes/${planId}/enviar`, { canales: channels });
             const resultado = data?.data || data;
-            const emailOk = resultado?.email === 'ok';
-            const whatsappOk = resultado?.whatsapp === 'ok';
-            const ambosOk = emailOk && whatsappOk;
-            const ambosErr = !emailOk && !whatsappOk;
-
-            let title = 'Plan enviado';
-            let description = '';
-
-            if (ambosOk) {
-                title = 'Plan enviado correctamente';
-                description = 'Correo y WhatsApp entregados al paciente.';
-            } else if (ambosErr) {
-                title = 'Enviado con advertencias';
-                description = 'El plan se marcó como enviado, pero tanto el correo como WhatsApp fallaron. Verifica la configuración.';
-            } else {
-                const okState = emailOk ? 'Correo ✓' : 'WhatsApp ✓';
-                const errState = emailOk ? 'WhatsApp ✗' : 'Correo ✗';
-                description = `${okState} entregado. ${errState} falló — verifica la configuración.`;
-            }
-
-            toast({ title, description });
+            const feedback = getPlanDeliveryFeedback(resultado || {}, channels);
+            toast({
+                title: feedback.title,
+                description: feedback.description,
+                variant: feedback.destructive ? 'destructive' : 'default',
+            });
+            setShowDeliveryDialog(false);
             setPlan((prev) => prev ? { ...prev, estadoEnvio: 'enviado' } as Plan : prev);
         } catch (err: any) {
             toast({
@@ -275,7 +255,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                                 <FileText className="h-[18px] w-[18px]" /> Descargar
                             </button>
                             <button
-                                onClick={handleEnviar}
+                                onClick={() => setShowDeliveryDialog(true)}
                                 disabled={sending}
                                 className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818] disabled:opacity-50 w-full sm:w-auto"
                             >
@@ -489,8 +469,16 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                     onSaveMeta={handleSaveMeta}
                     loading={savingMeta}
                 />
+                <PlanDeliveryDialog
+                    open={showDeliveryDialog}
+                    patientName={pacienteNombre}
+                    email={pacienteContacto.email}
+                    phone={pacienteContacto.phone}
+                    sending={sending}
+                    onCancel={() => setShowDeliveryDialog(false)}
+                    onConfirm={handleEnviar}
+                />
             </div>
-            {ConfirmDialogComponent}
         </>
     );
 };
