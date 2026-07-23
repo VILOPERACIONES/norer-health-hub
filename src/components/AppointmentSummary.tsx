@@ -1,4 +1,5 @@
 import { CalendarDays, Mail, MapPin, Phone, UserRound, Video } from 'lucide-react';
+import { formatMexicoCityAppointment } from '@/lib/dateTime';
 
 export type AppointmentSummaryData = {
   fecha: string;
@@ -16,13 +17,10 @@ const modalityLabel = (value: string) => {
 };
 
 export const formatAppointmentDate = (value: string) => {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value || 'Sin fecha';
-  return new Intl.DateTimeFormat('es-MX', {
-    timeZone: 'America/Merida',
+  return formatMexicoCityAppointment(value, {
     dateStyle: 'full',
     timeStyle: 'short',
-  }).format(date);
+  }) || 'Sin fecha';
 };
 
 export function AppointmentSummary({ data }: { data: AppointmentSummaryData }) {
