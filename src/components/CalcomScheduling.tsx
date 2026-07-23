@@ -9,6 +9,7 @@ import { format, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { buildPatientFullName } from '@/lib/patientName';
+import { formatMexicoCityAppointment } from '@/lib/dateTime';
 
 interface Slot {
   time: string;
@@ -97,7 +98,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
   const fetchMonthAvailability = async (mod: 'presencial' | 'online' | 'doble_presencial') => {
     try {
       const eventTypeId = EVENT_TYPES[mod];
-      // Usar offset -06:00 (America/Merida = UTC-6, CST permanente desde 2022)
+      // America/Mexico_City usa UTC-6 permanente para estas fechas.
       const todayStr = format(new Date(), 'yyyy-MM-dd');
       const twoMonthsLater = addMonths(new Date(), 2);
       const endStr = format(twoMonthsLater, 'yyyy-MM-dd');
@@ -139,7 +140,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
     try {
       const eventTypeId = EVENT_TYPES[mod];
 
-      // America/Merida = UTC-6 (CST permanente, sin horario de verano desde 2022).
+      // America/Mexico_City = UTC-6 (sin horario de verano desde 2022).
       // Usamos -06:00 explícito para que Cal.com reciba el día EXACTO sin
       // desplazamiento causado por la zona del navegador.
       const y  = selectedDate.getFullYear();
@@ -148,7 +149,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
       const startTimeISO = `${y}-${mo}-${d}T00:00:00-06:00`;
       const endTimeISO   = `${y}-${mo}-${d}T23:59:59-06:00`;
 
-      console.log('[fetchSlots] Rango Mérida:', startTimeISO, '→', endTimeISO);
+      console.log('[fetchSlots] Rango Ciudad de México:', startTimeISO, '→', endTimeISO);
 
       const { data } = await api.get('/api/citas/slots', {
         params: {
@@ -320,15 +321,17 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
             <div className="mt-auto p-3 bg-[#181818] border border-[#333] rounded-[12px] animate-in zoom-in-95 font-sans">
               <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-1">Resumen de Cita</p>
               <p className="text-[12px] font-bold text-white capitalize">
-                {eventDetails?.title || modalidad} — {format(new Date(selectedSlot), "d 'de' MMMM", { locale: es })}
+                {eventDetails?.title || modalidad} — {formatMexicoCityAppointment(selectedSlot, {
+                  day: 'numeric',
+                  month: 'long',
+                })}
               </p>
               <p className="text-[14px] font-black text-brand-primary mt-1">
-                {new Intl.DateTimeFormat('es-MX', {
-                  timeZone: 'America/Mexico_City',
+                {formatMexicoCityAppointment(selectedSlot, {
                   hour: '2-digit',
                   minute: '2-digit',
                   hour12: false,
-                }).format(new Date(selectedSlot))} hrs
+                })} hrs
               </p>
             </div>
           )}
@@ -349,13 +352,11 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
               <div className="grid grid-cols-2 gap-2">
                 {slots.map((slot) => {
                   const isSelected = selectedSlot === slot.time;
-                  // Mostrar la hora en America/Merida (UTC-6, CST permanente)
-                  const slotLabel = new Intl.DateTimeFormat('es-MX', {
-                    timeZone: 'America/Mexico_City',
+                  const slotLabel = formatMexicoCityAppointment(slot.time, {
                     hour: '2-digit',
                     minute: '2-digit',
                     hour12: false,
-                  }).format(new Date(slot.time));
+                  });
                   return (
                     <button
                       key={slot.time}

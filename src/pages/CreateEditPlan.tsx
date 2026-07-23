@@ -18,6 +18,7 @@ import BarridosEquivalenciasManager, {
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 import { formatMealTimeName } from '@/lib/mealTimes';
 import { buildAvoidFoods } from '@/lib/avoidFoods';
+import { getMexicoCityDateTimeParts } from '@/lib/dateTime';
 import {
   appendMealTimeToMenus,
   removeMealTimeFromMenus,
@@ -77,6 +78,7 @@ export const CreateEditPlanForm = ({
 
   const isEdit = !!propPlanId;
   const isBasePlan = !propPacienteId;
+  const initialSessionParts = getMexicoCityDateTimeParts(initialProximaSesion);
 
   const pacienteId = propPacienteId;
   const planId = propPlanId;
@@ -93,12 +95,8 @@ export const CreateEditPlanForm = ({
   const [proteinas, setProteinas] = useState('30');
   const [carbohidratos, setCarbohidratos] = useState('40');
   const [grasas, setGrasas] = useState('30');
-  const [proximaSesion, setProximaSesion] = useState(initialProximaSesion
-    ? initialProximaSesion.split('T')[0]        // date part
-    : '');
-  const [proximaSesionHora, setProximaSesionHora] = useState(initialProximaSesion && initialProximaSesion.includes('T')
-    ? initialProximaSesion.split('T')[1]?.slice(0, 5)  // HH:MM
-    : '');
+  const [proximaSesion, setProximaSesion] = useState(initialSessionParts?.date || '');
+  const [proximaSesionHora, setProximaSesionHora] = useState(initialSessionParts?.time || '');
   const [notas, setNotas] = useState('');
   const [menus, setMenus] = useState<Menu[]>([emptyMenu('Menú 1'), emptyMenu('Menú 2')]);
   const [valData, setValData] = useState<any>(null);
@@ -270,10 +268,10 @@ export const CreateEditPlanForm = ({
             setGrasas((Number(p.grasasPct ?? p.macros?.grasas ?? 30)).toString());
 
             if (p.proximaSesion) {
-              const d = new Date(p.proximaSesion);
-              if (!isNaN(d.getTime())) {
-                setProximaSesion(d.toISOString().split('T')[0]);
-                setProximaSesionHora(d.toTimeString().substring(0, 5));
+              const sessionParts = getMexicoCityDateTimeParts(p.proximaSesion);
+              if (sessionParts) {
+                setProximaSesion(sessionParts.date);
+                setProximaSesionHora(sessionParts.time);
               }
             } else {
               setProximaSesion('');

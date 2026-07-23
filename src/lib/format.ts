@@ -1,3 +1,5 @@
+import { getMexicoCityDateTimeParts } from './dateTime';
+
 const MONTHS = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
 
 export const formatDate = (dateStr: string | null | undefined): string => {
@@ -16,8 +18,10 @@ export const formatDate = (dateStr: string | null | undefined): string => {
     return `${d.getUTCDate()} de ${MONTHS[d.getUTCMonth()]} de ${d.getUTCFullYear()}`;
   }
 
-  // Si trae hora real, extraemos en formato local
-  return `${d.getDate()} de ${MONTHS[d.getMonth()]} de ${d.getFullYear()}`;
+  const mexicoParts = getMexicoCityDateTimeParts(d);
+  if (!mexicoParts) return '—';
+  const [year, month, day] = mexicoParts.date.split('-').map(Number);
+  return `${day} de ${MONTHS[month - 1]} de ${year}`;
 };
 
 export const formatDateShort = (dateStr: string | null | undefined): string => {
@@ -32,7 +36,10 @@ export const formatDateShort = (dateStr: string | null | undefined): string => {
     return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()].slice(0, 3)}`;
   }
 
-  return `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3)}`;
+  const mexicoParts = getMexicoCityDateTimeParts(d);
+  if (!mexicoParts) return '—';
+  const [, month, day] = mexicoParts.date.split('-').map(Number);
+  return `${day} ${MONTHS[month - 1].slice(0, 3)}`;
 };
 
 export const formatDecimal = (n: number | string | null | undefined, decimals = 2): string => {
@@ -73,5 +80,4 @@ export const getBadgeForValuation = (val: any) => {
 
   return { text: 'Enviado', cls: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20' };
 };
-
 
