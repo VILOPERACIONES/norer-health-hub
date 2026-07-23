@@ -5,6 +5,8 @@ import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { buildPdfMeta, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
+import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
+import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
 interface Phase4DeliveryProps {
   pacienteId: string;
@@ -30,6 +32,8 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   const [saving, setSaving] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [pacienteNombre, setPacienteNombre] = useState('Paciente');
+  const [pacienteContacto, setPacienteContacto] = useState({ email: '', phone: '' });
+  const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
 
   useEffect(() => {
     const loadMeta = async () => {
@@ -51,7 +55,10 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
         });
         if (pacRes) {
           const p = pacRes.data?.data || pacRes.data;
-          if (p) setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim() || 'Paciente');
+          if (p) {
+            setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim() || 'Paciente');
+            setPacienteContacto({ email: p.email || '', phone: p.telefono || '' });
+          }
         }
       } catch (e) {
         console.error("Error loading plan meta", e);
@@ -142,12 +149,19 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
     }
   };
 
-  const handleSend = async () => {
+  const handleSend = async (channels: PlanDeliveryChannels) => {
     await handleSaveMeta();
     setSending(true);
     try {
-      await api.post(`/api/planes/${planId}/enviar`);
-      toast({ title: '¡Plan Enviado!', description: 'El PDF fue enviado por WhatsApp correctamente.' });
+      const { data } = await api.post(`/api/planes/${planId}/enviar`, { canales: channels });
+      const resultado = data?.data || data;
+      const feedback = getPlanDeliveryFeedback(resultado || {}, channels);
+      toast({
+        title: feedback.title,
+        description: feedback.description,
+        variant: feedback.destructive ? 'destructive' : 'default',
+      });
+      setShowDeliveryDialog(false);
       onFinish();
     } catch (err: any) {
       toast({ title: 'Error al enviar', variant: 'destructive', description: err.response?.data?.message || 'Revisa tu configuración' });
@@ -162,6 +176,16 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   );
 
   return (
+    <>
+    <PlanDeliveryDialog
+      open={showDeliveryDialog}
+      patientName={pacienteNombre}
+      email={pacienteContacto.email}
+      phone={pacienteContacto.phone}
+      sending={sending}
+      onCancel={() => setShowDeliveryDialog(false)}
+      onConfirm={handleSend}
+    />
     <div className="flex flex-col lg:flex-row w-full lg:h-[700px] gap-6 animate-slide-up pb-8 lg:pb-0">
       {/* Columna Izquierda: Controles */}
       <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6">
@@ -197,7 +221,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
              <button onClick={onFinish} className="flex-1 bg-[#1a1a1a] border border-[#333] hover:bg-[#222] text-[#8a8a8a] hover:text-white font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all flex items-center justify-center text-center leading-tight">
                Omitir y<br/>Finalizar Consulta
              </button>
-             <button onClick={handleSend} disabled={sending || saving} className="flex-[1.5] bg-gradient-to-r from-[#90c2ff] to-[#60a5fa] hover:from-[#a6cdff] hover:to-[#90c2ff] text-black font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all shadow-[0_0_20px_rgba(144,194,255,0.2)] flex items-center justify-center gap-2">
+             <button onClick={() => setShowDeliveryDialog(true)} disabled={sending || saving} className="flex-[1.5] bg-gradient-to-r from-[#90c2ff] to-[#60a5fa] hover:from-[#a6cdff] hover:to-[#90c2ff] text-black font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all shadow-[0_0_20px_rgba(144,194,255,0.2)] flex items-center justify-center gap-2">
                {sending ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Send className="w-5 h-5" />}
                Enviar y Finalizar
              </button>
@@ -234,6 +258,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
           )}
       </div>
     </div>
+    </>
   );
 }
 

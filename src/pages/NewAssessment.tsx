@@ -12,6 +12,8 @@ import CalcomScheduling from '@/components/CalcomScheduling';
 import { buildPatientFullName } from '@/lib/patientName';
 import { PhotoFollowup } from '@/components/PhotoFollowup';
 import type { PendingFollowupPhoto } from '@/lib/followupPhotos';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { AppointmentSummary, type AppointmentSummaryData } from '@/components/AppointmentSummary';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
@@ -64,6 +66,7 @@ const NewAssessment = () => {
   const isEdit = !!valoracionId;
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogComponent } = useConfirm();
   const [saving, setSaving] = useState(false);
   const [paciente, setPaciente] = useState<any>(null);
 
@@ -92,7 +95,7 @@ const NewAssessment = () => {
   const [showScheduling, setShowScheduling] = useState(false);
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
-  const [calcomData, setCalcomData] = useState<{ fecha: string; modalidad: string; eventTypeId: number; name: string; email: string; phone: string } | null>(null);
+  const [calcomData, setCalcomData] = useState<AppointmentSummaryData | null>(null);
 
   const queryClient = useQueryClient();
 
@@ -591,6 +594,17 @@ const NewAssessment = () => {
   const handleSave = async (redirectAPlan: boolean | 'equivalencias' = false) => {
     if (!peso && measurementStatuses.peso === 'REGISTRADA') { toast({ title: 'Peso incompleto', description: 'Captura el peso o cambia su estado.', variant: 'destructive' }); return; }
 
+    if (calcomData) {
+      const confirmed = await confirm({
+        title: 'Confirmar cita de seguimiento',
+        description: <AppointmentSummary data={calcomData} />,
+        confirmLabel: 'Confirmar cita y guardar',
+        cancelLabel: 'Volver',
+        variant: 'info',
+      });
+      if (!confirmed) return;
+    }
+
     setSaving(true);
 
     // Asignar fechas al esquema de suplementos justo al guardar (estrategia de mutación en frío)
@@ -766,6 +780,7 @@ const NewAssessment = () => {
             ...calcomData
           });
           toast({ title: 'Cita agendada', description: 'Se ha agendado la próxima cita y notificado al paciente.' });
+          setCalcomData(null);
         } catch (bookingErr: any) {
           console.error('Error al agendar cita:', bookingErr);
           let errorMsg = 'Intenta agendar manualmente o revisa la configuración de Cal.com.';
@@ -806,6 +821,7 @@ const NewAssessment = () => {
 
   return (
     <div className="animate-fade-in w-full min-h-full font-sans flex flex-col pb-6 relative" style={{ backgroundColor: '#0a0a0a' }}>
+      {ConfirmDialogComponent}
 
       {/* DRAFT PROMPT MODAL */}
       {showDraftPrompt && (

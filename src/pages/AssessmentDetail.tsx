@@ -7,6 +7,8 @@ import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { useConfirm } from '@/components/ui/ConfirmDialog';
+import { AppointmentSummary } from '@/components/AppointmentSummary';
 
 // ─── Módulo Plan de la Consulta ───────────────────────────────────────────────
 const PlanSection = ({
@@ -147,6 +149,7 @@ const AssessmentDetail = () => {
   const { id: pacienteId, valoracionId } = useParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { confirm, ConfirmDialogComponent } = useConfirm();
   const [val, setVal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pacienteCitas, setPacienteCitas] = useState<any[]>([]);
@@ -210,6 +213,14 @@ const AssessmentDetail = () => {
 
   const handleScheduleCita = async () => {
     if (!calcomData) return;
+    const confirmed = await confirm({
+      title: 'Confirmar cita de seguimiento',
+      description: <AppointmentSummary data={calcomData} />,
+      confirmLabel: 'Confirmar y agendar',
+      cancelLabel: 'Volver',
+      variant: 'info',
+    });
+    if (!confirmed) return;
     setIsScheduling(true);
     try {
       await api.post('/api/citas/agendar', {
@@ -335,6 +346,7 @@ const AssessmentDetail = () => {
 
   return (
     <div className="space-y-8 animate-fade-in pb-20 w-full">
+      {ConfirmDialogComponent}
 
       {/* A1: Modal confirmación soft delete */}
       {showDeleteConfirm && (

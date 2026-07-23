@@ -6,7 +6,7 @@ type ConfirmVariant = 'danger' | 'warning' | 'info' | 'success';
 interface ConfirmDialogProps {
   open: boolean;
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmVariant;
@@ -161,7 +161,7 @@ import { useState, useCallback } from 'react';
 
 interface ConfirmOptions {
   title: string;
-  description?: string;
+  description?: React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   variant?: ConfirmVariant;
