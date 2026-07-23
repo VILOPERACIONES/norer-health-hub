@@ -12,6 +12,8 @@ import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { hasRecall24Data, normalizeRecall24 } from '@/lib/recall24';
+import { NutritionistPhotoHistory } from '@/components/NutritionistPhotoHistory';
 
 // Soft delete: la restauración queda implementada pero oculta de momento (a propósito
 // debe parecer que la consulta se borró; se reactiva poniendo esto en true si hace falta).
@@ -273,14 +275,19 @@ const PatientProfile = () => {
       const res = await api.get(`/api/pacientes/${id}/valoraciones`);
       const vals = res.data?.data || res.data || [];
       if (!Array.isArray(vals)) return [];
+      const chartNumber = (value: unknown) => {
+        if (value == null || value === '') return null;
+        const parsed = Number(String(value).replace(',', '.'));
+        return Number.isFinite(parsed) ? parsed : null;
+      };
       return vals
         .filter((v: any) => v && v.fecha)
         .map((v: any) => ({
           ...v,
-          pesoEvolucion: parseFloat((v.pesoActual || v.peso || 0).toString().replace(',', '.')),
-          grasaEvolucion: parseFloat((v.pctGrasa || v.pctGrasa2comp || v.pctGrasaCorporal4comp || v.pctGrasaCorp || 0).toString().replace(',', '.')),
-          masaMagraEvolucion: parseFloat((v.masaMagra || v.kgMasaMagra2comp || v.kgMasaMagra4comp || 0).toString().replace(',', '.')),
-          kgGrasaEvolucion: parseFloat((v.masaGrasaReal || v.kgGrasa2comp || 0).toString().replace(',', '.'))
+          pesoEvolucion: chartNumber(v.pesoActual ?? v.peso),
+          grasaEvolucion: chartNumber(v.pctGrasa ?? v.pctGrasa2comp ?? v.pctGrasaCorporal4comp ?? v.pctGrasaCorp),
+          masaMagraEvolucion: chartNumber(v.masaMagra ?? v.kgMasaMagra2comp ?? v.kgMasaMagra4comp),
+          kgGrasaEvolucion: chartNumber(v.masaGrasaReal ?? v.kgGrasa2comp)
         }))
         .sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
     },
@@ -422,6 +429,11 @@ const PatientProfile = () => {
   };
 
   const currentVal = valoraciones[0];
+  const metricValue = (key: string, value: unknown, unit: string) => {
+    if ((currentVal as any)?.medicionesEstado?.[key] === 'NO_APLICA') return 'No aplica';
+    return value != null && value !== '' ? `${value}${unit}` : '—';
+  };
+  const recall24Rows = normalizeRecall24(paciente.habitos || (paciente as any).consumoCalorico);
   const fullHistoryData = [...valoraciones].reverse();
   const previewHistoryData = valoraciones.length > 5 ? [...valoraciones].slice(0, 5).reverse() : fullHistoryData;
 
@@ -691,7 +703,7 @@ const PatientProfile = () => {
                 </div>
 
                 {/* Recordatorio 24 horas */}
-                {paciente.habitos && Object.values(paciente.habitos).some((v: any) => v?.hora || v?.ayer || v?.usualmente) && (
+                {(
                   <div className="bg-bg-elevated/20 border border-border-subtle/50 rounded-[12px] p-6 hover:bg-bg-elevated/40 transition-colors lg:col-span-2">
                     <div className="flex items-center gap-3 border-b border-border-subtle pb-4 mb-4">
                       <h4 className="text-[12px] font-medium text-text-primary uppercase tracking-widest">Recordatorio 24 Horas</h4>
@@ -707,24 +719,22 @@ const PatientProfile = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-subtle/30">
-                          {([
-                            { key: 'desayuno', label: 'Desayuno' },
-                            { key: 'colacion1', label: 'Colación' },
-                            { key: 'almuerzo', label: 'Comida' },
-                            { key: 'colacion2', label: 'Colación' },
-                            { key: 'cena', label: 'Cena' },
-                          ] as { key: string; label: string }[]).map(({ key, label }) => {
-                            const row = (paciente.habitos as any)[key];
-                            if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
+                          {recall24Rows.map((row, index) => {
+                            if (!row.hora && !row.ayer && !row.usualmente) return null;
                             return (
-                              <tr key={key}>
-                                <td className="py-2 pr-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">{label}</td>
-                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.hora || '—'}</td>
-                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row?.ayer || '—'}</td>
-                                <td className="py-2 text-[13px] text-text-secondary">{row?.usualmente || '—'}</td>
+                              <tr key={`${row.label}-${index}`}>
+                                <td className="py-2 pr-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">{row.label}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row.hora || '—'}</td>
+                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row.ayer || '—'}</td>
+                                <td className="py-2 text-[13px] text-text-secondary">{row.usualmente || '—'}</td>
                               </tr>
                             );
                           })}
+                          {!hasRecall24Data(recall24Rows) && (
+                            <tr>
+                              <td colSpan={4} className="py-5 text-center text-[12px] text-text-muted">Sin información registrada.</td>
+                            </tr>
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -741,12 +751,14 @@ const PatientProfile = () => {
             </div>
           </div>
 
+          <NutritionistPhotoHistory pacienteId={id!} />
+
           {/* KPIs */}
           <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
-            <KpiCardCompact label="Porcentaje Grasa (%)" value={`${(currentVal as any)?.pctGrasaCorp || (currentVal as any)?.pctGrasaCorporal4comp || currentVal?.pctGrasa2comp || (currentVal as any)?.pctGrasa || '--'}%`} active icon={Activity} />
-            <KpiCardCompact label="Kilos Grasa (KG)" value={`${(currentVal as any)?.masaGrasaReal || (currentVal as any)?.kgGrasa2comp || '--'} KG`} icon={Heart} />
-            <KpiCardCompact label="Peso Actual" value={`${currentVal?.pesoActual || currentVal?.peso || paciente.peso || '--'} KG`} icon={Activity} />
-            <KpiCardCompact label="Masa Magra" value={`${(currentVal as any)?.masaMagra || currentVal?.kgMasaMagra2comp || '--'} KG`} icon={Shield} />
+            <KpiCardCompact label="Porcentaje Grasa (%)" value={metricValue('pctGrasa', (currentVal as any)?.pctGrasaCorp ?? (currentVal as any)?.pctGrasaCorporal4comp ?? currentVal?.pctGrasa2comp ?? (currentVal as any)?.pctGrasa, '%')} active icon={Activity} />
+            <KpiCardCompact label="Kilos Grasa (KG)" value={metricValue('kgGrasa', (currentVal as any)?.masaGrasaReal ?? (currentVal as any)?.kgGrasa2comp, ' KG')} icon={Heart} />
+            <KpiCardCompact label="Peso Actual" value={metricValue('peso', currentVal?.pesoActual ?? currentVal?.peso ?? paciente.peso, ' KG')} icon={Activity} />
+            <KpiCardCompact label="Masa Magra" value={metricValue('masaMagra', (currentVal as any)?.masaMagra ?? currentVal?.kgMasaMagra2comp, ' KG')} icon={Shield} />
           </section>
 
           {/* PROGRESS CHARTS HIGH-CONTRAST */}

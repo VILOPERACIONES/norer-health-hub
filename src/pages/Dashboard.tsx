@@ -106,6 +106,33 @@ const Dashboard = () => {
     return pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [pacientesData]);
 
+  // La tabla "Últimos Pacientes" muestra la consulta más reciente de cada
+  // paciente, independientemente de si su menú ya fue enviado. Los pendientes
+  // se mantienen aparte para el KPI de Menús pendientes.
+  const pacientesRecientes = useMemo(() => pacientesData.flatMap((pac: any) => {
+    const val = Array.isArray(pac.valoraciones) ? pac.valoraciones[0] : null;
+    if (!val) return [];
+    const planAsociado = val.plan || (Array.isArray(pac.planes)
+      ? pac.planes.find((plan: any) => plan.valoracionId === val.id)
+      : null);
+    const valoracion = {
+      ...val,
+      plan: planAsociado || null,
+      planId: planAsociado?.id || val.planId || null,
+      estadoEnvio: planAsociado?.estadoEnvio || val.estadoEnvio || null,
+    };
+    return [{
+      pacienteId: pac.id,
+      nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
+      fecha: valoracion.fecha,
+      val: valoracion,
+      statusInfo: getBadgeForValuation(valoracion),
+      proximaSesion: valoracion.tieneCita
+        ? (valoracion.proximaCita || true)
+        : (planAsociado?.proximaSesion || null),
+    }];
+  }).sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [pacientesData]);
+
   const loading = loadingPacientes && !metricas;
 
   const userName = user?.nombre?.split(' ')[0] || 'Especialista';
@@ -342,16 +369,16 @@ const Dashboard = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
-                {ultimosPendientes.length === 0 ? (
+                {pacientesRecientes.length === 0 ? (
                   <tr>
                     <td colSpan={5} className="py-16">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <p className="text-[13px] text-[#8a8a8a] text-center">Sin pacientes pendientes. Todo al día ✨</p>
+                        <p className="text-[13px] text-[#8a8a8a] text-center">Aún no hay consultas registradas.</p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  ultimosPendientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, i) => {
+                  pacientesRecientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, i) => {
                     const dateStr = item.fecha
                       ? new Date(item.fecha.includes('T') ? item.fecha.split('T')[0] + 'T12:00:00' : item.fecha)
                           .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -398,7 +425,7 @@ const Dashboard = () => {
 
           <div className="px-5 py-3 border-t border-[#2a2a2a] flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111111]">
              <div className="text-[12px] font-medium text-[#8a8a8a]">
-                Mostrando {ultimosPendientes.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, ultimosPendientes.length)} Resultados de {ultimosPendientes.length}
+                Mostrando {pacientesRecientes.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, pacientesRecientes.length)} Resultados de {pacientesRecientes.length}
              </div>
              
              <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
@@ -434,19 +461,19 @@ const Dashboard = () => {
                       <ChevronLeft className="w-4 h-4" />
                    </button>
                    <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
-                      {currentPage} / {Math.max(1, Math.ceil(ultimosPendientes.length / itemsPerPage))}
+                      {currentPage} / {Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage))}
                    </span>
                    <button 
-                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(ultimosPendientes.length / itemsPerPage), min + 1))}
+                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(pacientesRecientes.length / itemsPerPage), min + 1))}
                       className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(ultimosPendientes.length / itemsPerPage)}
+                      disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
                    >
                       <ChevronRight className="w-4 h-4" />
                    </button>
                    <button 
-                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(ultimosPendientes.length / itemsPerPage)))}
+                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage)))}
                       className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(ultimosPendientes.length / itemsPerPage)}
+                      disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
                    >
                       <ChevronsRight className="w-4 h-4" />
                    </button>

@@ -8,28 +8,37 @@ import { useAuthStore } from "@/store/auth";
 import { usePortalAuthStore } from "@/store/portalAuth";
 import { useThemeStore } from "@/store/theme";
 import Layout from "@/components/Layout";
-import Login from "@/pages/Login";
-import Dashboard from "@/pages/Dashboard";
-import Patients from "@/pages/Patients";
-import NewPatient from "@/pages/NewPatient";
-import PatientProfile from "@/pages/PatientProfile";
-import EditPatient from "@/pages/EditPatient";
-import NewAssessment from "@/pages/NewAssessment";
-import AssessmentDetail from "@/pages/AssessmentDetail";
-import CreateEditPlan from "@/pages/CreateEditPlan";
-import PlanView from "@/pages/PlanView";
-import Requirements from "@/pages/Requirements";
-import Plans from "@/pages/Plans";
-import Pending from "@/pages/Pending";
-import Settings from "@/pages/Settings";
-import EquivalenciasSMAE from "@/pages/EquivalenciasSMAE";
-import Platillos from "@/pages/Platillos";
-import NotFound from "@/pages/NotFound";
-import NorderHealthLogin from "@/pages/norderhealth/Login";
-import NorderHealthHome from "@/pages/norderhealth/Home";
-import NorderHealthChat from "@/pages/norderhealth/Chat";
-import PaymentSuccess from "@/pages/norderhealth/PaymentSuccess";
-import PaymentError from "@/pages/norderhealth/PaymentError";
+
+// El diccionario ortográfico es pesado; se carga después del shell principal
+// para no bloquear la primera pintura ni inflar el bundle inicial.
+const LocalSpellcheck = React.lazy(() => import("@/components/LocalSpellcheck"));
+const Login = React.lazy(() => import("@/pages/Login"));
+const Dashboard = React.lazy(() => import("@/pages/Dashboard"));
+const Patients = React.lazy(() => import("@/pages/Patients"));
+const NewPatient = React.lazy(() => import("@/pages/NewPatient"));
+const PatientProfile = React.lazy(() => import("@/pages/PatientProfile"));
+const EditPatient = React.lazy(() => import("@/pages/EditPatient"));
+const NewAssessment = React.lazy(() => import("@/pages/NewAssessment"));
+const AssessmentDetail = React.lazy(() => import("@/pages/AssessmentDetail"));
+const CreateEditPlan = React.lazy(() => import("@/pages/CreateEditPlan"));
+const PlanView = React.lazy(() => import("@/pages/PlanView"));
+const Requirements = React.lazy(() => import("@/pages/Requirements"));
+const Pending = React.lazy(() => import("@/pages/Pending"));
+const Settings = React.lazy(() => import("@/pages/Settings"));
+const EquivalenciasSMAE = React.lazy(() => import("@/pages/EquivalenciasSMAE"));
+const Platillos = React.lazy(() => import("@/pages/Platillos"));
+const NotFound = React.lazy(() => import("@/pages/NotFound"));
+const NorderHealthLogin = React.lazy(() => import("@/pages/norderhealth/Login"));
+const NorderHealthHome = React.lazy(() => import("@/pages/norderhealth/Home"));
+const NorderHealthChat = React.lazy(() => import("@/pages/norderhealth/Chat"));
+const PaymentSuccess = React.lazy(() => import("@/pages/norderhealth/PaymentSuccess"));
+const PaymentError = React.lazy(() => import("@/pages/norderhealth/PaymentError"));
+
+const RouteFallback = () => (
+  <div className="flex min-h-screen items-center justify-center bg-bg-base text-sm text-text-muted">
+    Cargando…
+  </div>
+);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -103,8 +112,12 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <React.Suspense fallback={null}>
+          <LocalSpellcheck />
+        </React.Suspense>
         <BrowserRouter>
-          <Routes>
+          <React.Suspense fallback={<RouteFallback />}>
+            <Routes>
             <Route path="/login" element={<Login />} />
             <Route
               path="/"
@@ -145,7 +158,8 @@ const App = () => {
             <Route path="/norder-health/chat" element={<PortalRoute><NorderHealthChat /></PortalRoute>} />
 
             <Route path="*" element={<NotFound />} />
-          </Routes>
+            </Routes>
+          </React.Suspense>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

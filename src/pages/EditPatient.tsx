@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
+import { DEFAULT_RECALL_24, normalizeRecall24, type Recall24Row } from '@/lib/recall24';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
@@ -101,6 +102,7 @@ const EditPatient = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [suplementosIniciales, setSuplementosIniciales] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
+  const [habitos, setHabitos] = useState<Recall24Row[]>(DEFAULT_RECALL_24.map((row) => ({ ...row })));
 
   const [form, setForm] = useState({
     nombre: '', apellido: '', lada: '52', telefono: '', email: '',
@@ -127,6 +129,7 @@ const EditPatient = () => {
           const ej = p.ejercicio || p.datosEjercicio || {};
           const ant = p.antecedentes || {};
           const hab = p.habitos || p.consumoCalorico || {};
+          setHabitos(normalizeRecall24(hab));
 
           setForm({
             nombre: p.nombre || '',
@@ -269,8 +272,7 @@ const EditPatient = () => {
         agua: form.agua,
         suplementosDetalle: suplementosIniciales.filter(s => s.nombre.trim())
       },
-
-
+      habitos,
     };
 
     try {
@@ -433,6 +435,60 @@ const EditPatient = () => {
           <Select label="Hábito Tabáquico" value={form.tabaco} onChange={(v: string) => update('tabaco', v)} options={['No', 'Ocasional', 'Frecuente']} />
           <Input label="Ingesta de Agua (L)”" value={form.agua} onChange={(v: string) => update('agua', v)} placeholder="Ej. 2.5 Lts" />
           <TextArea label="Signos y Síntomas Adicionales" value={form.signosSintomas} onChange={(v: string) => update('signosSintomas', v)} placeholder="Cansancio crónico, dolor de cabeza..." />
+        </FormSection>
+
+        <FormSection title="Recordatorio 24 Horas" icon={Clock}>
+          <div className="col-span-full space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[13px] text-text-secondary m-0">Registro de horarios y alimentos del paciente. Esta información pertenece únicamente al expediente.</p>
+              <button
+                type="button"
+                onClick={() => setHabitos((rows) => [...rows, { label: 'Colación', hora: '', ayer: '', usualmente: '' }])}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
+              >
+                <Plus className="w-3 h-3" /> Agregar tiempo
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-[12px]">
+                <thead>
+                  <tr className="border-b border-border-subtle">
+                    {['Tiempo', 'Hora', 'Ayer', 'Usualmente'].map((label) => (
+                      <th key={label} className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-3">{label}</th>
+                    ))}
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle/50">
+                  {habitos.map((row, index) => (
+                    <tr key={index}>
+                      {(['label', 'hora', 'ayer', 'usualmente'] as const).map((field) => (
+                        <td key={field} className="py-2 pr-3">
+                          <input
+                            type="text"
+                            value={row[field]}
+                            onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
+                            placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Descripción...'}
+                            className="w-full bg-bg-elevated rounded-[6px] px-3 py-2 text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
+                          />
+                        </td>
+                      ))}
+                      <td className="py-2">
+                        <button
+                          type="button"
+                          onClick={() => setHabitos((rows) => rows.filter((_, itemIndex) => itemIndex !== index))}
+                          className="p-2 text-text-muted hover:text-accent-red rounded-[6px] hover:bg-bg-elevated transition-colors"
+                          title="Eliminar tiempo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </FormSection>
 
       </div>

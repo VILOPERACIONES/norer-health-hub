@@ -9,6 +9,7 @@ import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { formatMealTimeName } from '@/lib/mealTimes';
 
 export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
     const navigate = useNavigate();
@@ -59,7 +60,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                             }
                             return {
                                 ...t,
-                                nombre: t.nombre || 'Sin nombre',
+                                nombre: formatMealTimeName(t.nombre) || 'Sin nombre',
                                 nota,
                                 bebida: t.bebida || metaBebida,
                                 suplTiempo: t.suplTiempo || metaSuplTiempo,

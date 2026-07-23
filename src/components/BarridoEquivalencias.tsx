@@ -70,7 +70,7 @@ const GRUPOS: { key: string; label: string }[] = [
   { key: 'azConGr', label: 'Az con grasa' },
 ];
 
-const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
+const DEFAULT_TIEMPOS = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
 const newTiempoId = () =>
   globalThis.crypto?.randomUUID?.() || `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -93,7 +93,9 @@ export const normalizeBarridoData = (value: BarridoData | any | null): BarridoDa
     if (raw && typeof raw === 'object') {
       return {
         id: String(raw.id || `legacy-tiempo-${index + 1}`),
-        nombre: normalizeColacionLabel(String(raw.nombre || `Tiempo ${index + 1}`)),
+        nombre: raw.nombre == null
+          ? `Tiempo ${index + 1}`
+          : normalizeColacionLabel(String(raw.nombre)),
       };
     }
     return {
@@ -455,7 +457,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   const addTiempo = () => {
-    const nombre = normalizeColacionLabel(newTiempoName.trim() || 'Tiempo');
+    const nombre = normalizeColacionLabel(newTiempoName.trim()) || `Tiempo ${tiempos.length + 1}`;
     commit({
       ...state,
       tiempos: [...tiempos, { id: newTiempoId(), nombre }],
@@ -501,12 +503,10 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   const renameTiempo = (idx: number, name: string) => {
-    const current = tiempos[idx];
-    const newName = normalizeColacionLabel(name) || current.nombre;
-    if (current.nombre === newName) return;
-
     const newTiempos = [...tiempos];
-    newTiempos[idx] = { ...current, nombre: newName };
+    newTiempos[idx] = { ...newTiempos[idx], nombre: name };
+    // El ID de la columna permanece estable, incluso si el título queda vacío
+    // temporalmente mientras el usuario escribe uno nuevo.
     commit({ ...state, tiempos: newTiempos });
   };
 
@@ -654,7 +654,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 </th>
                 {tiempos.map((t, idx) => (
                   <th
-                    key={idx}
+                    key={t.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
@@ -774,7 +774,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       const v = getCell(t.id, key);
                       return (
                         <td
-                          key={idx}
+                          key={t.id}
                           style={{
                             padding: '2px',
                             borderRight: idx < tiempos.length - 1 ? '1px solid #222' : '2px solid #333',

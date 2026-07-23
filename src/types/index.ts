@@ -132,9 +132,9 @@ export interface Valoracion {
   fecha: string;
   hora?: string;
   numeracion?: number;
-  peso: number;
+  peso?: number;
   pesoActual?: number | string;
-  talla: number;
+  talla?: number;
   estatura?: number | string;
   imc?: number | string;
   pctGrasa2comp?: number | string;
@@ -166,6 +166,7 @@ export interface Valoracion {
   superficieCorp?: number;
   pctGrasaCorp?: number;
   indicePonderal?: number;
+  medicionesEstado?: Record<string, 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA' | boolean>;
 }
 
 export interface Plan {
