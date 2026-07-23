@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
+import { PortalPhotoHistory } from '@/components/PortalPhotoHistory';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type LucideIcon = React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
@@ -90,6 +91,8 @@ function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
   const Icon = mode.Icon;
   const value = mode.key === 'grasa' ? (progreso?.pctGrasa ?? null) : (progreso?.masaMagra ?? null);
   const delta = mode.key === 'grasa' ? (progreso?.delta?.pctGrasa ?? null) : (progreso?.delta?.masaMagra ?? null);
+  const statusKey = mode.key === 'grasa' ? 'pctGrasa' : 'masaMagra';
+  const noAplica = progreso?.medicionesEstado?.[statusKey] === 'NO_APLICA';
 
   return (
     <div
@@ -105,7 +108,7 @@ function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
           <RefreshCw size={9} className="text-[#222]" />
         </div>
         <p className="text-[30px] font-black text-white leading-none tracking-tight">
-          {fmt(value)}<span className="text-[11px] font-normal text-[#333] ml-0.5">{mode.unit}</span>
+          {noAplica ? 'N/A' : fmt(value)}{!noAplica && <span className="text-[11px] font-normal text-[#333] ml-0.5">{mode.unit}</span>}
         </p>
         {delta != null && <div className="mt-2"><Delta value={delta} positiveIsGood={mode.posGood} unit={mode.unit} /></div>}
         <div className="flex gap-1 mt-3">
@@ -124,7 +127,7 @@ function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
   );
 }
 
-function PesoCard({ value, delta }: { value: number | null; delta: number | null }) {
+function PesoCard({ value, delta, noAplica }: { value: number | null; delta: number | null; noAplica?: boolean }) {
   return (
     <div className="flex-1 bg-[#111] border border-[#1c1c1c] rounded-[16px] p-4">
       <div className="flex items-center gap-1.5 mb-3">
@@ -132,7 +135,7 @@ function PesoCard({ value, delta }: { value: number | null; delta: number | null
         <p className="text-[9px] text-[#444] font-bold uppercase tracking-widest">Peso</p>
       </div>
       <p className="text-[30px] font-black text-white leading-none tracking-tight">
-        {fmt(value)}<span className="text-[11px] font-normal text-[#333] ml-0.5">kg</span>
+        {noAplica ? 'N/A' : fmt(value)}{!noAplica && <span className="text-[11px] font-normal text-[#333] ml-0.5">kg</span>}
       </p>
       {delta != null && <div className="mt-2"><Delta value={delta} positiveIsGood={false} unit="kg" /></div>}
     </div>
@@ -324,7 +327,7 @@ export default function NorderHealthHome() {
             ) : (
               <div className="flex gap-3">
                 <StatCard progreso={progreso} locked={!isPremium} />
-                <PesoCard value={progreso?.peso ?? null} delta={progreso?.delta?.peso ?? null} />
+                <PesoCard value={progreso?.peso ?? null} delta={progreso?.delta?.peso ?? null} noAplica={progreso?.medicionesEstado?.peso === 'NO_APLICA'} />
               </div>
             )}
           </section>
@@ -443,6 +446,8 @@ export default function NorderHealthHome() {
               </div>
             </section>
           )}
+
+          <PortalPhotoHistory />
 
           {/* ── Teaser básico → premium ──────────────────────────────── */}
           {isBasica && (

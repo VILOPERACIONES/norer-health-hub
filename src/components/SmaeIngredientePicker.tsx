@@ -586,7 +586,13 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
               </span>
             )}
           </div>
-          <button type="button" onClick={onRemove} className="text-text-muted hover:text-accent-red px-2 transition-colors">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="shrink-0 p-2 text-[#d57a7a] border border-[#5a2929] bg-[#281818] hover:text-white hover:bg-[#7f1d1d] rounded-[6px] transition-colors"
+            title="Eliminar ingrediente"
+            aria-label="Eliminar ingrediente"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>

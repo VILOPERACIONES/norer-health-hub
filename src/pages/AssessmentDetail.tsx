@@ -328,6 +328,10 @@ const AssessmentDetail = () => {
 
   // Formato: 2 decimales para precisión
   const imcDisplay = imcNum > 0 ? imcNum.toFixed(2) : '—';
+  const measurementText = (key: string, value: unknown, unit = '') => {
+    if (val.medicionesEstado?.[key] === 'NO_APLICA') return 'No aplica';
+    return value != null && value !== '' ? `${value}${unit}` : '—';
+  };
 
   return (
     <div className="space-y-8 animate-fade-in pb-20 w-full">
@@ -379,6 +383,13 @@ const AssessmentDetail = () => {
               <span className="px-2.5 py-1 bg-[#1a2e1a] text-accent-green rounded-[6px] text-[12px] font-medium">
                 Historial Clínico
               </span>
+              <span className={`px-2.5 py-1 rounded-[6px] text-[12px] font-medium border ${val.medicionesEstado?.consultaEnLinea === true ? 'border-blue-500/30 bg-blue-500/10 text-blue-300' : 'border-[#333] bg-[#181818] text-[#999]'}`}>
+                {val.medicionesEstado?.consultaEnLinea === true
+                  ? 'En línea'
+                  : val.medicionesEstado?.consultaEnLinea === false
+                    ? 'Presencial'
+                    : 'Modalidad no registrada'}
+              </span>
               <span className="text-text-muted text-[13px] font-normal">Consulta #{val.numeroValoracion || '—'}</span>
             </div>
             {val.paciente ? (
@@ -424,17 +435,17 @@ const AssessmentDetail = () => {
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">Peso actual</p>
             <p className="text-[20px] font-bold text-text-primary m-0">
-              {val.pesoActual || val.peso || '—'}<span className="text-[14px] font-medium text-text-muted ml-1">kg</span>
+              {measurementText('peso', val.pesoActual ?? val.peso, ' kg')}
             </p>
           </div>
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">Estatura</p>
             <p className="text-[20px] font-bold text-text-primary m-0">
-              {(() => {
+              {val.medicionesEstado?.estatura === 'NO_APLICA' ? 'No aplica' : (() => {
                 const raw = parseFloat(val.estatura || val.talla);
                 if (!raw) return '—';
                 return raw < 10 ? Math.round(raw * 100) : raw;
-              })()}<span className="text-[14px] font-medium text-text-muted ml-1">cm</span>
+              })()}{val.medicionesEstado?.estatura !== 'NO_APLICA' && (val.estatura || val.talla) ? <span className="text-[14px] font-medium text-text-muted ml-1">cm</span> : null}
             </p>
           </div>
           <div className="space-y-1">
@@ -445,27 +456,27 @@ const AssessmentDetail = () => {
           </div>
         </div>
 
-        {(val.pctGrasa || val.masaMagra || val.masaGrasaReal) && (
+        {(val.pctGrasa || val.masaMagra || val.masaGrasaReal || Object.values(val.medicionesEstado || {}).includes('NO_APLICA')) && (
           <div className="grid grid-cols-2 md:grid-cols-3 p-6 md:p-8 gap-6 border-b border-border-subtle">
-            {val.pctGrasa && (
+            {(val.pctGrasa || val.medicionesEstado?.pctGrasa === 'NO_APLICA') && (
               <div className="space-y-1">
                 <p className="text-[12px] font-medium text-text-secondary m-0">% Grasa</p>
-                <p className="text-[18px] font-bold text-text-primary m-0">{val.pctGrasa}%</p>
+                <p className="text-[18px] font-bold text-text-primary m-0">{measurementText('pctGrasa', val.pctGrasa, '%')}</p>
               </div>
             )}
-            {val.masaGrasaReal && (
+            {(val.masaGrasaReal || val.medicionesEstado?.kgGrasa === 'NO_APLICA') && (
               <div className="space-y-1">
                 <p className="text-[12px] font-medium text-text-secondary m-0">Masa Grasa</p>
                 <p className="text-[18px] font-bold text-text-primary m-0">
-                  {val.masaGrasaReal}<span className="text-[13px] font-medium text-text-muted ml-1">kg</span>
+                  {measurementText('kgGrasa', val.masaGrasaReal, ' kg')}
                 </p>
               </div>
             )}
-            {val.masaMagra && (
+            {(val.masaMagra || val.medicionesEstado?.masaMagra === 'NO_APLICA') && (
               <div className="space-y-1">
                 <p className="text-[12px] font-medium text-text-secondary m-0">Masa Muscular</p>
                 <p className="text-[18px] font-bold text-text-primary m-0">
-                  {val.masaMagra}<span className="text-[13px] font-medium text-text-muted ml-1">kg</span>
+                  {measurementText('masaMagra', val.masaMagra, ' kg')}
                 </p>
               </div>
             )}
@@ -481,7 +492,7 @@ const AssessmentDetail = () => {
 
         {val.notasLibres && (
           <div className="p-6 md:p-8 border-b border-border-subtle">
-            <p className="text-[12px] font-medium text-text-muted m-0 mb-2">Notas Libres / Lineamientos</p>
+            <p className="text-[12px] font-medium text-text-muted m-0 mb-2">Notas de Entrenamiento</p>
             <pre className="text-[13px] leading-relaxed text-text-secondary font-mono bg-bg-elevated/30 rounded-[8px] p-4 m-0 whitespace-pre-wrap overflow-x-auto">{val.notasLibres}</pre>
             {val.adjuntosJson && Array.isArray(val.adjuntosJson) && val.adjuntosJson.length > 0 && (
               <div className="mt-4 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
@@ -740,7 +751,7 @@ const AssessmentDetail = () => {
 
               <div className="pt-2">
                 <CalcomScheduling
-                  pacienteData={val?.paciente ? { nombre: val.paciente.nombre, email: val.paciente.email, telefono: val.paciente.telefono } : undefined}
+                  pacienteData={val?.paciente ? { nombre: val.paciente.nombre, apellido: val.paciente.apellido, email: val.paciente.email, telefono: val.paciente.telefono } : undefined}
                   onSelection={setCalcomData}
                 />
               </div>

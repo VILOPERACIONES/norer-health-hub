@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { buildPdfMeta, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
 
 interface Phase4DeliveryProps {
   pacienteId: string;
@@ -14,17 +15,9 @@ interface Phase4DeliveryProps {
 export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryProps) {
   const { toast } = useToast();
   const [meta, setMeta] = useState<any>(() => {
-    const saved = localStorage.getItem('norder_pdfCustomMetaPrefs');
-    const defaultPrefs = saved ? JSON.parse(saved) : {};
+    const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
     return {
-      showPageHistorial: true,
-      showPageMenus: true,
-      showPageIntercambio: true,
-      showPageExtras: true,
-      showContacto: false,
-      showDistribucionPorciones: true,
-      soloEquivalencias: false,
-      ...defaultPrefs, // Aplica las que tengan guardadas en localStorage
+      ...buildPdfMeta(defaultPrefs),
       notaAmarilla: '',
       precioEspecial: '',
     };
@@ -50,9 +43,12 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
           api.get(`/api/planes/${planId}`),
           pacienteId ? api.get(`/api/pacientes/${pacienteId}`).catch(() => null) : Promise.resolve(null),
         ]);
-        if (planRes.data?.pdfCustomMeta) {
-          setMeta({ ...meta, ...planRes.data.pdfCustomMeta });
-        }
+        const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
+        setMeta({
+          ...buildPdfMeta(defaultPrefs, planRes.data?.pdfCustomMeta || {}),
+          notaAmarilla: planRes.data?.pdfCustomMeta?.notaAmarilla || '',
+          precioEspecial: planRes.data?.pdfCustomMeta?.precioEspecial || '',
+        });
         if (pacRes) {
           const p = pacRes.data?.data || pacRes.data;
           if (p) setPacienteNombre(`${p.nombre || ''} ${p.apellido || ''}`.trim() || 'Paciente');
@@ -94,15 +90,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
     setMeta(newMeta);
     
     // Guardar opciones booleanas en preferencias
-    const prefsToSave = {
-      showPageHistorial: newMeta.showPageHistorial !== false,
-      showPageMenus: newMeta.showPageMenus !== false,
-      showPageIntercambio: newMeta.showPageIntercambio !== false,
-      showPageExtras: newMeta.showPageExtras !== false,
-      showContacto: newMeta.showContacto === true,
-      soloEquivalencias: newMeta.soloEquivalencias === true,
-      showDistribucionPorciones: newMeta.showDistribucionPorciones !== false,
-    };
+    const prefsToSave = getGlobalPdfPreferences(newMeta);
     localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
   const handleTextChange = (key: string, value: string) => {
@@ -188,6 +176,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
             <div className="space-y-2.5">
               <ToggleItem label="1. Historial y Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
               <ToggleItem label="Correo y Teléfono del paciente" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
+              <ToggleItem label="Alimentos a evitar" active={meta.showAlimentosEvitar !== false} onChange={() => handleToggle('showAlimentosEvitar')} isSubItem />
               <ToggleItem label="2. Menús de Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
               <ToggleItem label="Solo equivalencias (Sin platillos)" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
               <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />

@@ -8,6 +8,7 @@ import { Calendar as CalendarIcon, Clock, CheckCircle2, Loader2, Video, MapPin }
 import { format, addMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { buildPatientFullName } from '@/lib/patientName';
 
 interface Slot {
   time: string;
@@ -24,6 +25,7 @@ interface CalcomSchedulingProps {
   } | null) => void;
   pacienteData?: {
     nombre: string;
+    apellido?: string;
     email: string;
     telefono?: string;
   };
@@ -50,7 +52,7 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
   };
 
   // Datos de contacto locales
-  const [name, setName] = useState(pacienteData?.nombre || '');
+  const [name, setName] = useState(buildPatientFullName(pacienteData?.nombre, pacienteData?.apellido));
   const [email, setEmail] = useState(pacienteData?.email || '');
   const [phone, setPhone] = useState(stripLada(pacienteData?.telefono));
 
@@ -63,11 +65,11 @@ const CalcomScheduling = ({ onSelection, pacienteData }: CalcomSchedulingProps) 
   // Sincronizar con props iniciales
   useEffect(() => {
     if (pacienteData) {
-      setName(pacienteData.nombre);
+      setName(buildPatientFullName(pacienteData.nombre, pacienteData.apellido));
       setEmail(pacienteData.email);
       setPhone(stripLada(pacienteData.telefono));
     }
-  }, [pacienteData]);
+  }, [pacienteData?.nombre, pacienteData?.apellido, pacienteData?.email, pacienteData?.telefono]);
 
   useEffect(() => {
     if (modalidad) {

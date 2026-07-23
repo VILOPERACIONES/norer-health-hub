@@ -9,8 +9,12 @@ import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
 import CalcomScheduling from '@/components/CalcomScheduling';
+import { buildPatientFullName } from '@/lib/patientName';
+import { PhotoFollowup } from '@/components/PhotoFollowup';
+import type { PendingFollowupPhoto } from '@/lib/followupPhotos';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
+type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
 
 const parseCompetenciaFromTemario = (items: { tema: string; detalle: string }[] | undefined) => {
   if (!items) return { comp: { antes: '', durante: '', despues: '' }, rest: [] as typeof items };
@@ -26,23 +30,29 @@ const parseCompetenciaFromTemario = (items: { tema: string; detalle: string }[] 
 };
 
 const Field = ({
-  label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '',
+  label, value, onChange, type = 'number', disabled = false, suffix = '', placeholder = '', status, onStatusChange,
 }: {
   label: string; value: string | number; onChange?: (v: string) => void;
   type?: string; disabled?: boolean; suffix?: string; placeholder?: string;
+  status?: MeasurementStatus; onStatusChange?: (status: MeasurementStatus) => void;
 }) => (
   <div className="space-y-1">
-    <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">
-      {label}{suffix && ` (${suffix})`}
-    </label>
+    <div className="flex items-center justify-between gap-2">
+      <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">{label}{suffix && ` (${suffix})`}</label>
+      {onStatusChange && (
+        <button type="button" onClick={() => onStatusChange(status === 'NO_APLICA' ? 'NO_CAPTURADA' : 'NO_APLICA')} className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${status === 'NO_APLICA' ? 'text-amber-300 border-amber-700 bg-amber-950/30' : 'text-[#666] border-[#333] hover:text-white'}`}>
+          {status === 'NO_APLICA' ? 'No aplica ✓' : 'Marcar N/A'}
+        </button>
+      )}
+    </div>
     <div className="relative">
       <input
         type={type}
-        value={value}
+        value={status === 'NO_APLICA' ? '' : value}
         onChange={onChange ? (e) => onChange(e.target.value) : undefined}
-        disabled={disabled}
-        placeholder={placeholder}
-        className={`w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors placeholder-[#555] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${disabled ? 'opacity-50 cursor-not-allowed bg-[#111111]' : ''}`}
+        disabled={disabled || status === 'NO_APLICA'}
+        placeholder={status === 'NO_APLICA' ? 'No aplica' : placeholder}
+        className={`w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555555] transition-colors placeholder-[#555] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${disabled ? 'opacity-50 cursor-not-allowed bg-[#111111]' : ''}`}
         step={type === 'number' ? "0.01" : undefined}
       />
     </div>
@@ -66,6 +76,11 @@ const NewAssessment = () => {
   const [estatura, setEstatura] = useState('');
   const [pctGrasa, setPctGrasa] = useState('');
   const [kgGrasa, setKgGrasa] = useState(''); // Kg Grasa manually? Or just auto? I'll add for capture.
+  const [measurementStatuses, setMeasurementStatuses] = useState<Record<'peso' | 'estatura' | 'pctGrasa' | 'kgGrasa' | 'masaMagra', MeasurementStatus>>({
+    peso: 'NO_CAPTURADA', estatura: 'NO_CAPTURADA', pctGrasa: 'NO_CAPTURADA', kgGrasa: 'NO_CAPTURADA', masaMagra: 'NO_CAPTURADA',
+  });
+  const [pendingFollowupPhotos, setPendingFollowupPhotos] = useState<PendingFollowupPhoto[]>([]);
+  const [consultaEnLinea, setConsultaEnLinea] = useState(false);
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [evitar, setEvitar] = useState<{ id: string; valor: string }[]>([]);
@@ -122,7 +137,6 @@ const NewAssessment = () => {
     { label: 'Cena',      hora: '', ayer: '', usualmente: '' },
   ];
   const [habitos, setHabitos] = useState<HabitoRow[]>(DEFAULT_HABITOS);
-  const [habitosModified, setHabitosModified] = useState(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
   const [showSuplemantacion, setShowSuplemantacion] = useState(false);
   const [showMedidas, setShowMedidas] = useState(true);
@@ -173,53 +187,6 @@ const NewAssessment = () => {
     setExpedienteModified(true);
   };
 
-  const updateHabitos = (idx: number, field: 'hora' | 'ayer' | 'usualmente', value: string) => {
-    setHabitos(h => h.map((row, i) => i === idx ? { ...row, [field]: value } : row));
-    setHabitosModified(true);
-  };
-
-  const updateHabitosLabel = (idx: number, label: string) => {
-    setHabitos(h => h.map((row, i) => i === idx ? { ...row, label } : row));
-    setHabitosModified(true);
-  };
-
-  const addHabitoRow = () => {
-    setHabitos(h => [...h, { label: 'Colación', hora: '', ayer: '', usualmente: '' }]);
-    setHabitosModified(true);
-  };
-
-  const removeHabitoRow = (idx: number) => {
-    setHabitos(h => h.filter((_, i) => i !== idx));
-    setHabitosModified(true);
-  };
-
-  const handleHabitoKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number, field: string) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      const fieldsOrder = ['label', 'hora', 'ayer', 'usualmente'];
-      const currentFieldIndex = fieldsOrder.indexOf(field);
-      
-      let nextIdx = idx;
-      let nextField = fieldsOrder[currentFieldIndex + 1];
-      
-      if (!nextField) {
-        nextIdx = idx + 1;
-        nextField = 'label';
-      }
-      
-      const nextInput = document.querySelector(`input[data-habito-idx="${nextIdx}"][data-habito-field="${nextField}"]`) as HTMLInputElement;
-      if (nextInput) {
-        nextInput.focus();
-      } else if (!nextInput && currentFieldIndex === fieldsOrder.length - 1) {
-        addHabitoRow();
-        setTimeout(() => {
-          const createdInput = document.querySelector(`input[data-habito-idx="${nextIdx}"][data-habito-field="${nextField}"]`) as HTMLInputElement;
-          if (createdInput) createdInput.focus();
-        }, 50);
-      }
-    }
-  };
-
   const totalSteps = 4;
   const STEPS = [
     { id: 1, label: 'Valoración' },
@@ -250,6 +217,7 @@ const NewAssessment = () => {
     if (d.peso) setPeso(d.peso);
     if (d.estatura) setEstatura(d.estatura);
     if (d.pctGrasa) setPctGrasa(d.pctGrasa);
+    if (typeof d.consultaEnLinea === 'boolean') setConsultaEnLinea(d.consultaEnLinea);
     if (d.comentarios) setComentarios(d.comentarios);
     if (d.temario) {
       const { comp, rest } = parseCompetenciaFromTemario(d.temario);
@@ -348,7 +316,6 @@ const NewAssessment = () => {
       setHabitos(rows.length > 0 ? rows : DEFAULT_HABITOS);
     }
     setExpedienteModified(false);
-    setHabitosModified(false);
   };
 
   // Save drafts (only if not editing)
@@ -361,9 +328,9 @@ const NewAssessment = () => {
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
     // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
-    const draft = { step, peso, estatura, pctGrasa, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
+    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
+  }, [step, peso, estatura, pctGrasa, consultaEnLinea, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -444,6 +411,15 @@ const NewAssessment = () => {
               }
               setPctGrasa(val.pctGrasa ? String(val.pctGrasa) : '');
               setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : (val.kgGrasa2comp ? String(val.kgGrasa2comp) : ''));
+              const savedStatuses = val.medicionesEstado || {};
+              setConsultaEnLinea(savedStatuses.consultaEnLinea === true);
+              setMeasurementStatuses({
+                peso: savedStatuses.peso || (val.pesoActual != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
+                estatura: savedStatuses.estatura || (val.estatura != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
+                pctGrasa: savedStatuses.pctGrasa || (val.pctGrasa != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
+                kgGrasa: savedStatuses.kgGrasa || ((val.masaGrasaReal ?? val.kgGrasa2comp) != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
+                masaMagra: savedStatuses.masaMagra || ((val.masaMagra ?? val.kgMasaMagra2comp) != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
+              });
               setComentarios(val.comentarios || '');
               setPlanVinculadoId(val.plan?.id || null);
 
@@ -565,9 +541,11 @@ const NewAssessment = () => {
 
   const handlePctGrasaChange = (v: string) => {
     setPctGrasa(v);
+    setMeasurementStatuses(prev => ({ ...prev, pctGrasa: v ? 'REGISTRADA' : 'NO_CAPTURADA' }));
     const vNum = parseFloat(v);
     if (pesoNum > 0 && !isNaN(vNum)) {
       setKgGrasa(((pesoNum * vNum) / 100).toFixed(2));
+      setMeasurementStatuses(prev => ({ ...prev, kgGrasa: 'REGISTRADA', masaMagra: 'REGISTRADA' }));
     } else {
       setKgGrasa('');
     }
@@ -575,6 +553,7 @@ const NewAssessment = () => {
 
   const handleKgGrasaChange = (v: string) => {
     setKgGrasa(v);
+    setMeasurementStatuses(prev => ({ ...prev, kgGrasa: v ? 'REGISTRADA' : 'NO_CAPTURADA' }));
     const vNum = parseFloat(v);
     if (pesoNum > 0 && !isNaN(vNum) && vNum > 0) {
       setPctGrasa(((vNum / pesoNum) * 100).toFixed(2));
@@ -610,8 +589,7 @@ const NewAssessment = () => {
   const clearDraft = () => localStorage.removeItem(`draft_assessment_${pacienteId}`);
 
   const handleSave = async (redirectAPlan: boolean | 'equivalencias' = false) => {
-    if (!peso) { toast({ title: 'Campo requerido', description: 'El peso actual es obligatorio.', variant: 'destructive' }); return; }
-    if (!estatura) { toast({ title: 'Campo requerido', description: 'La estatura es obligatoria.', variant: 'destructive' }); return; }
+    if (!peso && measurementStatuses.peso === 'REGISTRADA') { toast({ title: 'Peso incompleto', description: 'Captura el peso o cambia su estado.', variant: 'destructive' }); return; }
 
     setSaving(true);
 
@@ -638,9 +616,10 @@ const NewAssessment = () => {
     const body: Record<string, any> = {
       fecha, hora,
       numeroValoracion,
-      pesoActual: pesoNum,
-      estatura: estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum,
-      imc: parseFloat(imc.toFixed(2)),
+      pesoActual: measurementStatuses.peso === 'REGISTRADA' && peso ? pesoNum : null,
+      estatura: estatura ? (estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum) : null,
+      imc: measurementStatuses.peso === 'REGISTRADA' && imc > 0 ? parseFloat(imc.toFixed(2)) : null,
+      medicionesEstado: { ...measurementStatuses, estatura: estatura ? 'REGISTRADA' : measurementStatuses.estatura, consultaEnLinea },
       comentarios,
       temario: (() => {
         const base = temario.map(({ tema, detalle }) => ({ tema, detalle }));
@@ -657,25 +636,35 @@ const NewAssessment = () => {
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
 
-    if (pctGrasa) {
+    if (measurementStatuses.pctGrasa === 'REGISTRADA' && pctGrasa) {
       // pctGrasa (no pctGrasaCorp): backend lo destructura para calcular pctGrasa2comp/kgGrasa2comp/kgMasaMagra2comp
       // y getById lo regresa como val.pctGrasa para precargar este campo al editar.
       body.pctGrasa = parseFloat(pctGrasa);
-      if (masaMagra !== null) body.masaMagra = parseFloat(masaMagra.toFixed(2));
-      if (kgGrasa) body.masaGrasaReal = parseFloat(kgGrasa);
+      if (measurementStatuses.masaMagra === 'REGISTRADA' && masaMagra !== null) body.masaMagra = parseFloat(masaMagra.toFixed(2));
+      if (measurementStatuses.kgGrasa === 'REGISTRADA' && kgGrasa) body.masaGrasaReal = parseFloat(kgGrasa);
+    } else {
+      body.pctGrasa2comp = null;
+      body.kgGrasa2comp = null;
+      body.kgMasaMagra2comp = null;
+      body.masaGrasaReal = measurementStatuses.kgGrasa === 'REGISTRADA' && kgGrasa ? parseFloat(kgGrasa) : null;
+      body.masaMagra = null;
     }
 
     try {
       // 1. Verificamos cambios de contacto ANTES de guardar la valoración
       if (calcomData) {
-        const hasChanges = calcomData.name !== paciente?.nombre ||
+        const pacienteNombreCompleto = buildPatientFullName(paciente?.nombre, paciente?.apellido);
+        const hasChanges = calcomData.name.trim() !== pacienteNombreCompleto ||
           calcomData.email !== paciente?.email ||
           (calcomData.phone && calcomData.phone !== paciente?.telefono);
 
         if (hasChanges) {
           try {
             await api.put(`/api/pacientes/${pacienteId}`, {
-              nombre: calcomData.name,
+              // El nombre del agendamiento es completo; el expediente conserva
+              // nombre y apellido en sus campos separados.
+              nombre: paciente.nombre,
+              apellido: paciente.apellido,
               email: calcomData.email,
               telefono: calcomData.phone
             });
@@ -697,7 +686,7 @@ const NewAssessment = () => {
 
       // En modo edición siempre guardamos el expediente para asegurar que cambios
       // como cicloMenstrual o historial de suplementación se persistan correctamente.
-      if (expedienteModified || habitosModified || isEdit) {
+      if (expedienteModified || isEdit) {
         try {
           await api.put(`/api/pacientes/${pacienteId}`, {
             ejercicio: {
@@ -734,7 +723,6 @@ const NewAssessment = () => {
             habitos,
           });
           setExpedienteModified(false);
-          setHabitosModified(false);
         } catch (e) {
           console.warn('No se pudo actualizar expediente:', e);
         }
@@ -753,6 +741,19 @@ const NewAssessment = () => {
 
       if (valoracionResId && barridoData && barridoData.kcalTotal > 0) {
         try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch { }
+      }
+
+      if (valoracionResId && pendingFollowupPhotos.length > 0) {
+        for (const photo of pendingFollowupPhotos) {
+          await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/fotos`, {
+            dataUrl: photo.dataUrl,
+            nombreOriginal: photo.nombreOriginal,
+            ancho: photo.ancho,
+            alto: photo.alto,
+            esPrincipal: photo.esPrincipal,
+          });
+        }
+        setPendingFollowupPhotos([]);
       }
 
       // AGENDAR CITA EN SEGUNDO PLANO SI HAY DATOS
@@ -899,6 +900,47 @@ const NewAssessment = () => {
                 </p>
               </div>
 
+              <div className="shrink-0 rounded-[12px] border border-[#303030] bg-[#151515] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a]">Modalidad de consulta</p>
+                    <p className="m-0 text-[11px] text-[#666]">Selecciona cómo se está realizando esta consulta.</p>
+                  </div>
+                  <div className="grid w-full grid-cols-2 gap-2 sm:w-[280px]">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConsultaEnLinea(false);
+                        setMeasurementStatuses(prev => ({
+                          ...prev,
+                          pctGrasa: pctGrasa ? 'REGISTRADA' : 'NO_CAPTURADA',
+                          kgGrasa: kgGrasa ? 'REGISTRADA' : 'NO_CAPTURADA',
+                          masaMagra: masaMagra !== null ? 'REGISTRADA' : 'NO_CAPTURADA',
+                        }));
+                      }}
+                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${!consultaEnLinea ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                    >
+                      Presencial
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setConsultaEnLinea(true);
+                        setMeasurementStatuses(prev => ({ ...prev, pctGrasa: 'NO_APLICA', kgGrasa: 'NO_APLICA', masaMagra: 'NO_APLICA' }));
+                      }}
+                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${consultaEnLinea ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                    >
+                      En línea
+                    </button>
+                  </div>
+                </div>
+                {consultaEnLinea && (
+                  <p className="mb-0 mt-3 border-t border-[#292929] pt-3 text-[11px] leading-relaxed text-[#8faede]">
+                    Las mediciones que requieren equipo se marcaron como “No aplica”. Puedes registrar manualmente cualquier dato que sí proporcione el paciente.
+                  </p>
+                )}
+              </div>
+
               {/* PANEL EXPEDIENTE DEL PACIENTE */}
               {/* ── 1. EXPEDIENTE DEL PACIENTE ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
@@ -910,7 +952,7 @@ const NewAssessment = () => {
                   <div className="flex items-center gap-2">
                     <FileText className="w-4 h-4 text-brand-primary" />
                     <span className="text-[13px] font-bold text-white tracking-widest uppercase">Expediente del Paciente</span>
-                    {(expedienteModified || habitosModified) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                    {expedienteModified && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showExpediente ? 'rotate-180' : ''}`} />
                 </button>
@@ -965,76 +1007,6 @@ const NewAssessment = () => {
                             </div>
                           </div>
                         ))}
-                      </div>
-                    </div>
-
-                    {/* Recordatorio 24 horas */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Recordatorio 24 Horas</p>
-                        <button
-                          type="button"
-                          onClick={addHabitoRow}
-                          className="flex items-center gap-1 text-[10px] font-bold text-[#8a8a8a] hover:text-white bg-[#181818] border border-[#2a2a2a] hover:border-[#555] px-2.5 py-1 rounded-[6px] uppercase tracking-wider transition-colors"
-                        >
-                          <Plus className="w-3 h-3" /> Agregar tiempo
-                        </button>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-[12px]">
-                          <thead>
-                            <tr className="border-b border-[#2a2a2a]">
-                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3 w-32">Tiempo</th>
-                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Hora</th>
-                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">Ayer</th>
-                              <th className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2">Usualmente</th>
-                              <th className="pb-2 w-8"></th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#1e1e1e]">
-                            {habitos.map((row, idx) => (
-                              <tr key={idx}>
-                                <td className="py-2 pr-3">
-                                  <input
-                                    type="text"
-                                    value={row.label}
-                                    onChange={(e) => updateHabitosLabel(idx, e.target.value)}
-                                    onKeyDown={(e) => handleHabitoKeyDown(e, idx, 'label')}
-                                    data-habito-idx={idx}
-                                    data-habito-field="label"
-                                    className="w-full bg-transparent text-[11px] font-bold text-[#8a8a8a] uppercase tracking-wider outline-none border-b border-transparent focus:border-[#555] transition-colors"
-                                  />
-                                </td>
-                                {(['hora', 'ayer', 'usualmente'] as const).map((field) => (
-                                  <td key={field} className="py-2 pr-3">
-                                    <input
-                                      type="text"
-                                      value={row[field]}
-                                      onChange={(e) => updateHabitos(idx, field, e.target.value)}
-                                      onKeyDown={(e) => handleHabitoKeyDown(e, idx, field)}
-                                      data-habito-idx={idx}
-                                      data-habito-field={field}
-                                      className="w-full bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#2a2a2a] focus:border-[#555] transition-colors placeholder-[#444]"
-                                      placeholder={field === 'hora' ? '7:00 am' : 'Descripción...'}
-                                    />
-                                  </td>
-                                ))}
-                                <td className="py-2">
-                                  {habitos.length > 1 && (
-                                    <button
-                                      type="button"
-                                      onClick={() => removeHabitoRow(idx)}
-                                      className="p-1 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors"
-                                      title="Eliminar tiempo"
-                                    >
-                                      <Trash2 className="w-3.5 h-3.5" />
-                                    </button>
-                                  )}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
                       </div>
                     </div>
 
@@ -1159,129 +1131,7 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 2. NOTAS DE CONSULTA ── */}
-              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowNotasConsulta(s => !s)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas de Consulta</span>
-                    {(comentarios || temario.length > 0 || evitar.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showNotasConsulta ? 'rotate-180' : ''}`} />
-                </button>
-                {showNotasConsulta && (
-                  <div className="px-5 pb-5 space-y-4 border-t border-[#2a2a2a] pt-4">
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">¿Qué se habló en la consulta?</label>
-                      <textarea
-                        value={comentarios}
-                        onChange={(e) => setComentarios(e.target.value)}
-                        className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
-                        placeholder="Observaciones relevantes de la consulta..."
-                      />
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
-                        <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
-                        <button type="button" onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
-                          <Plus className="h-2.5 w-2.5" /> Agregar
-                        </button>
-                      </div>
-                      <div className="space-y-2">
-                        {evitar.map((e, idx) => (
-                          <div key={e.id} className="flex gap-2 items-center">
-                            <input
-                              type="text"
-                              value={e.valor}
-                              onChange={(el) => updateEvitar(idx, el.target.value)}
-                              className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
-                              placeholder="Ej. Lácteos, Azúcares..."
-                            />
-                            <button type="button" onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
-                        ))}
-                        {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3">
-                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temas de Consulta</label>
-                        <button type="button" onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
-                          <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
-                        </button>
-                      </div>
-                      {temario.length === 0 && (
-                        <div className="py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] text-center">
-                          <p className="text-[12px] text-[#8a8a8a] px-4">Sin notas asignadas. Haz clic en "Agregar" para registrar notas de la consulta.</p>
-                        </div>
-                      )}
-                      <div className="space-y-3">
-                        {temario.map((t, idx) => (
-                          <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
-                            <button type="button" onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                            <input
-                              type="text"
-                              placeholder="Título del tema..."
-                              value={t.tema}
-                              onChange={(e) => updateTema(idx, 'tema', e.target.value)}
-                              className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
-                            />
-                            <textarea
-                              placeholder="Detalles y comentarios de lo conversado..."
-                              value={t.detalle}
-                              onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
-                              className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Notas de Competencia */}
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setShowCompetencia(s => !s)}
-                        className="w-full flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3 hover:opacity-80 transition-opacity"
-                      >
-                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest cursor-pointer">
-                          Notas de Competencia <span className="text-[#555] normal-case tracking-normal">(deportistas — opcional)</span>
-                        </label>
-                        <span className="text-[14px] font-bold text-[#8a8a8a]">{showCompetencia ? '−' : '+'}</span>
-                      </button>
-                      {showCompetencia && (
-                        <div className="space-y-3">
-                          {(['antes', 'durante', 'despues'] as const).map((fase) => (
-                            <div key={fase}>
-                              <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1 uppercase tracking-widest">
-                                {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'} de competencia
-                              </label>
-                              <textarea
-                                value={competencia[fase]}
-                                onChange={(e) => setCompetencia(c => ({ ...c, [fase]: e.target.value }))}
-                                placeholder={fase === 'antes' ? 'Ej. 3h antes: 1 taza avena + plátano...' : fase === 'durante' ? 'Ej. Cada 30 min: 200ml bebida isotónica...' : 'Ej. 30 min post: 30g whey + 50g carbo simple...'}
-                                className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-white outline-none min-h-[60px] resize-y placeholder-[#444] transition-colors"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ── 3. ESQUEMA DE SUPLEMENTACIÓN ── */}
+              {/* ── 2. ESQUEMA DE SUPLEMENTACIÓN ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
                 <button
                   type="button"
@@ -1437,7 +1287,7 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 4. ESQUEMA DE HIDRATACIÓN ── */}
+              {/* ── 3. ESQUEMA DE HIDRATACIÓN ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0">
                 <button
                   type="button"
@@ -1465,7 +1315,129 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 5. NOTAS LIBRES / LINEAMIENTOS ── */}
+              {/* ── 4. NOTAS DE CONSULTA ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowNotasConsulta(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas de Consulta</span>
+                    {(comentarios || temario.length > 0 || evitar.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showNotasConsulta ? 'rotate-180' : ''}`} />
+                </button>
+                {showNotasConsulta && (
+                  <div className="px-5 pb-5 space-y-4 border-t border-[#2a2a2a] pt-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">¿Qué se habló en la consulta?</label>
+                      <textarea
+                        value={comentarios}
+                        onChange={(e) => setComentarios(e.target.value)}
+                        className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] min-h-[60px] resize-y transition-colors placeholder-[#555]"
+                        placeholder="Observaciones relevantes de la consulta..."
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-2">
+                        <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Alimentos a Evitar</label>
+                        <button type="button" onClick={addEvitar} className="text-[10px] font-bold text-white hover:opacity-70 flex items-center gap-1 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-2 py-1 border border-[#333] rounded-[4px]">
+                          <Plus className="h-2.5 w-2.5" /> Agregar
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {evitar.map((e, idx) => (
+                          <div key={e.id} className="flex gap-2 items-center">
+                            <input
+                              type="text"
+                              value={e.valor}
+                              onChange={(el) => updateEvitar(idx, el.target.value)}
+                              className="flex-1 bg-[#181818] rounded-[6px] px-3 py-1.5 text-[12px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                              placeholder="Ej. Lácteos, Azúcares..."
+                            />
+                            <button type="button" onClick={() => removeEvitar(idx)} className="text-[#555] hover:text-[#ff6b6b] transition-colors">
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        ))}
+                        {evitar.length === 0 && <p className="text-[11px] text-[#444] italic">Sin restricciones específicas.</p>}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3">
+                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest">Temas de Consulta</label>
+                        <button type="button" onClick={addTema} className="text-[11px] font-bold text-white hover:opacity-70 flex items-center gap-1.5 transition-colors uppercase tracking-wider bg-[#1a1a1a] px-3 py-1.5 border border-[#333] rounded-[6px]">
+                          <Plus className="h-3 w-3" strokeWidth={3} /> Agregar
+                        </button>
+                      </div>
+                      {temario.length === 0 && (
+                        <div className="py-6 border border-[#2a2a2a] border-dashed rounded-[12px] bg-[#141414] text-center">
+                          <p className="text-[12px] text-[#8a8a8a] px-4">Sin notas asignadas. Haz clic en "Agregar" para registrar notas de la consulta.</p>
+                        </div>
+                      )}
+                      <div className="space-y-3">
+                        {temario.map((t, idx) => (
+                          <div key={t.id} className="relative group space-y-2 pb-3 pt-1 border-b border-[#2a2a2a] last:border-0 last:pb-0">
+                            <button type="button" onClick={() => removeTema(idx)} className="absolute top-1 right-0 p-1.5 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] opacity-100 sm:opacity-0 group-hover:opacity-100 transition-all z-10">
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <input
+                              type="text"
+                              placeholder="Título del tema..."
+                              value={t.tema}
+                              onChange={(e) => updateTema(idx, 'tema', e.target.value)}
+                              className="w-full bg-transparent text-[14px] font-bold text-white outline-none placeholder-[#555] pr-8 border-none m-0 p-0"
+                            />
+                            <textarea
+                              placeholder="Detalles y comentarios de lo conversado..."
+                              value={t.detalle}
+                              onChange={(e) => updateTema(idx, 'detalle', e.target.value)}
+                              className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-[#8a8a8a] outline-none min-h-[50px] resize-none placeholder-[#444] transition-colors"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Notas de Competencia */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowCompetencia(s => !s)}
+                        className="w-full flex items-center justify-between pb-2 border-b border-[#2a2a2a] mb-3 hover:opacity-80 transition-opacity"
+                      >
+                        <label className="block text-[11px] font-bold text-[#8a8a8a] m-0 uppercase tracking-widest cursor-pointer">
+                          Notas de Competencia <span className="text-[#555] normal-case tracking-normal">(deportistas — opcional)</span>
+                        </label>
+                        <span className="text-[14px] font-bold text-[#8a8a8a]">{showCompetencia ? '−' : '+'}</span>
+                      </button>
+                      {showCompetencia && (
+                        <div className="space-y-3">
+                          {(['antes', 'durante', 'despues'] as const).map((fase) => (
+                            <div key={fase}>
+                              <label className="block text-[10px] font-bold text-[#8a8a8a] m-0 mb-1 uppercase tracking-widest">
+                                {fase === 'antes' ? 'Antes' : fase === 'durante' ? 'Durante' : 'Después'} de competencia
+                              </label>
+                              <textarea
+                                value={competencia[fase]}
+                                onChange={(e) => setCompetencia(c => ({ ...c, [fase]: e.target.value }))}
+                                placeholder={fase === 'antes' ? 'Ej. 3h antes: 1 taza avena + plátano...' : fase === 'durante' ? 'Ej. Cada 30 min: 200ml bebida isotónica...' : 'Ej. 30 min post: 30g whey + 50g carbo simple...'}
+                                className="w-full bg-[#181818] border border-[#333] focus:border-[#555] rounded-[6px] p-2.5 text-[12px] font-medium text-white outline-none min-h-[60px] resize-y placeholder-[#444] transition-colors"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── 5. NOTAS DE ENTRENAMIENTO ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0">
                 <button
                   type="button"
@@ -1474,7 +1446,7 @@ const NewAssessment = () => {
                 >
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas Libres / Seguimiento</span>
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Notas de Entrenamiento</span>
                     {(notasLibres || adjuntos.length > 0) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${notasLibresOpen ? 'rotate-180' : ''}`} />
@@ -1532,7 +1504,7 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 5. MEDIDAS ANTROPOMÉTRICAS ── */}
+              {/* ── 6. MEDIDAS ANTROPOMÉTRICAS ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
                 <button
                   type="button"
@@ -1548,20 +1520,20 @@ const NewAssessment = () => {
                 </button>
                 {showMedidas && (
                   <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-x-6 gap-y-5">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
                       <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
                       <Field label="Hora" value={hora} onChange={setHora} type="time" />
-                      <Field label="Peso" value={peso} onChange={setPeso} suffix="kg" placeholder="Ej. 68.5" />
-                      <Field label="Estatura" value={estatura} onChange={setEstatura} suffix="cm" placeholder="Ej. 165" />
-                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" />
-                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" />
-                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" />
+                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" status={measurementStatuses.masaMagra} onStatusChange={(status) => setMeasurementStatuses(prev => ({ ...prev, masaMagra: status }))} />
+                      <Field label="Peso" value={peso} onChange={(value) => { setPeso(value); setMeasurementStatuses(prev => ({ ...prev, peso: value ? 'REGISTRADA' : 'NO_CAPTURADA' })); }} suffix="kg" placeholder="Ej. 68.5" status={measurementStatuses.peso} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, peso: status })); if (status === 'NO_APLICA') setPeso(''); }} />
+                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" status={measurementStatuses.pctGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, pctGrasa: status })); if (status === 'NO_APLICA') { setPctGrasa(''); setKgGrasa(''); } }} />
+                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" status={measurementStatuses.kgGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, kgGrasa: status })); if (status === 'NO_APLICA') setKgGrasa(''); }} />
                     </div>
+                    <PhotoFollowup pacienteId={pacienteId!} valoracionId={valoracionId} onPendingChange={setPendingFollowupPhotos} />
                   </div>
                 )}
               </div>
 
-              {/* ── 6. AGENDAR PRÓXIMA CITA ── */}
+              {/* ── 7. AGENDAR PRÓXIMA CITA ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
                 <button
                   type="button"
@@ -1596,7 +1568,7 @@ const NewAssessment = () => {
                     {showScheduling && (
                       <div className="animate-fade-in">
                         <CalcomScheduling
-                          pacienteData={paciente ? { nombre: paciente.nombre, email: paciente.email, telefono: paciente.telefono } : undefined}
+                          pacienteData={paciente ? { nombre: paciente.nombre, apellido: paciente.apellido, email: paciente.email, telefono: paciente.telefono } : undefined}
                           onSelection={(data) => {
                             setCalcomData(data);
                             setProximaSesion(data?.fecha || '');

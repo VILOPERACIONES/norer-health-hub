@@ -4,7 +4,7 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface BarridoData {
-  tiempos: string[];
+  tiempos: BarridoTiempo[];
   porciones: Record<string, number | string>;
   distribucion: Record<string, Record<string, number | string>>;
   kcalTotal: number;
@@ -14,6 +14,11 @@ export interface BarridoData {
   energiaTotalManual?: number | null;
   /** Es válido cuando la distribución coincide con las porciones para TODOS los grupos. */
   isValid?: boolean;
+}
+
+export interface BarridoTiempo {
+  id: string;
+  nombre: string;
 }
 
 interface BarridoEquivalenciasProps {
@@ -62,7 +67,7 @@ const GRUPOS: { key: string; label: string }[] = [
   { key: 'azConGr', label: 'Az con grasa' },
 ];
 
-const DEFAULT_TIEMPOS = ['Pre Entreno', 'Desayuno', 'Colacion', 'Almuerzo', 'Colacion', 'Cena'];
+const DEFAULT_TIEMPOS = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
 // ─── Helpers: parsear número y limpiar input decimal ──────────────────────────
 const toNum = (v: any): number => {
@@ -83,14 +88,39 @@ const cleanInputStr = (val: string): string => {
 };
 
 // ─── Estado inicial ───────────────────────────────────────────────────────────
-const buildInitial = (value: BarridoData | null): BarridoData => ({
-  tiempos: value?.tiempos?.length ? value.tiempos : [...DEFAULT_TIEMPOS],
-  porciones: value?.porciones ?? {},
-  distribucion: value?.distribucion ?? {},
-  kcalTotal: value?.kcalTotal ?? 0,
-  kcalManuales: {}, // Siempre limpiar — el feature fue eliminado de la UI
-  energiaTotalManual: value?.energiaTotalManual ?? null,
-});
+const buildInitial = (value: BarridoData | null): BarridoData => {
+  const rawTiempos = (value?.tiempos as unknown[] | undefined) ?? [];
+  const sourceTiempos = rawTiempos.length > 0 ? rawTiempos : DEFAULT_TIEMPOS;
+  const sourceDistribucion = value?.distribucion ?? {};
+  const sourcePorcentajes = (sourceDistribucion as any)._porcentajesManuales ?? {};
+  const distribucion: BarridoData['distribucion'] = {};
+  const porcentajesManuales: Record<string, number | string> = {};
+
+  const tiempos = sourceTiempos.map((tiempo, index): BarridoTiempo => {
+    const isObject = Boolean(tiempo && typeof tiempo === 'object');
+    const ref = isObject ? tiempo as { id?: unknown; nombre?: unknown; label?: unknown } : null;
+    const id = String(ref?.id ?? `legacy-tiempo-${index + 1}`);
+    const nombre = String(ref?.nombre ?? ref?.label ?? tiempo ?? `Tiempo ${index + 1}`);
+    const legacyKey = String(ref?.id ?? ref?.nombre ?? ref?.label ?? tiempo ?? '');
+    distribucion[id] = { ...(sourceDistribucion[id] || sourceDistribucion[legacyKey] || {}) };
+    const pct = sourcePorcentajes[id] ?? sourcePorcentajes[legacyKey];
+    if (pct != null && pct !== '') porcentajesManuales[id] = pct;
+    return { id, nombre };
+  });
+
+  if (Object.keys(porcentajesManuales).length > 0) {
+    (distribucion as any)._porcentajesManuales = porcentajesManuales;
+  }
+
+  return {
+    tiempos,
+    porciones: value?.porciones ?? {},
+    distribucion,
+    kcalTotal: value?.kcalTotal ?? 0,
+    kcalManuales: {}, // Siempre limpiar — el feature fue eliminado de la UI
+    energiaTotalManual: value?.energiaTotalManual ?? null,
+  };
+};
 
 // ─── Estilos reutilizables tipo Excel ─────────────────────────────────────────
 const cellCls =
@@ -141,11 +171,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
         } else {
           const tiempoIdx = targetColIdx - 1;
           if (tiempoIdx >= tiempos.length) break;
-          const tiempo = tiempos[tiempoIdx];
-          if (!nextDistribucion[tiempo]) {
-            nextDistribucion[tiempo] = {};
+          const tiempoId = tiempos[tiempoIdx].id;
+          if (!nextDistribucion[tiempoId]) {
+            nextDistribucion[tiempoId] = {};
           }
-          nextDistribucion[tiempo][groupKey] = cleanedValue;
+          nextDistribucion[tiempoId][groupKey] = cleanedValue;
         }
       }
     }
@@ -171,13 +201,13 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     for (let c = 0; c < cols.length; c++) {
       const targetColIdx = startColIdx + c;
       if (targetColIdx >= tiempos.length) break;
-      const tiempo = tiempos[targetColIdx];
+      const tiempoId = tiempos[targetColIdx].id;
       const rawVal = cols[c].replace('%', '').trim();
       const cleaned = cleanInputStr(rawVal);
       if (cleaned === '') {
-        delete nextManual[tiempo];
+        delete nextManual[tiempoId];
       } else {
-        nextManual[tiempo] = cleaned;
+        nextManual[tiempoId] = cleaned;
       }
     }
 
@@ -275,7 +305,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   // kcalFromDistribucion: fallback si porciones están vacías
   const kcalFromDistribucion = useMemo(
-    () => tiempos.reduce((s, t) => s + colKcalAuto(t), 0),
+    () => tiempos.reduce((s, t) => s + colKcalAuto(t.id), 0),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tiempos, distribucion]
   );
@@ -301,7 +331,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     distribucion[tiempo]?.[grupo] ?? 0;
 
   const rowTotal = (grupo: string) =>
-    tiempos.reduce((s, t) => s + toNum(getCell(t, grupo)), 0);
+    tiempos.reduce((s, t) => s + toNum(getCell(t.id, grupo)), 0);
 
   // ─── Commit ──────────────────────────────────────────────────────────────────
   const commit = (next: BarridoData) => {
@@ -316,7 +346,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     // Fallback: energía desde distribución si porciones están vacías
     const distTotal = next.tiempos.reduce((s, t) => {
       return s + GRUPOS.reduce(
-        (gs, { key }) => gs + toNum(next.distribucion[t]?.[key]) * KCAL_POR_EQ[key],
+        (gs, { key }) => gs + toNum(next.distribucion[t.id]?.[key]) * KCAL_POR_EQ[key],
         0
       );
     }, 0);
@@ -331,7 +361,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     // Validar si la distribución suma exactamente la porción para TODOS los grupos
     const isValid = GRUPOS.every(({ key }) => {
       const porcion = toNum(next.porciones[key]);
-      const total = next.tiempos.reduce((s, t) => s + toNum(next.distribucion[t]?.[key]), 0);
+      const total = next.tiempos.reduce((s, t) => s + toNum(next.distribucion[t.id]?.[key]), 0);
       return Math.abs(porcion - total) < 0.01;
     });
 
@@ -384,7 +414,8 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   const addTiempo = () => {
     const name = newTiempoName.trim() || `Tiempo ${tiempos.length + 1}`;
-    commit({ ...state, tiempos: [...tiempos, name] });
+    const id = `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    commit({ ...state, tiempos: [...tiempos, { id, nombre: name }] });
     setNewTiempoName('');
   };
 
@@ -408,11 +439,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   const removeTiempo = (idx: number) => {
     if (tiempos.length <= 1) return;
-    const t = tiempos[idx];
+    const tiempoId = tiempos[idx].id;
     const nextDist = { ...distribucion };
     const nextManuales = { ...kcalManuales };
-    delete nextDist[t];
-    delete nextManuales[t];
+    delete nextDist[tiempoId];
+    delete nextManuales[tiempoId];
     commit({
       ...state,
       tiempos: tiempos.filter((_, i) => i !== idx),
@@ -422,26 +453,11 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
   };
 
   const renameTiempo = (idx: number, name: string) => {
-    const oldName = tiempos[idx];
-    if (oldName === name) return;
-
-    let newName = name;
-    if (tiempos.includes(newName) && tiempos.indexOf(newName) !== idx) {
-      newName = newName + '*';
-    }
-
     const newTiempos = [...tiempos];
-    newTiempos[idx] = newName;
-    const nextDist = { ...distribucion };
-    const nextManuales = { ...kcalManuales };
-
-    nextDist[newName] = nextDist[oldName] || {};
-    delete nextDist[oldName];
-    if (nextManuales[oldName] != null) {
-      nextManuales[newName] = nextManuales[oldName];
-      delete nextManuales[oldName];
-    }
-    commit({ ...state, tiempos: newTiempos, distribucion: nextDist, kcalManuales: nextManuales });
+    newTiempos[idx] = { ...newTiempos[idx], nombre: name };
+    // El ID de la columna permanece estable, incluso si el título queda vacío
+    // temporalmente mientras el usuario escribe uno nuevo.
+    commit({ ...state, tiempos: newTiempos });
   };
 
   // Evitar scroll que cambie valores
@@ -588,7 +604,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 </th>
                 {tiempos.map((t, idx) => (
                   <th
-                    key={idx}
+                    key={t.id}
                     draggable
                     onDragStart={(e) => handleDragStart(e, idx)}
                     onDragOver={(e) => handleDragOver(e, idx)}
@@ -613,7 +629,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                     <div className="flex items-center justify-center gap-1 group/thead px-1 relative mt-[14px]">
                       <input
                         type="text"
-                        value={t}
+                        value={t.nombre}
                         onChange={(e) => renameTiempo(idx, e.target.value)}
                         className="text-[11px] font-bold bg-transparent border-0 border-b border-transparent hover:border-[#444] focus:border-[#90c2ff] outline-none w-full text-center text-[#c0c0c0] focus:text-[#90c2ff] uppercase transition-colors tracking-wider placeholder:text-[#444] m-0 p-0"
                         title="Editable"
@@ -705,10 +721,10 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
                     {/* Celda por tiempo */}
                     {tiempos.map((t, idx) => {
-                      const v = getCell(t, key);
+                      const v = getCell(t.id, key);
                       return (
                         <td
-                          key={idx}
+                          key={t.id}
                           style={{
                             padding: '2px',
                             borderRight: idx < tiempos.length - 1 ? '1px solid #222' : '2px solid #333',
@@ -721,7 +737,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                             type="text"
                             inputMode="decimal"
                             value={v === 0 || v === '0' ? '' : (v ?? '')}
-                            onChange={(e) => setCell(t, key, cleanInputStr(e.target.value))}
+                            onChange={(e) => setCell(t.id, key, cleanInputStr(e.target.value))}
                             onPaste={(e) => handlePaste(e, rowIdx, idx + 1)}
                             onWheel={noScroll}
                             onKeyDown={(e) => handleCellKey(e, rowIdx, idx + 1, tiempos.length)}
@@ -797,16 +813,16 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                 <td style={{ borderRight: '2px solid #333', textAlign: 'center', color: '#444', fontSize: '13px' }}>—</td>
 
                 {tiempos.map((t, idx) => {
-                  const kcalTiempo = colKcalAuto(t);
+                  const kcalTiempo = colKcalAuto(t.id);
                   const denominador = energiaTotalManual && energiaTotalManual > 0 ? energiaTotalManual : kcalTotalAuto;
                   const pct = denominador > 0 ? (kcalTiempo / denominador) * 100 : 0;
 
-                  const manualPct = (distribucion as any)._porcentajesManuales?.[t] ?? '';
+                  const manualPct = (distribucion as any)._porcentajesManuales?.[t.id] ?? '';
                   const displayCalculated = pct > 0 ? `${pct.toFixed(1)}%` : '0%';
 
                   return (
                     <td
-                      key={t}
+                      key={t.id}
                       style={{
                         padding: '2px',
                         textAlign: 'center',
@@ -819,7 +835,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                           inputMode="decimal"
                           value={manualPct}
                           placeholder={displayCalculated}
-                          onChange={(e) => setManualPercentage(t, cleanInputStr(e.target.value))}
+                          onChange={(e) => setManualPercentage(t.id, cleanInputStr(e.target.value))}
                           onPaste={(e) => handlePastePercentages(e, idx)}
                           onWheel={noScroll}
                           className={cellCls}

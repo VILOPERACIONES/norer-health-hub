@@ -4,6 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { buildPdfMeta, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
 
 interface PDFPreviewModalProps {
   isOpen: boolean;
@@ -16,19 +17,8 @@ interface PDFPreviewModalProps {
 
 export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading }: PDFPreviewModalProps) {
   const [meta, setMeta] = useState<any>(() => {
-    const saved = localStorage.getItem('norder_pdfCustomMetaPrefs');
-    const defaultPrefs = saved ? JSON.parse(saved) : {};
-    return {
-      showPageHistorial: true,
-      showPageMenus: true,
-      showPageIntercambio: true,
-      showPageExtras: true,
-      showContacto: false,
-      showDistribucionPorciones: true,
-      soloEquivalencias: false,
-      ...defaultPrefs,
-      ...planCustomMeta
-    };
+    const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
+    return buildPdfMeta(defaultPrefs, planCustomMeta);
   });
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -95,15 +85,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
     setMeta(newMeta);
     
     // Guardar opciones booleanas en preferencias
-    const prefsToSave = {
-      showPageHistorial: newMeta.showPageHistorial !== false,
-      showPageMenus: newMeta.showPageMenus !== false,
-      showPageIntercambio: newMeta.showPageIntercambio !== false,
-      showPageExtras: newMeta.showPageExtras !== false,
-      showContacto: newMeta.showContacto === true,
-      soloEquivalencias: newMeta.soloEquivalencias === true,
-      showDistribucionPorciones: newMeta.showDistribucionPorciones !== false,
-    };
+    const prefsToSave = getGlobalPdfPreferences(newMeta);
     localStorage.setItem('norder_pdfCustomMetaPrefs', JSON.stringify(prefsToSave));
   };
 
@@ -116,7 +98,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-[1000] bg-black/80 backdrop-blur-md animate-fade-in" />
         <DialogPrimitive.Content 
-          className="fixed left-[50%] top-[50%] z-[1001] w-full max-w-7xl translate-x-[-50%] translate-y-[-50%] px-2 sm:px-4 focus:outline-none"
+          className="fixed left-[50%] top-[50%] z-[1001] w-[98vw] max-w-[1800px] translate-x-[-50%] translate-y-[-50%] px-2 sm:px-3 focus:outline-none"
         >
           <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] sm:rounded-[24px] w-full h-[94vh] lg:h-[90vh] flex flex-col lg:flex-row overflow-hidden shadow-[0_0_80px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in-95 duration-200">
             
@@ -137,6 +119,14 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
               </div>
 
               <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 sm:space-y-8 custom-scrollbar">
+                <div className="rounded-[10px] border border-red-400/20 bg-red-400/5 p-3">
+                  <p className="m-0 text-[11px] font-semibold leading-relaxed text-red-300">
+                    Revisión ortográfica: las palabras dudosas aparecen en rojo únicamente en esta vista previa.
+                  </p>
+                  <p className="mb-0 mt-1 text-[10px] leading-relaxed text-[#777]">
+                    El PDF descargado o enviado al paciente se genera sin estas marcas.
+                  </p>
+                </div>
                 
                 {/* HOJAS */}
                 <div className="space-y-4">
@@ -144,6 +134,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                   <div className="space-y-2">
                     <ToggleItem label="1. Antropometría" active={meta.showPageHistorial !== false} onChange={() => handleToggle('showPageHistorial')} />
                     <ToggleItem label="Correo y Teléfono" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
+                    <ToggleItem label="Alimentos a evitar" active={meta.showAlimentosEvitar !== false} onChange={() => handleToggle('showAlimentosEvitar')} isSubItem />
                     <ToggleItem label="2. Menús Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
                     <ToggleItem label="Solo equivalencias" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
                     <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />
@@ -166,7 +157,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
             </div>
 
             {/* PREVIEW */}
-            <div className="flex-1 bg-[#0a0a0a] p-4 sm:p-8 flex flex-col items-center justify-center relative overflow-hidden">
+            <div className="flex-1 min-w-0 bg-[#0a0a0a] p-2 sm:p-4 flex flex-col items-center justify-center relative overflow-hidden">
               <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#90c2ff]/5 blur-[120px] rounded-full pointer-events-none" />
               
               {loadingPdf && (
@@ -179,7 +170,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                 {pdfUrl ? (
                   <iframe 
                     src={`${pdfUrl}#toolbar=0&navpanes=0`} 
-                    className="w-full h-full max-w-[850px] rounded-[4px] sm:rounded-[8px] shadow-2xl border border-[#222] bg-white transition-opacity duration-300"
+                    className="w-full h-full rounded-[4px] sm:rounded-[8px] shadow-2xl border border-[#222] bg-white transition-opacity duration-300"
                     style={{ opacity: loadingPdf ? 0.4 : 1 }}
                     title="PDF"
                   />
@@ -221,4 +212,3 @@ function ToggleItem({ label, active, onChange, isSubItem = false }: { label: str
     </button>
   );
 }
-

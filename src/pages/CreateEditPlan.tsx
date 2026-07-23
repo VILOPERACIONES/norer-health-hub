@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill, FileText, X } from 'lucide-react';
+import { ArrowLeft, Save, Plus, PlusCircle, Search, ChevronDown, ChevronUp, Copy, BookOpen, Clock, Activity, AlertCircle, Edit3, Trash2, CheckCircle2, MoreHorizontal, ClipboardList, Settings, Bookmark, Droplets, Pill, FileText, X, GripVertical, RotateCcw } from 'lucide-react';
 import { SmaeIngredientePicker } from '@/components/SmaeIngredientePicker';
 import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
@@ -10,12 +10,22 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
 import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
+import { formatMealTimeName } from '@/lib/mealTimes';
+import { buildAvoidFoods } from '@/lib/avoidFoods';
+import {
+  appendMealTimeToMenus,
+  removeMealTimeFromMenus,
+  reorderMealTimes,
+  restoreMealTimeToMenus,
+  type RemovedMealTime,
+} from '@/lib/mealTimeOrdering';
+import { reorderDishGroups, reorderIngredientWithinDish } from '@/lib/ingredientOrdering';
 
-const defaultTiempos = ['Pre Entreno', 'Desayuno', 'Colacion', 'Almuerzo', 'Colacion', 'Cena'];
+const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
 const emptyMenu = (name: string): Menu => ({
   nombre: name,
-  tiempos: defaultTiempos.map((t) => ({ nombre: t.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' })),
+  tiempos: defaultTiempos.map((t) => ({ nombre: t, ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' })),
 });
 
 const emptyIngrediente = (): Ingrediente => ({
@@ -89,6 +99,15 @@ export const CreateEditPlanForm = ({
   const [pacienteInfo, setPacienteInfo] = useState<any>(null); // antecedentes + datos clínicos del paciente
   // Borradores locales del nombre de platillo mientras se edita — evita que el grupo desaparezca al vaciar el input
   const [platilloDrafts, setPlatilloDrafts] = useState<Record<string, string>>({});
+  const [removedMealTimes, setRemovedMealTimes] = useState<RemovedMealTime[]>([]);
+  const [draggedTiempoIdx, setDraggedTiempoIdx] = useState<number | null>(null);
+  const [dragOverTiempoIdx, setDragOverTiempoIdx] = useState<number | null>(null);
+  const [draggedDish, setDraggedDish] = useState<{ menuIdx: number; tiempoIdx: number; groupIdx: number } | null>(null);
+  const [dragOverDishIdx, setDragOverDishIdx] = useState<number | null>(null);
+  const [draggedIngredient, setDraggedIngredient] = useState<{ menuIdx: number; tiempoIdx: number; ingredientIdx: number } | null>(null);
+  const [dragOverIngredientIdx, setDragOverIngredientIdx] = useState<number | null>(null);
+  const [removedDishes, setRemovedDishes] = useState<Array<{ menuIdx: number; tiempoIdx: number; nombre: string; ingredientes: Ingrediente[] }>>([]);
+  const [removedIngredients, setRemovedIngredients] = useState<Array<{ menuIdx: number; tiempoIdx: number; ingrediente: Ingrediente }>>([]);
 
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
   const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
@@ -141,7 +160,7 @@ export const CreateEditPlanForm = ({
         const isThisNonMain = /colaci[oó]n/i.test(t.nombre || '') || /pre.?entreno/i.test(t.nombre || '');
         const bebidaFinal = (isThisNonMain && rawBebida === 'Agua natural 500ml') ? '' : rawBebida;
         return {
-          nombre: t.nombre,
+          nombre: formatMealTimeName(t.nombre),
           nota,
           bebida: bebidaFinal,
           suplTiempo: t.suplTiempo || metaSuplTiempo,
@@ -301,8 +320,8 @@ export const CreateEditPlanForm = ({
             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
             if (barrido?.tiempos?.length > 0) {
-              const assessmentTiempos = barrido.tiempos.map((t: string) => ({
-                nombre: t.toUpperCase(),
+              const assessmentTiempos = barrido.tiempos.map((t: unknown) => ({
+                nombre: formatMealTimeName(getBarridoTiempoNombre(t)),
                 ingredientes: [],
                 nota: ''
               }));
@@ -470,17 +489,38 @@ export const CreateEditPlanForm = ({
   // Match plan tiempo ↔ columna de barrido por nombre + índice de ocurrencia,
   // para soportar dos tiempos con el mismo nombre (p.ej. dos "Colación"):
   // la 1ª Colación del plan toma la 1ª columna "Colación" del barrido, la 2ª toma la 2ª.
-  const findBarridoTiempoKey = (barridoTiempos: string[], planTiempos: { nombre?: string }[], tiempoIdx: number): string | undefined => {
-    const norm = (s?: string) => (s || '').toLowerCase().trim();
+  const getBarridoTiempoNombre = (tiempo: unknown): string => {
+    if (typeof tiempo === 'string' || typeof tiempo === 'number') return String(tiempo);
+    if (tiempo && typeof tiempo === 'object') {
+      const ref = tiempo as { id?: unknown; nombre?: unknown; label?: unknown };
+      return String(ref.nombre ?? ref.label ?? ref.id ?? '');
+    }
+    return '';
+  };
+
+  const getBarridoTiempoKey = (tiempo: unknown): string => {
+    if (tiempo && typeof tiempo === 'object') {
+      const ref = tiempo as { id?: unknown; nombre?: unknown; label?: unknown };
+      return String(ref.id ?? ref.nombre ?? ref.label ?? '');
+    }
+    return getBarridoTiempoNombre(tiempo);
+  };
+
+  const normalizeBarridoTiempo = (tiempo: unknown): string =>
+    getBarridoTiempoNombre(tiempo).toLowerCase().trim();
+
+  const findBarridoTiempoKey = (barridoTiempos: unknown[], planTiempos: { nombre?: string }[], tiempoIdx: number): string | undefined => {
+    const norm = normalizeBarridoTiempo;
     const name = norm(planTiempos[tiempoIdx]?.nombre);
     if (!name) return undefined;
     const occurrence = planTiempos.slice(0, tiempoIdx).filter(t => norm(t.nombre) === name).length;
     const candidates = barridoTiempos.filter(t => norm(t) === name);
-    if (candidates[occurrence]) return candidates[occurrence];
+    if (candidates[occurrence]) return getBarridoTiempoKey(candidates[occurrence]);
     // 2da+ ocurrencia (ej. segunda "Colación") puede estar como columna "Colación 2" en el barrido
     if (occurrence > 0) {
       const altName = `${name} ${occurrence + 1}`;
-      return barridoTiempos.find(t => norm(t) === altName);
+      const alternate = barridoTiempos.find(t => norm(t) === altName);
+      return alternate ? getBarridoTiempoKey(alternate) : undefined;
     }
     return undefined;
   };
@@ -539,68 +579,45 @@ export const CreateEditPlanForm = ({
     }));
   };
 
+  const updateTiempoName = (tiempoIdx: number, nombre: string) => {
+    setMenus(prev => prev.map(menu => ({
+      ...menu,
+      tiempos: menu.tiempos.map((tiempo, index) =>
+        index === tiempoIdx ? { ...tiempo, nombre } : tiempo
+      ),
+    })));
+  };
+
   const moveTiempo = (menuIdx: number, tiempoIdx: number, dir: -1 | 1) => {
-    // Los tiempos de comida representan el horario del día — el orden debe ser
-    // idéntico en TODOS los menús para que UI y PDF sean consistentes.
-    setMenus(prev => {
-      // Determinar el nuevo orden usando el menú de referencia (el que el usuario editó)
-      const refMenu = prev[menuIdx];
-      if (!refMenu) return prev;
-      const refTiempos = [...refMenu.tiempos];
-      if (tiempoIdx + dir < 0 || tiempoIdx + dir >= refTiempos.length) return prev;
+    void menuIdx;
+    setMenus(prev => reorderMealTimes(prev, tiempoIdx, tiempoIdx + dir));
+  };
 
-      // Nombres de los tiempos que se van a intercambiar (para mapear a otros menús)
-      const nameA = refTiempos[tiempoIdx]?.nombre;
-      const nameB = refTiempos[tiempoIdx + dir]?.nombre;
-
-      return prev.map(menu => {
-        const tiempos = [...menu.tiempos];
-        // Encontrar los índices de nameA y nameB en este menú (por ocurrencia igual)
-        const idxA = tiempos.findIndex(t => t.nombre === nameA);
-        const idxB = tiempos.findIndex(t => t.nombre === nameB);
-        if (idxA === -1 || idxB === -1) {
-          // Fallback: swap por índice si los nombres no coinciden
-          if (tiempoIdx + dir >= 0 && tiempoIdx + dir < tiempos.length) {
-            const temp = tiempos[tiempoIdx];
-            tiempos[tiempoIdx] = tiempos[tiempoIdx + dir];
-            tiempos[tiempoIdx + dir] = temp;
-          }
-          return { ...menu, tiempos };
-        }
-        // Swap por nombre — cada menú mantiene su contenido, solo cambia el orden
-        const temp = tiempos[idxA];
-        tiempos[idxA] = tiempos[idxB];
-        tiempos[idxB] = temp;
-        return { ...menu, tiempos };
-      });
-    });
+  const dropTiempo = (targetIdx: number) => {
+    if (draggedTiempoIdx !== null) {
+      setMenus(prev => reorderMealTimes(prev, draggedTiempoIdx, targetIdx));
+    }
+    setDraggedTiempoIdx(null);
+    setDragOverTiempoIdx(null);
   };
 
 
-  const movePlatillo = (menuIdx: number, tiempoIdx: number, platilloName: string, dir: -1 | 1) => {
+  const movePlatillo = (menuIdx: number, tiempoIdx: number, groupIdx: number, dir: -1 | 1) => {
     updateTiempo(menuIdx, tiempoIdx, (t) => {
-      const platillos = Array.from(new Set(t.ingredientes.map(i => i.platillo || '')));
-      const pIndex = platillos.indexOf(platilloName);
-      if (pIndex + dir < 0 || pIndex + dir >= platillos.length) return t;
+      return { ...t, ingredientes: reorderDishGroups(t.ingredientes, groupIdx, groupIdx + dir) };
+    });
+  };
 
-      const targetPlatillo = platillos[pIndex + dir];
-
-      platillos[pIndex] = targetPlatillo;
-      platillos[pIndex + dir] = platilloName;
-
-      const groups: Record<string, any[]> = {};
-      t.ingredientes.forEach(ing => {
-        const p = ing.platillo || '';
-        if (!groups[p]) groups[p] = [];
-        groups[p].push(ing);
-      });
-
-      let newIngredientes: any[] = [];
-      platillos.forEach(p => {
-        if (groups[p]) newIngredientes = newIngredientes.concat(groups[p]);
-      });
-
-      return { ...t, ingredientes: newIngredientes };
+  const moveIngredient = (menuIdx: number, tiempoIdx: number, ingredientIdx: number, dir: -1 | 1) => {
+    updateTiempo(menuIdx, tiempoIdx, (t) => {
+      const platillo = t.ingredientes[ingredientIdx]?.platillo || '';
+      const groupIndices = t.ingredientes.map((item, index) => ({ item, index }))
+        .filter(({ item }) => (item.platillo || '') === platillo)
+        .map(({ index }) => index);
+      const localIndex = groupIndices.indexOf(ingredientIdx);
+      const targetIndex = groupIndices[localIndex + dir];
+      if (targetIndex === undefined) return t;
+      return { ...t, ingredientes: reorderIngredientWithinDish(t.ingredientes, ingredientIdx, targetIndex) };
     });
   };
 
@@ -656,9 +673,9 @@ export const CreateEditPlanForm = ({
     // Con contexto del menú usamos matching por ocurrencia (soporta dos "Colación")
     const barridoTiempoKey = (planTiempos && tiempoIdx !== undefined)
       ? findBarridoTiempoKey(barridoData.tiempos, planTiempos, tiempoIdx)
-      : barridoData.tiempos.find(
-        (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
-      );
+      : getBarridoTiempoKey(barridoData.tiempos.find(
+        (t: unknown) => normalizeBarridoTiempo(t) === normalizeBarridoTiempo(tiempo.nombre)
+      ));
     if (!barridoTiempoKey) return [];
     const dist = barridoData.distribucion[barridoTiempoKey] || {};
 
@@ -826,6 +843,85 @@ export const CreateEditPlanForm = ({
   };
 
   const { confirm, ConfirmDialogComponent } = useConfirm();
+  const alimentosAEvitar = buildAvoidFoods(
+    valData?.evitar,
+    pacienteInfo?.antecedentes?.alimentosNoGustan,
+  );
+
+  const handleRemoveMealTime = async (tiempoIdx: number, nombre: string) => {
+    const ok = await confirm({
+      title: `¿Eliminar ${nombre || 'este tiempo'}?`,
+      description: 'Se quitará de ambos menús para conservar la alineación. Podrás recuperarlo desde el botón inferior sin perder sus alimentos.',
+      confirmLabel: 'Eliminar tiempo',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+
+    const result = removeMealTimeFromMenus(menus, tiempoIdx);
+    setMenus(result.menus);
+    if (result.removed) setRemovedMealTimes(stack => [...stack, result.removed!]);
+  };
+
+  const handleRestoreMealTime = () => {
+    const removed = removedMealTimes.at(-1);
+    if (!removed) return;
+    setMenus(prev => restoreMealTimeToMenus(prev, removed));
+    setRemovedMealTimes(stack => stack.slice(0, -1));
+    toast({ title: 'TIEMPO RECUPERADO', description: 'Se agregó al final de ambos menús. Puedes arrastrarlo a cualquier posición.' });
+  };
+
+  const handleAppendMealTime = (nombre = 'Nuevo tiempo') => {
+    setMenus(prev => appendMealTimeToMenus(prev, nombre));
+  };
+
+  const handleRemoveDish = async (menuIdx: number, tiempoIdx: number, nombre: string) => {
+    const ok = await confirm({
+      title: `¿Eliminar el platillo “${nombre}”?`,
+      description: 'Se quitarán sus ingredientes, pero podrás recuperarlos desde este mismo tiempo de comida.',
+      confirmLabel: 'Eliminar platillo',
+      cancelLabel: 'Cancelar',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const ingredientes = menus[menuIdx]?.tiempos[tiempoIdx]?.ingredientes.filter(item => (item.platillo || '') === nombre) || [];
+    if (!ingredientes.length) return;
+    setRemovedDishes(stack => [...stack, { menuIdx, tiempoIdx, nombre, ingredientes }]);
+    updateTiempo(menuIdx, tiempoIdx, tiempo => ({
+      ...tiempo,
+      ingredientes: tiempo.ingredientes.filter(item => (item.platillo || '') !== nombre),
+    }));
+  };
+
+  const handleRestoreDish = (removedIndex: number) => {
+    const removed = removedDishes[removedIndex];
+    if (!removed) return;
+    updateTiempo(removed.menuIdx, removed.tiempoIdx, tiempo => ({
+      ...tiempo,
+      ingredientes: [...tiempo.ingredientes, ...removed.ingredientes],
+    }));
+    setRemovedDishes(stack => stack.filter((_, index) => index !== removedIndex));
+  };
+
+  const handleRemoveIngredient = (menuIdx: number, tiempoIdx: number, ingredientIdx: number) => {
+    const ingrediente = menus[menuIdx]?.tiempos[tiempoIdx]?.ingredientes[ingredientIdx];
+    if (!ingrediente) return;
+    setRemovedIngredients(stack => [...stack, { menuIdx, tiempoIdx, ingrediente }]);
+    updateTiempo(menuIdx, tiempoIdx, tiempo => ({
+      ...tiempo,
+      ingredientes: tiempo.ingredientes.filter((_, index) => index !== ingredientIdx),
+    }));
+  };
+
+  const handleRestoreIngredient = (removedIndex: number) => {
+    const removed = removedIngredients[removedIndex];
+    if (!removed) return;
+    updateTiempo(removed.menuIdx, removed.tiempoIdx, tiempo => ({
+      ...tiempo,
+      ingredientes: [...tiempo.ingredientes, removed.ingrediente],
+    }));
+    setRemovedIngredients(stack => stack.filter((_, index) => index !== removedIndex));
+  };
 
   const handleDelete = async () => {
     const ok = await confirm({
@@ -1146,26 +1242,66 @@ export const CreateEditPlanForm = ({
 
                   <div className="p-6 space-y-6 flex-1 flex flex-col">
                     {menu.tiempos.map((tiempo, ti) => (
-                      <div key={ti} className="p-4 rounded-[8px] border border-[#2a2a2a] bg-[#181818] group relative">
-                        <div className="flex items-center justify-between mb-4">
-                          <input
-                            value={tiempo.nombre}
-                            onChange={(e) => updateTiempo(mi, ti, (t) => ({ ...t, nombre: e.target.value }))}
-                            className="text-[14px] font-semibold text-white bg-transparent border-none outline-none w-[70%]"
-                            placeholder="Nombre del tiempo"
-                          />
-                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => moveTiempo(mi, ti, -1)} disabled={ti === 0} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                      <div
+                        key={ti}
+                        onDragOver={(event) => {
+                          if (draggedTiempoIdx === null) return;
+                          event.preventDefault();
+                          setDragOverTiempoIdx(ti);
+                        }}
+                        onDrop={(event) => {
+                          if (draggedTiempoIdx === null) return;
+                          event.preventDefault();
+                          dropTiempo(ti);
+                        }}
+                        className={`p-4 rounded-[8px] border bg-[#181818] group relative transition-all ${
+                          dragOverTiempoIdx === ti && draggedTiempoIdx !== ti
+                            ? 'border-brand-primary ring-1 ring-brand-primary/50'
+                            : 'border-[#2a2a2a]'
+                        } ${draggedTiempoIdx === ti ? 'opacity-45' : ''}`}
+                      >
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="flex items-center gap-1 shrink-0 pr-3 border-r border-[#3a3a3a]">
+                            <button
+                              type="button"
+                              draggable
+                              onDragStart={(event) => {
+                                setDraggedTiempoIdx(ti);
+                                event.dataTransfer.effectAllowed = 'move';
+                                event.dataTransfer.setData('text/plain', String(ti));
+                              }}
+                              onDragEnd={() => {
+                                setDraggedTiempoIdx(null);
+                                setDragOverTiempoIdx(null);
+                              }}
+                              className="p-1.5 text-[#b0b0b0] bg-[#222] border border-[#3a3a3a] hover:text-white hover:border-[#666] rounded-[6px] cursor-grab active:cursor-grabbing transition-colors"
+                              title="Arrastrar para reordenar en ambos menús"
+                              aria-label={`Arrastrar ${tiempo.nombre} para reordenar`}
+                            >
+                              <GripVertical className="h-4 w-4" />
+                            </button>
+                            <button type="button" onClick={() => moveTiempo(mi, ti, -1)} disabled={ti === 0} className="p-1.5 text-[#a0a0a0] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors" title="Subir tiempo">
                               <ChevronUp className="h-3.5 w-3.5" />
                             </button>
-                            <button onClick={() => moveTiempo(mi, ti, 1)} disabled={ti === menu.tiempos.length - 1} className="p-1.5 text-[#8a8a8a] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors">
+                            <button type="button" onClick={() => moveTiempo(mi, ti, 1)} disabled={ti === menu.tiempos.length - 1} className="p-1.5 text-[#a0a0a0] disabled:opacity-20 hover:text-white rounded-[6px] hover:bg-[#333] transition-colors" title="Bajar tiempo">
                               <ChevronDown className="h-3.5 w-3.5" />
                             </button>
-                            <div className="w-[1px] h-4 bg-[#333] hidden sm:block mx-1"></div>
-                            <button onClick={() => updateMenu(mi, (m) => ({ ...m, tiempos: m.tiempos.filter((_, i) => i !== ti) }))} className="p-1.5 text-[#8a8a8a] hover:text-accent-red rounded-[6px] hover:bg-[#2e1a1a] transition-colors">
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
                           </div>
+                          <input
+                            value={tiempo.nombre}
+                            onChange={(e) => updateTiempoName(ti, e.target.value)}
+                            className="text-[14px] font-semibold text-white bg-transparent border-none outline-none min-w-0 flex-1"
+                            placeholder="Nombre del tiempo"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => void handleRemoveMealTime(ti, tiempo.nombre)}
+                            className="ml-auto p-2 text-[#d57a7a] border border-[#5a2929] bg-[#281818] hover:text-white hover:bg-[#7f1d1d] rounded-[6px] transition-colors shrink-0"
+                            title="Eliminar este tiempo de ambos menús"
+                            aria-label={`Eliminar ${tiempo.nombre}`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
                         </div>
 
                         {/* ─── Bebida y Suplemento alineados al título del tiempo ─── */}
@@ -1264,8 +1400,50 @@ export const CreateEditPlanForm = ({
 
                         <div className="space-y-6">
                           {Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).map((pName, pIndex) => (
-                            <div key={`${mi}-${ti}-${pIndex}`} className={pName ? 'p-3 bg-[#111111] border border-[#333] rounded-[8px]' : ''}>
+                            <div
+                              key={`${mi}-${ti}-${pIndex}`}
+                              onDragOver={(event) => {
+                                if (!draggedDish || draggedDish.menuIdx !== mi || draggedDish.tiempoIdx !== ti) return;
+                                event.preventDefault();
+                                setDragOverDishIdx(pIndex);
+                              }}
+                              onDrop={(event) => {
+                                if (!draggedDish || draggedDish.menuIdx !== mi || draggedDish.tiempoIdx !== ti) return;
+                                event.preventDefault();
+                                updateTiempo(mi, ti, current => ({
+                                  ...current,
+                                  ingredientes: reorderDishGroups(current.ingredientes, draggedDish.groupIdx, pIndex),
+                                }));
+                                setDraggedDish(null);
+                                setDragOverDishIdx(null);
+                              }}
+                              className={pName ? `p-3 bg-[#111111] border rounded-[8px] transition-all ${draggedDish?.menuIdx === mi && draggedDish?.tiempoIdx === ti && dragOverDishIdx === pIndex && draggedDish.groupIdx !== pIndex ? 'border-brand-primary ring-1 ring-brand-primary/40' : 'border-[#333]'}` : ''}
+                            >
                               {pName ? (<div className="flex items-center gap-2 mb-3 pb-2 border-b border-[#2a2a2a] border-dashed">
+                                <div className="flex items-center gap-1 shrink-0 pr-2 border-r border-[#333]">
+                                  <button
+                                    type="button"
+                                    draggable
+                                    onDragStart={(event) => {
+                                      setDraggedDish({ menuIdx: mi, tiempoIdx: ti, groupIdx: pIndex });
+                                      event.dataTransfer.effectAllowed = 'move';
+                                    }}
+                                    onDragEnd={() => {
+                                      setDraggedDish(null);
+                                      setDragOverDishIdx(null);
+                                    }}
+                                    className="p-1.5 text-[#b0b0b0] bg-[#222] border border-[#3a3a3a] hover:text-white rounded-[5px] cursor-grab active:cursor-grabbing"
+                                    title="Arrastrar platillo"
+                                  >
+                                    <GripVertical className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button type="button" onClick={() => movePlatillo(mi, ti, pIndex, -1)} disabled={pIndex === 0} className="p-1 text-[#999] disabled:opacity-20 hover:text-white rounded-[4px] hover:bg-[#2a2a2a]" title="Subir platillo">
+                                    <ChevronUp className="h-3 w-3" />
+                                  </button>
+                                  <button type="button" onClick={() => movePlatillo(mi, ti, pIndex, 1)} disabled={pIndex === Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).length - 1} className="p-1 text-[#999] disabled:opacity-20 hover:text-white rounded-[4px] hover:bg-[#2a2a2a]" title="Bajar platillo">
+                                    <ChevronDown className="h-3 w-3" />
+                                  </button>
+                                </div>
                                 <span className="text-white text-[11px] font-bold uppercase tracking-wider shrink-0">Platillo:</span>
                                 {(() => {
                                   const draftKey = `${mi}-${ti}-${pIndex}`;
@@ -1308,46 +1486,85 @@ export const CreateEditPlanForm = ({
                                   );
                                 })()}
 
-                                <div className="flex items-center gap-1 ml-auto shrink-0">
-                                  <button onClick={() => movePlatillo(mi, ti, pName, -1)} disabled={pIndex === 0} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
-                                    <ChevronUp className="h-3 w-3" />
-                                  </button>
-                                  <button onClick={() => movePlatillo(mi, ti, pName, 1)} disabled={pIndex === Array.from(new Set(tiempo.ingredientes.map(i => i.platillo || ''))).length - 1} className="p-1 text-[#555] disabled:opacity-30 hover:text-white rounded-[4px] hover:bg-[#2a2a2a] transition-colors">
-                                    <ChevronDown className="h-3 w-3" />
-                                  </button>
-                                  {pName && (
-                                    <button
-                                      onClick={() => updateTiempo(mi, ti, t => ({ ...t, ingredientes: t.ingredientes.filter(ing => ing.platillo !== pName) }))}
-                                      className="text-[10px] uppercase font-bold text-[#8a8a8a] hover:text-accent-red ml-1 px-1.5 py-1 rounded-[4px] hover:bg-[#2e1a1a] whitespace-nowrap transition-colors tracking-wider"
-                                    >
-                                      Borrar
-                                    </button>
-                                  )}
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleRemoveDish(mi, ti, pName)}
+                                  className="ml-auto shrink-0 p-1.5 text-[#d57a7a] border border-[#5a2929] bg-[#281818] hover:text-white hover:bg-[#7f1d1d] rounded-[5px]"
+                                  title="Eliminar platillo y sus ingredientes"
+                                  aria-label={`Eliminar platillo ${pName}`}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </button>
                               </div>) : null}
                               <div className="space-y-4">
-                                {tiempo.ingredientes.map((ing, ii) => (ing.platillo || '') === pName ? (
-                                  <SmaeIngredientePicker
-                                    key={ing.id || `ing-${mi}-${ti}-${ii}`}
-                                    ingrediente={ing}
-                                    index={ii}
-                                    gapByGroup={getBudgetForTiempo(tiempo, menu.tiempos, ti).reduce((acc, b) => ({ ...acc, [b.groupKey]: b.missing > 0 ? b.missing : 0 }), {} as Record<string, number>)}
-                                    onUpdate={(updates) =>
-                                      updateTiempo(mi, ti, (t) => ({
-                                        ...t,
-                                        ingredientes: t.ingredientes.map((x, j) =>
-                                          j === ii ? { ...x, ...updates } : x
-                                        ),
-                                      }))
-                                    }
-                                    onRemove={() =>
-                                      updateTiempo(mi, ti, (t) => ({
-                                        ...t,
-                                        ingredientes: t.ingredientes.filter((_, j) => j !== ii),
-                                      }))
-                                    }
-                                  />
-                                ) : null)}
+                                {tiempo.ingredientes.map((ing, ii) => {
+                                  if ((ing.platillo || '') !== pName) return null;
+                                  const groupIndices = tiempo.ingredientes.map((item, index) => ({ item, index }))
+                                    .filter(({ item }) => (item.platillo || '') === pName)
+                                    .map(({ index }) => index);
+                                  const localIngredientIdx = groupIndices.indexOf(ii);
+                                  const isDraggingThis = draggedIngredient?.menuIdx === mi && draggedIngredient?.tiempoIdx === ti && draggedIngredient?.ingredientIdx === ii;
+                                  const isIngredientDragTarget = draggedIngredient?.menuIdx === mi && draggedIngredient?.tiempoIdx === ti && dragOverIngredientIdx === ii && !isDraggingThis;
+                                  return (
+                                    <div
+                                      key={ing.id || `ing-${mi}-${ti}-${ii}`}
+                                      onDragOver={(event) => {
+                                        if (!draggedIngredient || draggedIngredient.menuIdx !== mi || draggedIngredient.tiempoIdx !== ti) return;
+                                        if ((tiempo.ingredientes[draggedIngredient.ingredientIdx]?.platillo || '') !== pName) return;
+                                        event.preventDefault();
+                                        setDragOverIngredientIdx(ii);
+                                      }}
+                                      onDrop={(event) => {
+                                        if (!draggedIngredient || draggedIngredient.menuIdx !== mi || draggedIngredient.tiempoIdx !== ti) return;
+                                        event.preventDefault();
+                                        updateTiempo(mi, ti, current => ({
+                                          ...current,
+                                          ingredientes: reorderIngredientWithinDish(current.ingredientes, draggedIngredient.ingredientIdx, ii),
+                                        }));
+                                        setDraggedIngredient(null);
+                                        setDragOverIngredientIdx(null);
+                                      }}
+                                      className={`flex items-start gap-2 rounded-[6px] transition-all ${isIngredientDragTarget ? 'ring-1 ring-brand-primary/50 bg-brand-primary/5' : ''} ${isDraggingThis ? 'opacity-45' : ''}`}
+                                    >
+                                      <div className="flex flex-col items-center gap-1 pt-1 shrink-0">
+                                        <button
+                                          type="button"
+                                          draggable
+                                          onDragStart={(event) => {
+                                            setDraggedIngredient({ menuIdx: mi, tiempoIdx: ti, ingredientIdx: ii });
+                                            event.dataTransfer.effectAllowed = 'move';
+                                          }}
+                                          onDragEnd={() => {
+                                            setDraggedIngredient(null);
+                                            setDragOverIngredientIdx(null);
+                                          }}
+                                          className="p-1.5 text-[#aaa] bg-[#222] border border-[#3a3a3a] hover:text-white rounded-[5px] cursor-grab active:cursor-grabbing"
+                                          title="Arrastrar ingrediente"
+                                        >
+                                          <GripVertical className="h-3.5 w-3.5" />
+                                        </button>
+                                        <div className="flex">
+                                          <button type="button" onClick={() => moveIngredient(mi, ti, ii, -1)} disabled={localIngredientIdx === 0} className="p-1 text-[#999] disabled:opacity-20 hover:text-white" title="Subir ingrediente"><ChevronUp className="h-3 w-3" /></button>
+                                          <button type="button" onClick={() => moveIngredient(mi, ti, ii, 1)} disabled={localIngredientIdx === groupIndices.length - 1} className="p-1 text-[#999] disabled:opacity-20 hover:text-white" title="Bajar ingrediente"><ChevronDown className="h-3 w-3" /></button>
+                                        </div>
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <SmaeIngredientePicker
+                                          ingrediente={ing}
+                                          index={ii}
+                                          gapByGroup={getBudgetForTiempo(tiempo, menu.tiempos, ti).reduce((acc, b) => ({ ...acc, [b.groupKey]: b.missing > 0 ? b.missing : 0 }), {} as Record<string, number>)}
+                                          onUpdate={(updates) =>
+                                            updateTiempo(mi, ti, (t) => ({
+                                              ...t,
+                                              ingredientes: t.ingredientes.map((x, j) => j === ii ? { ...x, ...updates } : x),
+                                            }))
+                                          }
+                                          onRemove={() => handleRemoveIngredient(mi, ti, ii)}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
 
                                 <button
                                   onClick={() => updateTiempo(mi, ti, (t) => ({ ...t, ingredientes: [...t.ingredientes, { ...emptyIngrediente(), platillo: pName }] }))}
@@ -1382,6 +1599,30 @@ export const CreateEditPlanForm = ({
                               + Crear Platillo
                             </button>
                           </div>
+
+                          {(() => {
+                            const dishRecovery = removedDishes.map((item, index) => ({ item, index }))
+                              .filter(({ item }) => item.menuIdx === mi && item.tiempoIdx === ti)
+                              .at(-1);
+                            const ingredientRecovery = removedIngredients.map((item, index) => ({ item, index }))
+                              .filter(({ item }) => item.menuIdx === mi && item.tiempoIdx === ti)
+                              .at(-1);
+                            if (!dishRecovery && !ingredientRecovery) return null;
+                            return (
+                              <div className="flex flex-wrap justify-end gap-2 pt-1">
+                                {ingredientRecovery && (
+                                  <button type="button" onClick={() => handleRestoreIngredient(ingredientRecovery.index)} className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold text-emerald-200 bg-emerald-950/40 border border-emerald-700/60 rounded-[6px] hover:bg-emerald-900/50">
+                                    <RotateCcw className="h-3.5 w-3.5" /> Recuperar ingrediente
+                                  </button>
+                                )}
+                                {dishRecovery && (
+                                  <button type="button" onClick={() => handleRestoreDish(dishRecovery.index)} className="flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold text-emerald-200 bg-emerald-950/40 border border-emerald-700/60 rounded-[6px] hover:bg-emerald-900/50">
+                                    <RotateCcw className="h-3.5 w-3.5" /> Recuperar “{dishRecovery.item.nombre}”
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           <div className="relative">
                             <div className="flex gap-2 mt-3">
@@ -1468,9 +1709,10 @@ export const CreateEditPlanForm = ({
                                         onClick={() => {
                                           const d = valData?.barridoEquivalencias?.distribucion;
                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                          const barridoTiempo = valData?.barridoEquivalencias?.tiempos?.find(
-                                            (t: string) => t.toLowerCase().trim() === (tiempo.nombre || '').toLowerCase().trim()
+                                          const barridoTiempoRef = valData?.barridoEquivalencias?.tiempos?.find(
+                                            (t: unknown) => normalizeBarridoTiempo(t) === normalizeBarridoTiempo(tiempo.nombre)
                                           );
+                                          const barridoTiempo = getBarridoTiempoKey(barridoTiempoRef);
                                           const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
 
                                           const ings = p.ingredientes.map((i: any, idx: number) => {
@@ -1557,49 +1799,62 @@ export const CreateEditPlanForm = ({
 
                     <div className="flex-1" />
 
-                    {/* Importar tiempos desde el barrido (los que aún no están en este menú) */}
-                    {(() => {
-                      const barridoTiempos: string[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
-                      if (!barridoTiempos.length) return null;
-                      const existing = new Set(menu.tiempos.map(t => (t.nombre || '').trim().toLowerCase()));
-                      const faltantes = barridoTiempos.filter(bt => !existing.has((bt || '').trim().toLowerCase()));
-                      if (!faltantes.length) return null;
-                      return (
-                        <div className="mt-4 p-3 rounded-[8px] border border-[#2a2a2a] bg-[#0f1620]">
-                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 mb-2">
-                            Importar de barrido
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {faltantes.map((nombre) => (
-                              <button
-                                key={nombre}
-                                type="button"
-                                onClick={() => updateMenu(mi, (m) => ({
-                                  ...m,
-                                  tiempos: [...m.tiempos, { nombre: nombre.toUpperCase(), ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' }]
-                                }))}
-                                className="flex items-center gap-1 text-[11px] font-bold text-[#90c2ff] bg-[#1a2640] hover:bg-[#22324f] border border-[#3a5680] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
-                                title={`Agregar "${nombre}" desde el barrido`}
-                              >
-                                <Plus className="w-3 h-3" /> {nombre}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
-
-                    <button
-                      onClick={() => updateMenu(mi, (m) => ({
-                        ...m, tiempos: [...m.tiempos, { nombre: 'Nuevo Tiempo', ingredientes: [], nota: '' }]
-                      }))}
-                      className="w-full py-3 mt-4 border border-dashed border-[#333] hover:border-text-secondary rounded-[8px] text-[13px] font-medium text-[#8a8a8a] hover:text-white transition-colors"
-                    >
-                      + Agregar Tiempo de Comida
-                    </button>
                   </div>
                 </div>
               ))}
+
+              <div className="md:col-span-2 flex flex-col items-end gap-3 pt-1">
+                {(() => {
+                  const barridoTiempos: unknown[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
+                  if (!barridoTiempos.length) return null;
+                  const referenceTimes = menus[0]?.tiempos || [];
+                  const existing = new Set(referenceTimes.map(t => normalizeBarridoTiempo(t.nombre)));
+                  const faltantes = barridoTiempos.filter(bt => !existing.has(normalizeBarridoTiempo(bt)));
+                  if (!faltantes.length) return null;
+
+                  return (
+                    <div className="w-full sm:w-auto p-3 rounded-[8px] border border-[#2a2a2a] bg-[#0f1620]">
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 mb-2">Importar de barrido en ambos menús</p>
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {faltantes.map((tiempoRef) => {
+                          const nombre = getBarridoTiempoNombre(tiempoRef);
+                          return (
+                            <button
+                              key={getBarridoTiempoKey(tiempoRef)}
+                              type="button"
+                              onClick={() => handleAppendMealTime(formatMealTimeName(nombre))}
+                              className="flex items-center gap-1 text-[11px] font-bold text-[#90c2ff] bg-[#1a2640] hover:bg-[#22324f] border border-[#3a5680] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
+                              title={`Agregar "${nombre}" a ambos menús`}
+                            >
+                              <Plus className="w-3 h-3" /> {nombre}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  {removedMealTimes.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleRestoreMealTime}
+                      className="flex items-center gap-2 px-4 py-3 text-[12px] font-bold text-emerald-200 bg-emerald-950/40 hover:bg-emerald-900/50 border border-emerald-700/60 rounded-[8px] transition-colors"
+                    >
+                      <RotateCcw className="h-4 w-4" />
+                      Recuperar “{removedMealTimes.at(-1)?.label}”
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleAppendMealTime()}
+                    className="flex items-center gap-2 px-5 py-3 border border-dashed border-[#555] hover:border-brand-primary bg-[#151515] rounded-[8px] text-[13px] font-semibold text-[#b0b0b0] hover:text-white transition-colors"
+                  >
+                    <Plus className="h-4 w-4" /> Agregar tiempo de comida
+                  </button>
+                </div>
+              </div>
             </div>
           </div>{/* closes flex-1 main col */}
 
@@ -1612,11 +1867,28 @@ export const CreateEditPlanForm = ({
               </div>
 
               <div className="space-y-2">
+                {/* Información prioritaria antes de elaborar el menú */}
+                <SidebarSeccion titulo="Alimentos a evitar / No consume">
+                  {alimentosAEvitar.length > 0 ? (
+                    <ul className="space-y-1">
+                      {alimentosAEvitar.map((alimento, index) => (
+                        <li key={`${alimento}-${index}`} className="text-[12px] text-red-300 flex items-start gap-1.5 break-words">
+                          <span className="mt-0.5 shrink-0 text-red-500">✕</span>
+                          <span>{alimento}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-[#666] italic">Sin información registrada.</p>
+                  )}
+                </SidebarSeccion>
+
                 {/* Número de comidas */}
                 {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
                   <SidebarSeccion titulo="Número de comidas">
                     <p className="text-[12px] font-bold text-white leading-snug">
-                      {valData.barridoEquivalencias.tiempos.length} tiempos: {valData.barridoEquivalencias.tiempos.join(', ')}
+                      {valData.barridoEquivalencias.tiempos.length} tiempos:{' '}
+                      {valData.barridoEquivalencias.tiempos.map(getBarridoTiempoNombre).join(', ')}
                     </p>
                   </SidebarSeccion>
                 )}
@@ -1654,19 +1926,6 @@ export const CreateEditPlanForm = ({
                   </SidebarSeccion>
                 )}
 
-                {/* Alimentos a evitar */}
-                {Array.isArray(valData?.evitar) && valData.evitar.filter((e: any) => e?.valor?.trim()).length > 0 && (
-                  <SidebarSeccion titulo="Alimentos a evitar">
-                    <ul className="space-y-1">
-                      {valData.evitar.filter((e: any) => e?.valor?.trim()).map((e: any, i: number) => (
-                        <li key={i} className="text-[12px] text-red-300 flex items-start gap-1.5">
-                          <span className="mt-0.5 shrink-0 text-red-500">✕</span> {e.valor}
-                        </li>
-                      ))}
-                    </ul>
-                  </SidebarSeccion>
-                )}
-
                 {/* Patología */}
                 {pacienteInfo?.antecedentes?.patologia && (
                   <SidebarSeccion titulo="Patología"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p></SidebarSeccion>
@@ -1692,11 +1951,6 @@ export const CreateEditPlanForm = ({
                 {/* Alergias */}
                 {pacienteInfo?.antecedentes?.alergias && (
                   <SidebarSeccion titulo="Alergias"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p></SidebarSeccion>
-                )}
-
-                {/* No consume / no le gustan */}
-                {pacienteInfo?.antecedentes?.alimentosNoGustan && (
-                  <SidebarSeccion titulo="No consume / No le gustan"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosNoGustan}</p></SidebarSeccion>
                 )}
 
                 {/* Ciclo menstrual */}
@@ -1756,35 +2010,10 @@ export const CreateEditPlanForm = ({
                   </SidebarSeccion>
                 )}
 
-                {/* Notas libres / lineamientos */}
+                {/* Notas de entrenamiento */}
                 {valData?.notasLibres && (
-                  <SidebarSeccion titulo="Notas Libres / Lineamientos">
+                  <SidebarSeccion titulo="Notas de Entrenamiento">
                     <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.notasLibres}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Recordatorio 24 horas */}
-                {pacienteInfo?.habitos && Object.values(pacienteInfo.habitos).some((v: any) => v?.hora || v?.ayer || v?.usualmente) && (
-                  <SidebarSeccion titulo="Recordatorio 24 Horas">
-                    <div className="space-y-1.5 mt-1">
-                      {([
-                        { key: 'desayuno', label: 'Desayuno' },
-                        { key: 'colacion1', label: 'Colación 1' },
-                        { key: 'almuerzo', label: 'Comida' },
-                        { key: 'colacion2', label: 'Colación 2' },
-                        { key: 'cena', label: 'Cena' },
-                      ] as { key: string; label: string }[]).map(({ key, label }) => {
-                        const row = pacienteInfo.habitos[key];
-                        if (!row?.hora && !row?.ayer && !row?.usualmente) return null;
-                        return (
-                          <div key={key} className="border-l-2 border-[#2a2a2a] pl-2">
-                            <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-wider">{label}{row?.hora ? ` · ${row.hora}` : ''}</p>
-                            {row?.usualmente && <p className="text-[12px] text-[#e0e0e0]">{row.usualmente}</p>}
-                            {row?.ayer && !row?.usualmente && <p className="text-[12px] text-[#c0c0c0]">{row.ayer}</p>}
-                          </div>
-                        );
-                      })}
-                    </div>
                   </SidebarSeccion>
                 )}
               </div>
