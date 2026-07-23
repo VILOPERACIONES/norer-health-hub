@@ -4,7 +4,10 @@ import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, 
 import { useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import BarridosEquivalenciasManager, {
+  getBarridoVariantes,
+  type BarridoCollection,
+} from '@/components/BarridosEquivalenciasManager';
 import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
@@ -86,7 +89,7 @@ const NewAssessment = () => {
   const [evitar, setEvitar] = useState<{ id: string; valor: string }[]>([]);
   const [competencia, setCompetencia] = useState<{ antes: string; durante: string; despues: string }>({ antes: '', durante: '', despues: '' });
   const [showCompetencia, setShowCompetencia] = useState(false);
-  const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
+  const [barridoData, setBarridoData] = useState<BarridoCollection | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
   const [proximaSesion, setProximaSesion] = useState('');
   const [showScheduling, setShowScheduling] = useState(false);
@@ -739,7 +742,7 @@ const NewAssessment = () => {
         toast({ title: 'Valoración guardada correctamente' });
       }
 
-      if (valoracionResId && barridoData && barridoData.kcalTotal > 0) {
+      if (valoracionResId && barridoData && getBarridoVariantes(barridoData).some(item => item.kcalTotal > 0)) {
         try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch { }
       }
 
@@ -1599,7 +1602,10 @@ const NewAssessment = () => {
 
               <div className="bg-[#111111] px-5 py-4 rounded-[16px] border border-[#2a2a2a] shadow-none flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                 <div className="-mx-4 md:mx-0">
-                  <BarridoEquivalenciasComp value={barridoData} onChange={(data) => setBarridoData(data)} />
+                  <BarridosEquivalenciasManager
+                    value={barridoData}
+                    onChange={(data) => setBarridoData(data)}
+                  />
                 </div>
               </div>
             </div>

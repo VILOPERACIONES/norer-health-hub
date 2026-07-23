@@ -8,7 +8,13 @@ import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
-import BarridoEquivalenciasComp, { normalizeBarridoData, type BarridoData, type BarridoTiempo } from '@/components/BarridoEquivalencias';
+import { normalizeBarridoData, type BarridoData, type BarridoTiempo } from '@/components/BarridoEquivalencias';
+import BarridosEquivalenciasManager, {
+  buildBarridoCollection,
+  getBarridoVariantes,
+  type BarridoCollection,
+  type BarridoVariante,
+} from '@/components/BarridosEquivalenciasManager';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 import { formatMealTimeName } from '@/lib/mealTimes';
 import { buildAvoidFoods } from '@/lib/avoidFoods';
@@ -25,6 +31,8 @@ const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Col
 
 const emptyMenu = (name: string): Menu => ({
   nombre: name,
+  tipoContenido: 'platillos',
+  barridoEquivalencias: null,
   tiempos: defaultTiempos.map((t) => ({ nombre: t, ingredientes: [], nota: '', bebida: '', suplTiempo: '', suplNotas: '', ademas: '' })),
 });
 
@@ -133,9 +141,17 @@ export const CreateEditPlanForm = ({
   const sortByOrden = <T extends { orden?: number }>(arr: T[]): T[] =>
     arr.map((item, idx) => ({ item, idx })).sort((a, b) => (a.item.orden ?? a.idx + 1) - (b.item.orden ?? b.idx + 1)).map(({ item }) => item);
 
-  const mapMenusFromBackend = (backendMenus: any[]) => {
+  const mapMenusFromBackend = (backendMenus: any[]): Menu[] => {
     return (backendMenus ? sortByOrden(backendMenus) : backendMenus)?.map((m: any) => ({
       nombre: m.nombre,
+      tipoContenido: (m.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos') as Menu['tipoContenido'],
+      barridoEquivalencias: m.barridoEquivalencias
+        ? {
+            ...normalizeBarridoData(m.barridoEquivalencias),
+            id: m.barridoEquivalencias.id || 'principal',
+            nombre: m.barridoEquivalencias.nombre || 'Barrido 1',
+          }
+        : null,
       tiempos: sortByOrden(m.tiemposComida || m.tiempos || []).map((t: any) => {
         // Parse metadata encoded in notaPie (fallback until backend adds columns)
         const rawNote = t.notaPie || t.nota || '';
@@ -304,7 +320,9 @@ export const CreateEditPlanForm = ({
             try { barrido = JSON.parse(barrido); } catch (e) { }
           }
 
-          const normalizedBarrido = barrido ? normalizeBarridoData(barrido) : barrido;
+          const normalizedBarrido = barrido
+            ? buildBarridoCollection(getBarridoVariantes(barrido))
+            : barrido;
           setValData({ ...v, barridoEquivalencias: normalizedBarrido });
           // Siempre actualizar el último peso para los cálculos de G/kg (incluso en Edit)
           setPesoUltimo(v.peso || 0);
@@ -329,9 +347,10 @@ export const CreateEditPlanForm = ({
                 nota: ''
               }));
               if (assessmentTiempos.length > 0) {
+                const primaryBarrido = normalizedBarrido ? getBarridoVariantes(normalizedBarrido)[0] : null;
                 setMenus([
-                  { nombre: 'Menú 1', tiempos: assessmentTiempos },
-                  { nombre: 'Menú 2', tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
+                  { nombre: 'Menú 1', tipoContenido: 'platillos', barridoEquivalencias: primaryBarrido, tiempos: assessmentTiempos },
+                  { nombre: 'Menú 2', tipoContenido: 'platillos', barridoEquivalencias: primaryBarrido ? JSON.parse(JSON.stringify(primaryBarrido)) : null, tiempos: JSON.parse(JSON.stringify(assessmentTiempos)) }
                 ]);
               }
             }
@@ -532,17 +551,22 @@ export const CreateEditPlanForm = ({
     return undefined;
   };
 
-  const autoScaleIngredients = (nextBarridoData: BarridoData) => {
-    if (!nextBarridoData?.distribucion) return;
+  const autoScaleIngredients = (nextBarridoData: BarridoCollection | BarridoData) => {
+    const variants = getBarridoVariantes(nextBarridoData);
+    if (!variants.length) return;
 
 
     const getBarridoKey = (grupo: string) => groupToBarridoKey(normalizeGroup(grupo));
 
 
-    setMenus(prevMenus => prevMenus.map(menu => ({
+    setMenus(prevMenus => prevMenus.map(menu => {
+      const assignedId = String(menu.barridoEquivalencias?.id || 'principal');
+      const assignedBarrido = variants.find(item => item.id === assignedId) || variants[0];
+      return {
       ...menu,
+      barridoEquivalencias: assignedBarrido,
       tiempos: menu.tiempos.map((tiempo, tIdx) => {
-        const barridoTiempoKey = findBarridoTiempo(nextBarridoData.tiempos, menu.tiempos, tIdx)?.id;
+        const barridoTiempoKey = findBarridoTiempo(assignedBarrido.tiempos, menu.tiempos, tIdx)?.id;
 
         if (!barridoTiempoKey) return tiempo;
 
@@ -551,7 +575,7 @@ export const CreateEditPlanForm = ({
           ingredientes: tiempo.ingredientes.map(ing => {
             if (ing.platillo && ing.eqGrupo) {
               const bKey = getBarridoKey(ing.eqGrupo);
-              const assignedEq = nextBarridoData.distribucion[barridoTiempoKey]?.[bKey] || 0;
+              const assignedEq = Number(assignedBarrido.distribucion[barridoTiempoKey]?.[bKey]) || 0;
 
               if (assignedEq >= 0) {
                 // EXCEPCIÓN: Si es verdura y el barrido le asignó 0 (libre), no la desaparecemos a 0. 
@@ -571,12 +595,41 @@ export const CreateEditPlanForm = ({
           })
         };
       })
-    })));
+    };
+    }));
   };
 
 
   const updateMenu = (menuIdx: number, fn: (m: Menu) => Menu) => {
-    setMenus(menus.map((m, i) => i === menuIdx ? fn({ ...m }) : m));
+    setMenus(current => current.map((m, i) => i === menuIdx ? fn({ ...m }) : m));
+  };
+
+  const setMenuContentType = (menuIdx: number, tipoContenido: 'platillos' | 'equivalencias') => {
+    updateMenu(menuIdx, menu => {
+      if (tipoContenido === 'platillos') return { ...menu, tipoContenido };
+
+      // Cada menú recibe su propia copia. Editar el barrido del Menú #1 no
+      // modifica el del Menú #2 ni el barrido maestro de la valoración.
+      const source = menu.barridoEquivalencias
+        || getBarridoVariantes(valData?.barridoEquivalencias)[0]
+        || null;
+      return {
+        ...menu,
+        tipoContenido,
+        barridoEquivalencias: {
+          ...normalizeBarridoData(source ? JSON.parse(JSON.stringify(source)) : null),
+          id: source?.id || 'principal',
+          nombre: source?.nombre || 'Barrido 1',
+        },
+      };
+    });
+  };
+
+  const assignBarridoToMenu = (menuIdx: number, variant: BarridoVariante) => {
+    updateMenu(menuIdx, menu => ({
+      ...menu,
+      barridoEquivalencias: JSON.parse(JSON.stringify(variant)),
+    }));
   };
 
   const updateTiempo = (menuIdx: number, tiempoIdx: number, fn: (t: TiempoComida) => TiempoComida) => {
@@ -673,8 +726,8 @@ export const CreateEditPlanForm = ({
   };
 
   // ─── Presupuesto de equivalencias por tiempo (del barrido) ──────────────────
-  const getBudgetForTiempo = (tiempo: TiempoComida, planTiempos?: TiempoComida[], tiempoIdx?: number): { label: string; groupKey: string; used: number; budget: number; missing: number; isExtra?: boolean }[] => {
-    const barridoData = valData?.barridoEquivalencias;
+  const getBudgetForTiempo = (tiempo: TiempoComida, planTiempos?: TiempoComida[], tiempoIdx?: number, assignedBarrido?: any): { label: string; groupKey: string; used: number; budget: number; missing: number; isExtra?: boolean }[] => {
+    const barridoData = assignedBarrido || getBarridoVariantes(valData?.barridoEquivalencias)[0];
     if (!barridoData?.tiempos || !barridoData?.distribucion) return [];
 
     // Con contexto del menú usamos matching por ocurrencia (soporta dos "Colación")
@@ -789,6 +842,8 @@ export const CreateEditPlanForm = ({
       menus: menusToSave.map((m, mIdx) => ({
         nombre: m.nombre,
         orden: mIdx + 1,
+        tipoContenido: m.tipoContenido === 'equivalencias' ? 'equivalencias' : 'platillos',
+        barridoEquivalencias: m.barridoEquivalencias || null,
         tiemposComida: m.tiempos.map((t, tIdx) => {
           let injectedNota = t.nota || '';
           if (t.ademas && t.ademas.trim()) {
@@ -796,10 +851,16 @@ export const CreateEditPlanForm = ({
           }
           return {
             nombre: t.nombre,
-            barridoTiempoId: t.barridoTiempoId
-              || (valData?.barridoEquivalencias?.tiempos
-                ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, m.tiempos, tIdx)?.id
+            barridoTiempoId: ((m.barridoEquivalencias?.tiempos
+                || getBarridoVariantes(valData?.barridoEquivalencias)[0]?.tiempos)
+                ? findBarridoTiempo(
+                    (m.barridoEquivalencias?.tiempos
+                      || getBarridoVariantes(valData?.barridoEquivalencias)[0]?.tiempos) as BarridoTiempo[],
+                    m.tiempos,
+                    tIdx
+                  )?.id
                 : undefined)
+              || t.barridoTiempoId
               || null,
             orden: tIdx + 1,
             notaPie: injectedNota,
@@ -1221,7 +1282,7 @@ export const CreateEditPlanForm = ({
 
                 {showBarridoRef && (
                   <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300">
-                    <BarridoEquivalenciasComp
+                    <BarridosEquivalenciasManager
                       value={valData.barridoEquivalencias}
                       onChange={(data) => {
                         setValData({ ...valData, barridoEquivalencias: data });
@@ -1237,22 +1298,71 @@ export const CreateEditPlanForm = ({
             <div className="grid md:grid-cols-2 gap-8 items-start">
               {menus.map((menu, mi) => (
                 <div key={mi} className="bg-[#111111] rounded-[12px] animate-slide-up border border-[#2a2a2a] flex flex-col h-full ring-1 ring-border-default hover:ring-border-subtle transition-all" style={{ animationDelay: `${mi * 0.1}s` }}>
-                  <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 flex items-center justify-between">
-                    <input
-                      value={menu.nombre}
-                      onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
-                      className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-white selection:bg-brand-primary placeholder:text-[#8a8a8a]"
-                      placeholder="Nombre del menú"
-                    />
-
-                    <div className="flex items-center gap-2">
+                  <div className="bg-[#181818] border-b border-[#2a2a2a] px-6 py-4 space-y-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <input
+                        value={menu.nombre}
+                        onChange={(e) => updateMenu(mi, (m) => ({ ...m, nombre: e.target.value }))}
+                        className="text-[16px] font-semibold bg-transparent border-none outline-none w-full text-white selection:bg-brand-primary placeholder:text-[#8a8a8a]"
+                        placeholder="Nombre del menú"
+                      />
                       <button
                         onClick={() => setMenus(menus.filter((_, i) => i !== mi))}
                         className="p-2 text-[#8a8a8a] hover:text-accent-red hover:bg-[#2e1a1a] rounded-[6px] transition-colors"
+                        title="Eliminar menú"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
+
+                    {!isBasePlan && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-1 rounded-[8px] bg-[#0d0d0d] border border-[#2a2a2a] p-1">
+                          <button
+                            type="button"
+                            onClick={() => setMenuContentType(mi, 'platillos')}
+                            className={`flex-1 px-3 py-2 rounded-[6px] text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                              menu.tipoContenido !== 'equivalencias'
+                                ? 'bg-brand-primary text-white'
+                                : 'text-[#8a8a8a] hover:text-white hover:bg-[#202020]'
+                            }`}
+                          >
+                            Platillos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMenuContentType(mi, 'equivalencias')}
+                            className={`flex-1 px-3 py-2 rounded-[6px] text-[11px] font-bold uppercase tracking-wide transition-colors ${
+                              menu.tipoContenido === 'equivalencias'
+                                ? 'bg-brand-primary text-white'
+                                : 'text-[#8a8a8a] hover:text-white hover:bg-[#202020]'
+                            }`}
+                          >
+                            Solo equivalencias
+                          </button>
+                        </div>
+                        {getBarridoVariantes(valData?.barridoEquivalencias).length > 1 && (
+                          <label className="flex items-center gap-2 rounded-[8px] border border-[#2a2a2a] bg-[#0d0d0d] px-3 py-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-[#8a8a8a]">
+                              Barrido asignado
+                            </span>
+                            <select
+                              value={String(menu.barridoEquivalencias?.id || 'principal')}
+                              onChange={event => {
+                                const selected = getBarridoVariantes(valData?.barridoEquivalencias)
+                                  .find(item => item.id === event.target.value);
+                                if (selected) assignBarridoToMenu(mi, selected);
+                              }}
+                              className="ml-auto rounded-[6px] border border-[#333] bg-[#181818] px-2 py-1.5 text-[11px] font-semibold text-white outline-none"
+                            >
+                              {getBarridoVariantes(valData?.barridoEquivalencias).map(variant => (
+                                <option key={variant.id} value={variant.id}>{variant.nombre}</option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-6 space-y-6 flex-1 flex flex-col">
@@ -1360,7 +1470,7 @@ export const CreateEditPlanForm = ({
                         {/* ─── Panel Presupuesto Colapsable ─── */}
                         {(() => {
                           const budgetKey = `${mi}-${ti}`;
-                          const budgetItems = getBudgetForTiempo(tiempo, menu.tiempos, ti);
+                          const budgetItems = getBudgetForTiempo(tiempo, menu.tiempos, ti, menu.barridoEquivalencias);
                           if (budgetItems.length === 0) return null;
                           const isOpen = showBudgetMap[budgetKey] !== false; // Abierto por defecto
                           return (
@@ -1567,7 +1677,7 @@ export const CreateEditPlanForm = ({
                                         <SmaeIngredientePicker
                                           ingrediente={ing}
                                           index={ii}
-                                          gapByGroup={getBudgetForTiempo(tiempo, menu.tiempos, ti).reduce((acc, b) => ({ ...acc, [b.groupKey]: b.missing > 0 ? b.missing : 0 }), {} as Record<string, number>)}
+                                          gapByGroup={getBudgetForTiempo(tiempo, menu.tiempos, ti, menu.barridoEquivalencias).reduce((acc, b) => ({ ...acc, [b.groupKey]: b.missing > 0 ? b.missing : 0 }), {} as Record<string, number>)}
                                           onUpdate={(updates) =>
                                             updateTiempo(mi, ti, (t) => ({
                                               ...t,
@@ -1722,10 +1832,12 @@ export const CreateEditPlanForm = ({
                                       <button
                                         key={p.id}
                                         onClick={() => {
-                                          const d = valData?.barridoEquivalencias?.distribucion;
+                                          const assignedMenuBarrido = menu.barridoEquivalencias
+                                            || getBarridoVariantes(valData?.barridoEquivalencias)[0];
+                                          const d = assignedMenuBarrido?.distribucion;
                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                          const barridoTiempo = valData?.barridoEquivalencias?.tiempos
-                                            ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, menu.tiempos, ti)
+                                          const barridoTiempo = assignedMenuBarrido?.tiempos
+                                            ? findBarridoTiempo(assignedMenuBarrido.tiempos, menu.tiempos, ti)
                                             : undefined;
                                           const distTiempo = d && barridoTiempo ? d[barridoTiempo.id] : null;
 
