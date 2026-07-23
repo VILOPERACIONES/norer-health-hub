@@ -8,7 +8,7 @@ import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
-import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import BarridoEquivalenciasComp, { normalizeBarridoData, type BarridoData, type BarridoTiempo } from '@/components/BarridoEquivalencias';
 import { normalizeGroup, groupToBarridoKey, SMAE_GROUP_LABELS, CANONICAL_TO_BARRIDO_KEY } from '@/lib/smaeGroups';
 import { formatMealTimeName } from '@/lib/mealTimes';
 import { buildAvoidFoods } from '@/lib/avoidFoods';
@@ -161,6 +161,7 @@ export const CreateEditPlanForm = ({
         const bebidaFinal = (isThisNonMain && rawBebida === 'Agua natural 500ml') ? '' : rawBebida;
         return {
           nombre: formatMealTimeName(t.nombre),
+          barridoTiempoId: t.barridoTiempoId || undefined,
           nota,
           bebida: bebidaFinal,
           suplTiempo: t.suplTiempo || metaSuplTiempo,
@@ -303,7 +304,8 @@ export const CreateEditPlanForm = ({
             try { barrido = JSON.parse(barrido); } catch (e) { }
           }
 
-          setValData({ ...v, barridoEquivalencias: barrido });
+          const normalizedBarrido = barrido ? normalizeBarridoData(barrido) : barrido;
+          setValData({ ...v, barridoEquivalencias: normalizedBarrido });
           // Siempre actualizar el último peso para los cálculos de G/kg (incluso en Edit)
           setPesoUltimo(v.peso || 0);
 
@@ -319,9 +321,10 @@ export const CreateEditPlanForm = ({
             });
             if (v.getSedentario) setCalorias(Math.round(v.getSedentario).toString());
 
-            if (barrido?.tiempos?.length > 0) {
-              const assessmentTiempos = barrido.tiempos.map((t: unknown) => ({
-                nombre: formatMealTimeName(getBarridoTiempoNombre(t)),
+            if (normalizedBarrido?.tiempos?.length > 0) {
+              const assessmentTiempos = normalizedBarrido.tiempos.map((t: BarridoTiempo) => ({
+                barridoTiempoId: t.id,
+                nombre: formatMealTimeName(t.nombre),
                 ingredientes: [],
                 nota: ''
               }));
@@ -509,18 +512,22 @@ export const CreateEditPlanForm = ({
   const normalizeBarridoTiempo = (tiempo: unknown): string =>
     getBarridoTiempoNombre(tiempo).toLowerCase().trim();
 
-  const findBarridoTiempoKey = (barridoTiempos: unknown[], planTiempos: { nombre?: string }[], tiempoIdx: number): string | undefined => {
-    const norm = normalizeBarridoTiempo;
-    const name = norm(planTiempos[tiempoIdx]?.nombre);
+  const findBarridoTiempo = (barridoTiempos: BarridoTiempo[], planTiempos: TiempoComida[], tiempoIdx: number): BarridoTiempo | undefined => {
+    const norm = (s?: string) => (s || '').toLowerCase().trim();
+    const planTiempo = planTiempos[tiempoIdx];
+    if (planTiempo?.barridoTiempoId) {
+      const byId = barridoTiempos.find(t => t.id === planTiempo.barridoTiempoId);
+      if (byId) return byId;
+    }
+    const name = norm(planTiempo?.nombre);
     if (!name) return undefined;
     const occurrence = planTiempos.slice(0, tiempoIdx).filter(t => norm(t.nombre) === name).length;
-    const candidates = barridoTiempos.filter(t => norm(t) === name);
-    if (candidates[occurrence]) return getBarridoTiempoKey(candidates[occurrence]);
-    // 2da+ ocurrencia (ej. segunda "Colación") puede estar como columna "Colación 2" en el barrido
+    const candidates = barridoTiempos.filter(t => norm(t.nombre) === name);
+    if (candidates[occurrence]) return candidates[occurrence];
+    // Compatibilidad defensiva si un barrido histórico llega sin normalizar.
     if (occurrence > 0) {
       const altName = `${name} ${occurrence + 1}`;
-      const alternate = barridoTiempos.find(t => norm(t) === altName);
-      return alternate ? getBarridoTiempoKey(alternate) : undefined;
+      return barridoTiempos.find(t => norm(t.nombre) === altName);
     }
     return undefined;
   };
@@ -535,7 +542,7 @@ export const CreateEditPlanForm = ({
     setMenus(prevMenus => prevMenus.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map((tiempo, tIdx) => {
-        const barridoTiempoKey = findBarridoTiempoKey(nextBarridoData.tiempos, menu.tiempos, tIdx);
+        const barridoTiempoKey = findBarridoTiempo(nextBarridoData.tiempos, menu.tiempos, tIdx)?.id;
 
         if (!barridoTiempoKey) return tiempo;
 
@@ -672,10 +679,13 @@ export const CreateEditPlanForm = ({
 
     // Con contexto del menú usamos matching por ocurrencia (soporta dos "Colación")
     const barridoTiempoKey = (planTiempos && tiempoIdx !== undefined)
-      ? findBarridoTiempoKey(barridoData.tiempos, planTiempos, tiempoIdx)
-      : getBarridoTiempoKey(barridoData.tiempos.find(
-        (t: unknown) => normalizeBarridoTiempo(t) === normalizeBarridoTiempo(tiempo.nombre)
-      ));
+      ? findBarridoTiempo(barridoData.tiempos, planTiempos, tiempoIdx)?.id
+      : (
+        barridoData.tiempos.find((t: BarridoTiempo) => t.id === tiempo.barridoTiempoId)?.id
+        || barridoData.tiempos.find(
+          (t: BarridoTiempo) => normalizeBarridoTiempo(t) === normalizeBarridoTiempo(tiempo.nombre)
+        )?.id
+      );
     if (!barridoTiempoKey) return [];
     const dist = barridoData.distribucion[barridoTiempoKey] || {};
 
@@ -786,6 +796,11 @@ export const CreateEditPlanForm = ({
           }
           return {
             nombre: t.nombre,
+            barridoTiempoId: t.barridoTiempoId
+              || (valData?.barridoEquivalencias?.tiempos
+                ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, m.tiempos, tIdx)?.id
+                : undefined)
+              || null,
             orden: tIdx + 1,
             notaPie: injectedNota,
             bebida: t.bebida || '',
@@ -871,8 +886,8 @@ export const CreateEditPlanForm = ({
     toast({ title: 'TIEMPO RECUPERADO', description: 'Se agregó al final de ambos menús. Puedes arrastrarlo a cualquier posición.' });
   };
 
-  const handleAppendMealTime = (nombre = 'Nuevo tiempo') => {
-    setMenus(prev => appendMealTimeToMenus(prev, nombre));
+  const handleAppendMealTime = (nombre = 'Nuevo tiempo', barridoTiempoId?: string) => {
+    setMenus(prev => appendMealTimeToMenus(prev, nombre, barridoTiempoId));
   };
 
   const handleRemoveDish = async (menuIdx: number, tiempoIdx: number, nombre: string) => {
@@ -1709,11 +1724,10 @@ export const CreateEditPlanForm = ({
                                         onClick={() => {
                                           const d = valData?.barridoEquivalencias?.distribucion;
                                           // Encontrar el tiempo del barrido que coincide con este tiempo de comida
-                                          const barridoTiempoRef = valData?.barridoEquivalencias?.tiempos?.find(
-                                            (t: unknown) => normalizeBarridoTiempo(t) === normalizeBarridoTiempo(tiempo.nombre)
-                                          );
-                                          const barridoTiempo = getBarridoTiempoKey(barridoTiempoRef);
-                                          const distTiempo = d && barridoTiempo ? d[barridoTiempo] : null;
+                                          const barridoTiempo = valData?.barridoEquivalencias?.tiempos
+                                            ? findBarridoTiempo(valData.barridoEquivalencias.tiempos, menu.tiempos, ti)
+                                            : undefined;
+                                          const distTiempo = d && barridoTiempo ? d[barridoTiempo.id] : null;
 
                                           const ings = p.ingredientes.map((i: any, idx: number) => {
                                             let scaledCant = Number(i.cantidad);
@@ -1805,11 +1819,13 @@ export const CreateEditPlanForm = ({
 
               <div className="md:col-span-2 flex flex-col items-end gap-3 pt-1">
                 {(() => {
-                  const barridoTiempos: unknown[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
+                  const barridoTiempos: BarridoTiempo[] = valData?.barridoEquivalencias?.tiempos || valData?.barrido?.tiempos || [];
                   if (!barridoTiempos.length) return null;
                   const referenceTimes = menus[0]?.tiempos || [];
-                  const existing = new Set(referenceTimes.map(t => normalizeBarridoTiempo(t.nombre)));
-                  const faltantes = barridoTiempos.filter(bt => !existing.has(normalizeBarridoTiempo(bt)));
+                  const existingIds = new Set(referenceTimes.map((tiempo, index) => (
+                    tiempo.barridoTiempoId || findBarridoTiempo(barridoTiempos, referenceTimes, index)?.id
+                  )).filter(Boolean));
+                  const faltantes = barridoTiempos.filter(tiempo => !existingIds.has(tiempo.id));
                   if (!faltantes.length) return null;
 
                   return (
@@ -1817,12 +1833,12 @@ export const CreateEditPlanForm = ({
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0 mb-2">Importar de barrido en ambos menús</p>
                       <div className="flex flex-wrap justify-end gap-2">
                         {faltantes.map((tiempoRef) => {
-                          const nombre = getBarridoTiempoNombre(tiempoRef);
+                          const nombre = tiempoRef.nombre;
                           return (
                             <button
                               key={getBarridoTiempoKey(tiempoRef)}
                               type="button"
-                              onClick={() => handleAppendMealTime(formatMealTimeName(nombre))}
+                              onClick={() => handleAppendMealTime(formatMealTimeName(nombre), tiempoRef.id)}
                               className="flex items-center gap-1 text-[11px] font-bold text-[#90c2ff] bg-[#1a2640] hover:bg-[#22324f] border border-[#3a5680] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors"
                               title={`Agregar "${nombre}" a ambos menús`}
                             >

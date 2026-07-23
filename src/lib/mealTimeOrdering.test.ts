@@ -36,7 +36,8 @@ describe('mealTimeOrdering', () => {
   });
 
   it('crea el tiempo nuevo alineado en todos los menús', () => {
-    const result = appendMealTimeToMenus(menusFixture(), 'Nuevo tiempo');
+    const result = appendMealTimeToMenus(menusFixture(), 'Nuevo tiempo', 'tiempo-nuevo');
     expect(result.every((menu) => menu.tiempos.at(-1)?.nombre === 'Nuevo tiempo')).toBe(true);
+    expect(result.every((menu) => menu.tiempos.at(-1)?.barridoTiempoId === 'tiempo-nuevo')).toBe(true);
   });
 });

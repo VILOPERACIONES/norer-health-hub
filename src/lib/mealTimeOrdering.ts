@@ -6,7 +6,8 @@ export type RemovedMealTime = {
   tiempos: Array<TiempoComida | null>;
 };
 
-export const createEmptyMealTime = (nombre: string): TiempoComida => ({
+export const createEmptyMealTime = (nombre: string, barridoTiempoId?: string): TiempoComida => ({
+  barridoTiempoId,
   nombre,
   ingredientes: [],
   nota: '',
@@ -55,8 +56,8 @@ export const restoreMealTimeToMenus = (menus: Menu[], removed: RemovedMealTime):
     ],
   }));
 
-export const appendMealTimeToMenus = (menus: Menu[], nombre: string): Menu[] =>
+export const appendMealTimeToMenus = (menus: Menu[], nombre: string, barridoTiempoId?: string): Menu[] =>
   menus.map((menu) => ({
     ...menu,
-    tiempos: [...menu.tiempos, createEmptyMealTime(nombre)],
+    tiempos: [...menu.tiempos, createEmptyMealTime(nombre, barridoTiempoId)],
   }));
