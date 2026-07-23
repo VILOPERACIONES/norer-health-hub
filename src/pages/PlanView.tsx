@@ -9,6 +9,7 @@ import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { formatMealTimeName } from '@/lib/mealTimes';
+import { getMenuTimesForDisplay } from '@/lib/menuEquivalencias';
 import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
 import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
@@ -40,9 +41,14 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                         tiemposCount: (m.tiemposComida || m.tiempos || []).length,
                     }))));
 
-                    serverData.menus = serverData.menus?.map((m: any) => ({
+                    serverData.menus = serverData.menus?.map((m: any) => {
+                        const displayTimes = getMenuTimesForDisplay({
+                            ...m,
+                            tiempos: m.tiemposComida || m.tiempos || [],
+                        });
+                        return {
                         ...m,
-                        tiempos: (m.tiemposComida || m.tiempos || []).map((t: any) => {
+                        tiempos: displayTimes.map((t: any) => {
                             // Parse metadata encoded in notaPie (fallback until backend adds columns)
                             const rawNote = t.notaPie || t.nota || '';
                             let nota = rawNote;
@@ -73,7 +79,8 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                                 }))
                             };
                         })
-                    })) || [];
+                    };
+                    }) || [];
 
                     // Siempre sincronizar suplementosDetalle desde la valoración enlazada
                     // para que cambios en el toggle de la valoración se reflejen aquí

@@ -206,6 +206,10 @@ export interface Menu {
   id?: string;
   nombre: string;
   orden?: number;
+  /** El flujo normal sigue siendo platillos; equivalencias se activa por menú. */
+  tipoContenido?: 'platillos' | 'equivalencias';
+  /** Snapshot independiente del barrido usado por este menú. */
+  barridoEquivalencias?: Record<string, any> | null;
   tiempos: TiempoComida[];
   tiemposComida?: TiempoComida[]; // Soporte para data bruta de backend
 }

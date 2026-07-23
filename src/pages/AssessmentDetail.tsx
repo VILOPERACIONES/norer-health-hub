@@ -5,7 +5,10 @@ import api from '@/lib/api';
 import CalcomScheduling from '@/components/CalcomScheduling';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
-import BarridoEquivalenciasComp, { type BarridoData } from '@/components/BarridoEquivalencias';
+import BarridosEquivalenciasManager, {
+  getBarridoVariantes,
+  type BarridoCollection,
+} from '@/components/BarridosEquivalenciasManager';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AppointmentSummary } from '@/components/AppointmentSummary';
@@ -155,7 +158,7 @@ const AssessmentDetail = () => {
   const [pacienteCitas, setPacienteCitas] = useState<any[]>([]);
 
   // Barrido: estado controlado por el padre, se pasa al componente compartido
-  const [barridoData, setBarridoData] = useState<BarridoData | null>(null);
+  const [barridoData, setBarridoData] = useState<BarridoCollection | null>(null);
   const [initialBarridoData, setInitialBarridoData] = useState<string | null>(null);
   const [showBarrido, setShowBarrido] = useState(true);
   const [savingBarrido, setSavingBarrido] = useState(false);
@@ -195,7 +198,7 @@ const AssessmentDetail = () => {
           const br = await api.get(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`);
           const bd = br.data?.data || br.data;
           if (bd && (bd.tiempos || bd.kcalTotal)) {
-            setBarridoData(bd as BarridoData);
+            setBarridoData(bd as BarridoCollection);
             setInitialBarridoData(JSON.stringify(bd));
           }
         } catch {
@@ -660,20 +663,22 @@ const AssessmentDetail = () => {
 
         {showBarrido && (
           <div className="p-6 border-t border-border-subtle animate-fade-in space-y-4">
-            <BarridoEquivalenciasComp
+            <BarridosEquivalenciasManager
               value={barridoData}
               onChange={(data) => setBarridoData(data)}
             />
             {/* Botón "Guardar barrido" separado — POST upsert */}
             <div className="flex items-center justify-between pt-4 mt-2 border-t border-border-subtle">
               <div className="text-[12px] text-accent-red font-medium">
-                {barridoData?.isValid === false && (
+                {barridoData && getBarridoVariantes(barridoData).some(item => item.isValid === false) && (
                   <span className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> La distribución de comidas no de cuadra con las porciones planeadas.</span>
                 )}
               </div>
               <button
                 onClick={handleGuardarBarrido}
-                disabled={savingBarrido || barridoData?.isValid === false || JSON.stringify(barridoData) === initialBarridoData}
+                disabled={savingBarrido
+                  || (!!barridoData && getBarridoVariantes(barridoData).some(item => item.isValid === false))
+                  || JSON.stringify(barridoData) === initialBarridoData}
                 className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {savingBarrido ? (
