@@ -346,6 +346,7 @@ const AssessmentDetail = () => {
     if (val.medicionesEstado?.[key] === 'NO_APLICA') return 'No aplica';
     return value != null && value !== '' ? `${value}${unit}` : '—';
   };
+  const isOnlineAssessment = val.medicionesEstado?.consultaEnLinea === true;
 
   return (
     <div className="space-y-8 animate-fade-in pb-20 w-full">
@@ -446,32 +447,58 @@ const AssessmentDetail = () => {
 
       {/* RESUMEN BÁSICO */}
       <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden">
-        <div className="grid grid-cols-2 md:grid-cols-4 bg-bg-elevated border-b border-border-subtle p-6 md:p-8 gap-6">
+        <div className={`grid grid-cols-1 ${isOnlineAssessment ? 'md:grid-cols-1' : 'md:grid-cols-3'} bg-bg-elevated border-b border-border-subtle p-6 md:p-8 gap-6`}>
           <div className="space-y-1">
             <p className="text-[12px] font-medium text-text-secondary m-0">Peso actual</p>
             <p className="text-[20px] font-bold text-text-primary m-0">
               {measurementText('peso', val.pesoActual ?? val.peso, ' kg')}
             </p>
           </div>
-          <div className="space-y-1">
-            <p className="text-[12px] font-medium text-text-secondary m-0">Estatura</p>
-            <p className="text-[20px] font-bold text-text-primary m-0">
-              {val.medicionesEstado?.estatura === 'NO_APLICA' ? 'No aplica' : (() => {
-                const raw = parseFloat(val.estatura || val.talla);
-                if (!raw) return '—';
-                return raw < 10 ? Math.round(raw * 100) : raw;
-              })()}{val.medicionesEstado?.estatura !== 'NO_APLICA' && (val.estatura || val.talla) ? <span className="text-[14px] font-medium text-text-muted ml-1">cm</span> : null}
-            </p>
-          </div>
-          <div className="space-y-1">
-            <p className="text-[12px] font-medium text-text-secondary m-0">IMC</p>
-            <p className="text-[20px] font-bold m-0 text-text-primary">
-              {imcDisplay}
-            </p>
-          </div>
+          {!isOnlineAssessment && (
+            <>
+              <div className="space-y-1">
+                <p className="text-[12px] font-medium text-text-secondary m-0">Estatura</p>
+                <p className="text-[20px] font-bold text-text-primary m-0">
+                  {val.medicionesEstado?.estatura === 'NO_APLICA' ? 'No aplica' : (() => {
+                    const raw = parseFloat(val.estatura || val.talla);
+                    if (!raw) return '—';
+                    return raw < 10 ? Math.round(raw * 100) : raw;
+                  })()}{val.medicionesEstado?.estatura !== 'NO_APLICA' && (val.estatura || val.talla) ? <span className="text-[14px] font-medium text-text-muted ml-1">cm</span> : null}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-[12px] font-medium text-text-secondary m-0">IMC</p>
+                <p className="text-[20px] font-bold m-0 text-text-primary">
+                  {imcDisplay}
+                </p>
+              </div>
+            </>
+          )}
         </div>
 
-        {(val.pctGrasa || val.masaMagra || val.masaGrasaReal || Object.values(val.medicionesEstado || {}).includes('NO_APLICA')) && (
+        {isOnlineAssessment && (
+          <div className="border-b border-border-subtle p-6 md:p-8">
+            <p className="mb-5 text-[11px] font-bold uppercase tracking-widest text-text-muted">Medidas internas de consulta en línea</p>
+            <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+              {([
+                ['Brazo relajado', val.perimetros?.brazoRelajado],
+                ['Brazo contraído', val.perimetros?.brazoContraido],
+                ['Cintura', val.perimetros?.cintura],
+                ['Cadera', val.perimetros?.cadera],
+              ] as [string, unknown][]).map(([label, value]) => (
+                <div key={label} className="space-y-1">
+                  <p className="m-0 text-[12px] font-medium text-text-secondary">{label}</p>
+                  <p className="m-0 text-[18px] font-bold text-text-primary">
+                    {value != null && value !== '' ? `${value} cm` : '—'}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="mb-0 mt-4 text-[11px] text-text-muted">Información interna: estas medidas no se incluyen en el PDF del paciente.</p>
+          </div>
+        )}
+
+        {!isOnlineAssessment && (val.pctGrasa || val.masaMagra || val.masaGrasaReal || Object.values(val.medicionesEstado || {}).includes('NO_APLICA')) && (
           <div className="grid grid-cols-2 md:grid-cols-3 p-6 md:p-8 gap-6 border-b border-border-subtle">
             {(val.pctGrasa || val.medicionesEstado?.pctGrasa === 'NO_APLICA') && (
               <div className="space-y-1">
@@ -499,6 +526,7 @@ const AssessmentDetail = () => {
         )}
 
         {(() => {
+          if (isOnlineAssessment) return null;
           const bio = val.bioimpedancia || {};
           const grasa = bio['Grasa %'];
           const agua = bio['Agua %'];
