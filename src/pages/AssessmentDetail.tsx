@@ -498,6 +498,40 @@ const AssessmentDetail = () => {
           </div>
         )}
 
+        {(() => {
+          const bio = val.bioimpedancia || {};
+          const grasa = bio['Grasa %'];
+          const agua = bio['Agua %'];
+          const musculo = bio['Músculo (kg)'] ?? bio['Músculo %'];
+          const energia = bio['Energía (kcal)'];
+          const hasBio = [grasa, agua, musculo, energia].some(value => value != null && value !== '');
+          if (!hasBio) return null;
+
+          return (
+            <div className="border-b border-border-subtle p-6 md:p-8">
+              <p className="mb-5 text-[11px] font-bold uppercase tracking-widest text-text-muted">Resultados de bioimpedancia</p>
+              <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+                <div className="space-y-1">
+                  <p className="m-0 text-[12px] font-medium text-text-secondary">Grasa corporal</p>
+                  <p className="m-0 text-[18px] font-bold text-text-primary">{grasa ?? '—'}{grasa != null ? '%' : ''}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="m-0 text-[12px] font-medium text-text-secondary">Agua corporal</p>
+                  <p className="m-0 text-[18px] font-bold text-text-primary">{agua ?? '—'}{agua != null ? '%' : ''}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="m-0 text-[12px] font-medium text-text-secondary">Músculo</p>
+                  <p className="m-0 text-[18px] font-bold text-text-primary">{musculo ?? '—'}{musculo != null ? ' kg' : ''}</p>
+                </div>
+                <div className="space-y-1">
+                  <p className="m-0 text-[12px] font-medium text-text-secondary">Energía</p>
+                  <p className="m-0 text-[18px] font-bold text-text-primary">{energia ?? '—'}{energia != null ? ' kcal' : ''}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {val.comentarios && (
           <div className="p-6 md:p-8 border-b border-border-subtle">
             <p className="text-[12px] font-medium text-text-muted m-0 mb-2">Notas de consulta</p>

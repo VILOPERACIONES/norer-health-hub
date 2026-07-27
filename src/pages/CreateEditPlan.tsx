@@ -1321,7 +1321,7 @@ export const CreateEditPlanForm = ({
                             onClick={() => setMenuContentType(mi, 'platillos')}
                             className={`flex-1 px-3 py-2 rounded-[6px] text-[11px] font-bold uppercase tracking-wide transition-colors ${
                               menu.tipoContenido !== 'equivalencias'
-                                ? 'bg-brand-primary text-white'
+                                ? 'bg-brand-primary text-black'
                                 : 'text-[#8a8a8a] hover:text-white hover:bg-[#202020]'
                             }`}
                           >
@@ -1332,7 +1332,7 @@ export const CreateEditPlanForm = ({
                             onClick={() => setMenuContentType(mi, 'equivalencias')}
                             className={`flex-1 px-3 py-2 rounded-[6px] text-[11px] font-bold uppercase tracking-wide transition-colors ${
                               menu.tipoContenido === 'equivalencias'
-                                ? 'bg-brand-primary text-white'
+                                ? 'bg-brand-primary text-black'
                                 : 'text-[#8a8a8a] hover:text-white hover:bg-[#202020]'
                             }`}
                           >
