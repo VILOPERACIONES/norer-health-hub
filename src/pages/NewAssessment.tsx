@@ -17,9 +17,16 @@ import { PhotoFollowup } from '@/components/PhotoFollowup';
 import type { PendingFollowupPhoto } from '@/lib/followupPhotos';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AppointmentSummary, type AppointmentSummaryData } from '@/components/AppointmentSummary';
+import {
+  EMPTY_ONLINE_MEASUREMENTS,
+  buildOnlinePerimeters,
+  hasInvalidOnlineMeasurement,
+  onlineMeasurementsFromPerimeters,
+} from '@/lib/assessmentModality';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
+type CompositionMethod = 'ANTROPOMETRIA' | 'BIOIMPEDANCIA';
 
 const parseCompetenciaFromTemario = (items: { tema: string; detalle: string }[] | undefined) => {
   if (!items) return { comp: { antes: '', durante: '', despues: '' }, rest: [] as typeof items };
@@ -87,6 +94,14 @@ const NewAssessment = () => {
   });
   const [pendingFollowupPhotos, setPendingFollowupPhotos] = useState<PendingFollowupPhoto[]>([]);
   const [consultaEnLinea, setConsultaEnLinea] = useState(false);
+  const [compositionMethod, setCompositionMethod] = useState<CompositionMethod>('ANTROPOMETRIA');
+  const [bioimpedancia, setBioimpedancia] = useState({
+    grasa: '',
+    agua: '',
+    musculo: '',
+    energia: '',
+  });
+  const [onlineMeasurements, setOnlineMeasurements] = useState({ ...EMPTY_ONLINE_MEASUREMENTS });
   const [comentarios, setComentarios] = useState('');
   const [temario, setTemario] = useState<{ id: string; tema: string; detalle: string }[]>([]);
   const [evitar, setEvitar] = useState<{ id: string; valor: string }[]>([]);
@@ -224,6 +239,20 @@ const NewAssessment = () => {
     if (d.estatura) setEstatura(d.estatura);
     if (d.pctGrasa) setPctGrasa(d.pctGrasa);
     if (typeof d.consultaEnLinea === 'boolean') setConsultaEnLinea(d.consultaEnLinea);
+    if (d.compositionMethod === 'BIOIMPEDANCIA' || d.compositionMethod === 'ANTROPOMETRIA') {
+      setCompositionMethod(d.compositionMethod);
+    }
+    if (d.bioimpedancia) {
+      setBioimpedancia({
+        grasa: d.bioimpedancia.grasa || '',
+        agua: d.bioimpedancia.agua || '',
+        musculo: d.bioimpedancia.musculo || '',
+        energia: d.bioimpedancia.energia || '',
+      });
+    }
+    if (d.onlineMeasurements) {
+      setOnlineMeasurements(onlineMeasurementsFromPerimeters(d.onlineMeasurements));
+    }
     if (d.comentarios) setComentarios(d.comentarios);
     if (d.temario) {
       const { comp, rest } = parseCompetenciaFromTemario(d.temario);
@@ -334,9 +363,9 @@ const NewAssessment = () => {
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
     // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
-    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
+    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, consultaEnLinea, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
+  }, [step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -419,6 +448,25 @@ const NewAssessment = () => {
               setKgGrasa(val.masaGrasaReal ? String(val.masaGrasaReal) : (val.kgGrasa2comp ? String(val.kgGrasa2comp) : ''));
               const savedStatuses = val.medicionesEstado || {};
               setConsultaEnLinea(savedStatuses.consultaEnLinea === true);
+              const savedBio = val.bioimpedancia || {};
+              const hasBioimpedancia = [
+                savedBio['Grasa %'],
+                savedBio['Agua %'],
+                savedBio['Músculo (kg)'],
+                savedBio['Músculo %'],
+                savedBio['Energía (kcal)'],
+              ].some(value => value != null && value !== '');
+              setCompositionMethod(savedStatuses.metodoComposicion === 'BIOIMPEDANCIA' || hasBioimpedancia ? 'BIOIMPEDANCIA' : 'ANTROPOMETRIA');
+              setBioimpedancia({
+                grasa: savedBio['Grasa %'] != null ? String(savedBio['Grasa %']) : '',
+                agua: savedBio['Agua %'] != null ? String(savedBio['Agua %']) : '',
+                musculo: savedBio['Músculo (kg)'] != null
+                  ? String(savedBio['Músculo (kg)'])
+                  : (savedBio['Músculo %'] != null ? String(savedBio['Músculo %']) : ''),
+                energia: savedBio['Energía (kcal)'] != null ? String(savedBio['Energía (kcal)']) : '',
+              });
+              const savedPerimeters = val.perimetros || {};
+              setOnlineMeasurements(onlineMeasurementsFromPerimeters(savedPerimeters));
               setMeasurementStatuses({
                 peso: savedStatuses.peso || (val.pesoActual != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
                 estatura: savedStatuses.estatura || (val.estatura != null ? 'REGISTRADA' : 'NO_CAPTURADA'),
@@ -596,6 +644,23 @@ const NewAssessment = () => {
 
   const handleSave = async (redirectAPlan: boolean | 'equivalencias' = false) => {
     if (!peso && measurementStatuses.peso === 'REGISTRADA') { toast({ title: 'Peso incompleto', description: 'Captura el peso o cambia su estado.', variant: 'destructive' }); return; }
+    if (!consultaEnLinea && compositionMethod === 'BIOIMPEDANCIA') {
+      const bioValues = Object.values(bioimpedancia).filter(value => value.trim() !== '');
+      if (bioValues.length === 0) {
+        toast({ title: 'Bioimpedancia incompleta', description: 'Captura al menos uno de los resultados de bioimpedancia.', variant: 'destructive' });
+        return;
+      }
+      if (bioValues.some(value => !Number.isFinite(Number(value)) || Number(value) < 0)) {
+        toast({ title: 'Resultado inválido', description: 'Los resultados de bioimpedancia deben ser números iguales o mayores a cero.', variant: 'destructive' });
+        return;
+      }
+    }
+    if (consultaEnLinea) {
+      if (hasInvalidOnlineMeasurement(onlineMeasurements)) {
+        toast({ title: 'Medida inválida', description: 'Las medidas de la consulta en línea deben ser números iguales o mayores a cero.', variant: 'destructive' });
+        return;
+      }
+    }
 
     if (calcomData) {
       const confirmed = await confirm({
@@ -634,9 +699,14 @@ const NewAssessment = () => {
       fecha, hora,
       numeroValoracion,
       pesoActual: measurementStatuses.peso === 'REGISTRADA' && peso ? pesoNum : null,
-      estatura: estatura ? (estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum) : null,
-      imc: measurementStatuses.peso === 'REGISTRADA' && imc > 0 ? parseFloat(imc.toFixed(2)) : null,
-      medicionesEstado: { ...measurementStatuses, estatura: estatura ? 'REGISTRADA' : measurementStatuses.estatura, consultaEnLinea },
+      estatura: !consultaEnLinea && estatura ? (estaturaNum < 10 ? Math.round(estaturaNum * 100) : estaturaNum) : null,
+      imc: !consultaEnLinea && measurementStatuses.peso === 'REGISTRADA' && imc > 0 ? parseFloat(imc.toFixed(2)) : null,
+      medicionesEstado: {
+        ...measurementStatuses,
+        estatura: consultaEnLinea ? 'NO_APLICA' : (estatura ? 'REGISTRADA' : measurementStatuses.estatura),
+        consultaEnLinea,
+        metodoComposicion: consultaEnLinea ? 'FOTOSCOPIA' : compositionMethod,
+      },
       comentarios,
       temario: (() => {
         const base = temario.map(({ tema, detalle }) => ({ tema, detalle }));
@@ -652,6 +722,28 @@ const NewAssessment = () => {
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
+
+    if (consultaEnLinea) {
+      body.perimetros = buildOnlinePerimeters(onlineMeasurements);
+    }
+
+    if (!consultaEnLinea && compositionMethod === 'BIOIMPEDANCIA') {
+      body.bioimpedancia = {
+        'Grasa %': bioimpedancia.grasa.trim() === '' ? null : Number(bioimpedancia.grasa),
+        'Agua %': bioimpedancia.agua.trim() === '' ? null : Number(bioimpedancia.agua),
+        'Músculo (kg)': bioimpedancia.musculo.trim() === '' ? null : Number(bioimpedancia.musculo),
+        'Energía (kcal)': bioimpedancia.energia.trim() === '' ? null : Number(bioimpedancia.energia),
+      };
+    } else if (isEdit) {
+      // Al cambiar una valoración existente de bioimpedancia a antropometría,
+      // se eliminan los resultados anteriores para evitar mostrarlos en el PDF.
+      body.bioimpedancia = {
+        'Grasa %': null,
+        'Agua %': null,
+        'Músculo (kg)': null,
+        'Energía (kcal)': null,
+      };
+    }
 
     if (measurementStatuses.pctGrasa === 'REGISTRADA' && pctGrasa) {
       // pctGrasa (no pctGrasaCorp): backend lo destructura para calcular pctGrasa2comp/kgGrasa2comp/kgMasaMagra2comp
@@ -760,7 +852,7 @@ const NewAssessment = () => {
         try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch { }
       }
 
-      if (valoracionResId && pendingFollowupPhotos.length > 0) {
+      if (consultaEnLinea && valoracionResId && pendingFollowupPhotos.length > 0) {
         for (const photo of pendingFollowupPhotos) {
           await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/fotos`, {
             dataUrl: photo.dataUrl,
@@ -932,12 +1024,13 @@ const NewAssessment = () => {
                         setConsultaEnLinea(false);
                         setMeasurementStatuses(prev => ({
                           ...prev,
+                          estatura: estatura ? 'REGISTRADA' : 'NO_CAPTURADA',
                           pctGrasa: pctGrasa ? 'REGISTRADA' : 'NO_CAPTURADA',
                           kgGrasa: kgGrasa ? 'REGISTRADA' : 'NO_CAPTURADA',
                           masaMagra: masaMagra !== null ? 'REGISTRADA' : 'NO_CAPTURADA',
                         }));
                       }}
-                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${!consultaEnLinea ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${!consultaEnLinea ? 'border-white bg-white text-black hover:bg-white hover:text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
                     >
                       Presencial
                     </button>
@@ -945,9 +1038,10 @@ const NewAssessment = () => {
                       type="button"
                       onClick={() => {
                         setConsultaEnLinea(true);
-                        setMeasurementStatuses(prev => ({ ...prev, pctGrasa: 'NO_APLICA', kgGrasa: 'NO_APLICA', masaMagra: 'NO_APLICA' }));
+                        setIsGrasaModified(true);
+                        setMeasurementStatuses(prev => ({ ...prev, estatura: 'NO_APLICA', pctGrasa: 'NO_APLICA', kgGrasa: 'NO_APLICA', masaMagra: 'NO_APLICA' }));
                       }}
-                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${consultaEnLinea ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${consultaEnLinea ? 'border-white bg-white text-black hover:bg-white hover:text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
                     >
                       En línea
                     </button>
@@ -955,7 +1049,7 @@ const NewAssessment = () => {
                 </div>
                 {consultaEnLinea && (
                   <p className="mb-0 mt-3 border-t border-[#292929] pt-3 text-[11px] leading-relaxed text-[#8faede]">
-                    Las mediciones que requieren equipo se marcaron como “No aplica”. Puedes registrar manualmente cualquier dato que sí proporcione el paciente.
+                    Captura el peso y los cuatro perímetros proporcionados por el paciente. Los perímetros quedan únicamente en el expediente interno.
                   </p>
                 )}
               </div>
@@ -1523,7 +1617,7 @@ const NewAssessment = () => {
                 )}
               </div>
 
-              {/* ── 6. MEDIDAS ANTROPOMÉTRICAS ── */}
+              {/* ── 6. MEDICIONES CORPORALES ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
                 <button
                   type="button"
@@ -1532,22 +1626,69 @@ const NewAssessment = () => {
                 >
                   <div className="flex items-center gap-2">
                     <Activity className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Medidas Antropométricas</span>
-                    {(peso || pctGrasa) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Mediciones corporales</span>
+                    {(peso || pctGrasa || Object.values(bioimpedancia).some(Boolean)) && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showMedidas ? 'rotate-180' : ''}`} />
                 </button>
                 {showMedidas && (
                   <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
+                    {!consultaEnLinea && (
+                      <div className="mb-5 flex flex-col gap-3 rounded-[10px] border border-[#292929] bg-[#151515] p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a]">Método de composición corporal</p>
+                          <p className="m-0 text-[11px] text-[#666]">Selecciona el método utilizado en esta valoración.</p>
+                        </div>
+                        <div className="grid w-full grid-cols-2 gap-2 sm:w-[300px]">
+                          <button
+                            type="button"
+                            onClick={() => setCompositionMethod('ANTROPOMETRIA')}
+                            className={`rounded-[7px] border px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${compositionMethod === 'ANTROPOMETRIA' ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                          >
+                            Antropometría
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompositionMethod('BIOIMPEDANCIA');
+                              setIsGrasaModified(true);
+                            }}
+                            className={`rounded-[7px] border px-3 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${compositionMethod === 'BIOIMPEDANCIA' ? 'border-brand-primary bg-brand-primary text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                          >
+                            Bioimpedancia
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
                       <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
                       <Field label="Hora" value={hora} onChange={setHora} type="time" />
-                      <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" status={measurementStatuses.masaMagra} onStatusChange={(status) => setMeasurementStatuses(prev => ({ ...prev, masaMagra: status }))} />
                       <Field label="Peso" value={peso} onChange={(value) => { setPeso(value); setMeasurementStatuses(prev => ({ ...prev, peso: value ? 'REGISTRADA' : 'NO_CAPTURADA' })); }} suffix="kg" placeholder="Ej. 68.5" status={measurementStatuses.peso} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, peso: status })); if (status === 'NO_APLICA') setPeso(''); }} />
-                      <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" status={measurementStatuses.pctGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, pctGrasa: status })); if (status === 'NO_APLICA') { setPctGrasa(''); setKgGrasa(''); } }} />
-                      <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" status={measurementStatuses.kgGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, kgGrasa: status })); if (status === 'NO_APLICA') setKgGrasa(''); }} />
+                      {consultaEnLinea ? (
+                        <>
+                          <Field label="Brazo relajado" value={onlineMeasurements.brazoRelajado} onChange={(value) => { setOnlineMeasurements(prev => ({ ...prev, brazoRelajado: value })); setIsGrasaModified(true); }} suffix="cm" placeholder="Ej. 29.5" />
+                          <Field label="Brazo contraído" value={onlineMeasurements.brazoContraido} onChange={(value) => { setOnlineMeasurements(prev => ({ ...prev, brazoContraido: value })); setIsGrasaModified(true); }} suffix="cm" placeholder="Ej. 31.2" />
+                          <Field label="Cintura" value={onlineMeasurements.cintura} onChange={(value) => { setOnlineMeasurements(prev => ({ ...prev, cintura: value })); setIsGrasaModified(true); }} suffix="cm" placeholder="Ej. 78.4" />
+                          <Field label="Cadera" value={onlineMeasurements.cadera} onChange={(value) => { setOnlineMeasurements(prev => ({ ...prev, cadera: value })); setIsGrasaModified(true); }} suffix="cm" placeholder="Ej. 96.1" />
+                        </>
+                      ) : compositionMethod === 'ANTROPOMETRIA' ? (
+                        <>
+                          <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" status={measurementStatuses.masaMagra} onStatusChange={(status) => setMeasurementStatuses(prev => ({ ...prev, masaMagra: status }))} />
+                          <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" status={measurementStatuses.pctGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, pctGrasa: status })); if (status === 'NO_APLICA') { setPctGrasa(''); setKgGrasa(''); } }} />
+                          <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" status={measurementStatuses.kgGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, kgGrasa: status })); if (status === 'NO_APLICA') setKgGrasa(''); }} />
+                        </>
+                      ) : (
+                        <>
+                          <Field label="Grasa corporal" value={bioimpedancia.grasa} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, grasa: value })); setIsGrasaModified(true); }} suffix="%" placeholder="Ej. 24.3" />
+                          <Field label="Agua corporal" value={bioimpedancia.agua} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, agua: value })); setIsGrasaModified(true); }} suffix="%" placeholder="Ej. 52.1" />
+                          <Field label="Músculo" value={bioimpedancia.musculo} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, musculo: value })); setIsGrasaModified(true); }} suffix="kg" placeholder="Ej. 31.8" />
+                          <Field label="Energía" value={bioimpedancia.energia} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, energia: value })); setIsGrasaModified(true); }} suffix="kcal" placeholder="Ej. 1450" />
+                        </>
+                      )}
                     </div>
-                    <PhotoFollowup pacienteId={pacienteId!} valoracionId={valoracionId} onPendingChange={setPendingFollowupPhotos} />
+                    {consultaEnLinea && (
+                      <PhotoFollowup pacienteId={pacienteId!} valoracionId={valoracionId} onPendingChange={setPendingFollowupPhotos} />
+                    )}
                   </div>
                 )}
               </div>
