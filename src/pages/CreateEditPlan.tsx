@@ -118,7 +118,8 @@ export const CreateEditPlanForm = ({
   const [platilloLibrary, setPlatilloLibrary] = useState<Platillo[]>([]);
   const [showPlatilloSelector, setShowPlatilloSelector] = useState<{ mIdx: number, tIdx: number } | null>(null);
   const [platilloSearch, setPlatilloSearch] = useState('');
-  const [platilloCatFilter, setPlatilloCatFilter] = useState(null); // filtro activo por categoría
+  const [platilloCatFilter, setPlatilloCatFilter] = useState<string | null>(null); // filtro activo por categoría
+  const [platilloCategoryMenuOpen, setPlatilloCategoryMenuOpen] = useState(false);
 
   // ─── Save-as-Platillo modal ────────────────────────────────────────────────
   const [savePlatilloModal, setSavePlatilloModal] = useState<{
@@ -1750,7 +1751,10 @@ export const CreateEditPlanForm = ({
                           <div className="relative">
                             <div className="flex gap-2 mt-3">
                               <button
-                                onClick={() => setShowPlatilloSelector(showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti ? null : { mIdx: mi, tIdx: ti })}
+                                onClick={() => {
+                                  setShowPlatilloSelector(showPlatilloSelector?.mIdx === mi && showPlatilloSelector?.tIdx === ti ? null : { mIdx: mi, tIdx: ti });
+                                  setPlatilloCategoryMenuOpen(false);
+                                }}
                                 className="flex-1 py-2.5 px-4 bg-[#1a1a1a] border border-[#333] text-[#90c2ff] hover:text-white hover:border-[#90c2ff]/40 hover:bg-[#1d2536] text-[12px] font-bold rounded-[8px] transition-all uppercase tracking-wider flex items-center justify-center gap-2"
                               >
                                 <BookOpen className="w-4 h-4" /> Importar Alimentos
@@ -1777,19 +1781,73 @@ export const CreateEditPlanForm = ({
                                     value={platilloSearch}
                                     onChange={(e) => setPlatilloSearch(e.target.value)}
                                   />
-                                  <div className="relative">
-                                    <select
-                                      value={platilloCatFilter || ''}
-                                      onChange={(e) => setPlatilloCatFilter(e.target.value ? e.target.value : null)}
-                                      className="w-full h-9 text-xs bg-[#0a0a0a] border border-[#333] text-white rounded-[8px] pl-3 pr-8 outline-none focus:border-[#90c2ff] appearance-none"
-                                    >
-                                      <option value="">TODOS</option>
-                                      {Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort().map(cat => (
-                                        <option key={cat} value={cat}>{cat} ({platilloLibrary.filter(p => p.categoria === cat).length})</option>
-                                      ))}
-                                    </select>
-                                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#555] pointer-events-none" />
-                                  </div>
+                                  {(() => {
+                                    const categories = Array.from(new Set(platilloLibrary.map(p => p.categoria))).sort();
+                                    const selectedLabel = platilloCatFilter
+                                      ? `${platilloCatFilter} (${platilloLibrary.filter(p => p.categoria === platilloCatFilter).length})`
+                                      : `TODOS (${platilloLibrary.length})`;
+
+                                    return (
+                                      <div className="relative">
+                                        <button
+                                          type="button"
+                                          aria-haspopup="listbox"
+                                          aria-expanded={platilloCategoryMenuOpen}
+                                          onClick={() => setPlatilloCategoryMenuOpen(open => !open)}
+                                          onKeyDown={(event) => {
+                                            if (event.key === 'Escape') setPlatilloCategoryMenuOpen(false);
+                                          }}
+                                          className="flex h-9 w-full items-center justify-between gap-2 rounded-[8px] border border-[#333] bg-[#0a0a0a] px-3 text-left text-xs text-white outline-none transition-colors hover:border-[#555] focus:border-[#90c2ff]"
+                                        >
+                                          <span className="truncate">{selectedLabel}</span>
+                                          <ChevronDown className={`h-4 w-4 shrink-0 text-[#777] transition-transform ${platilloCategoryMenuOpen ? 'rotate-180' : ''}`} />
+                                        </button>
+
+                                        {platilloCategoryMenuOpen && (
+                                          <div
+                                            role="listbox"
+                                            aria-label="Categoría de alimentos"
+                                            className="absolute left-0 right-0 top-full z-20 mt-1 max-h-52 overflow-y-auto rounded-[8px] border border-[#3d3d3d] bg-[#0d0d0d] p-1 shadow-[0_12px_28px_rgba(0,0,0,0.75)] custom-scrollbar"
+                                          >
+                                            <button
+                                              type="button"
+                                              role="option"
+                                              aria-selected={!platilloCatFilter}
+                                              onClick={() => {
+                                                setPlatilloCatFilter(null);
+                                                setPlatilloCategoryMenuOpen(false);
+                                              }}
+                                              className={`flex w-full items-center justify-between rounded-[6px] px-3 py-2 text-left text-[11px] transition-colors ${!platilloCatFilter ? 'bg-[#1d4ed8] text-white' : 'text-[#d8d8d8] hover:bg-[#1a1a1a] hover:text-white'}`}
+                                            >
+                                              <span>TODOS</span>
+                                              <span className="text-[10px] opacity-70">{platilloLibrary.length}</span>
+                                            </button>
+                                            {categories.map(cat => {
+                                              const count = platilloLibrary.filter(p => p.categoria === cat).length;
+                                              const isSelected = platilloCatFilter === cat;
+
+                                              return (
+                                                <button
+                                                  key={cat}
+                                                  type="button"
+                                                  role="option"
+                                                  aria-selected={isSelected}
+                                                  onClick={() => {
+                                                    setPlatilloCatFilter(cat);
+                                                    setPlatilloCategoryMenuOpen(false);
+                                                  }}
+                                                  className={`flex w-full items-center justify-between rounded-[6px] px-3 py-2 text-left text-[11px] transition-colors ${isSelected ? 'bg-[#1d4ed8] text-white' : 'text-[#d8d8d8] hover:bg-[#1a1a1a] hover:text-white'}`}
+                                                >
+                                                  <span className="truncate">{cat}</span>
+                                                  <span className="ml-3 text-[10px] opacity-70">{count}</span>
+                                                </button>
+                                              );
+                                            })}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
 
                                 {/* Lista de platillos renderizada siempre por defecto (TODOS) */}
@@ -1902,6 +1960,7 @@ export const CreateEditPlanForm = ({
                                           setShowPlatilloSelector(null);
                                           setPlatilloSearch('');
                                           setPlatilloCatFilter(null);
+                                          setPlatilloCategoryMenuOpen(false);
                                         }}
                                         className="w-full text-left px-3 py-2 hover:bg-[#1a1a1a] rounded-lg transition-colors flex items-center justify-between group"
                                       >
