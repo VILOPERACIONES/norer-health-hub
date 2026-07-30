@@ -15,6 +15,7 @@ export interface CheckoutStatusResponse {
   paymentStatus: 'paid' | 'unpaid' | 'no_payment_required';
   nivel: CheckoutTier | null;
   activated: boolean;
+  continuationUrl: string | null;
   membership: {
     nivel: CheckoutTier | 'gratis';
     status: string | null;
@@ -30,7 +31,18 @@ export const validateCheckoutStatusResponse = (
   const validStatus = ['open', 'complete', 'expired'].includes(result?.status as string);
   const validPaymentStatus = ['paid', 'unpaid', 'no_payment_required']
     .includes(result?.paymentStatus as string);
-  if (!result || result.sessionId !== expectedSessionId || !validStatus || !validPaymentStatus) {
+  const validContinuationUrl = result?.continuationUrl == null
+    || (
+      typeof result.continuationUrl === 'string'
+      && result.continuationUrl.startsWith('https://')
+    );
+  if (
+    !result
+    || result.sessionId !== expectedSessionId
+    || !validStatus
+    || !validPaymentStatus
+    || !validContinuationUrl
+  ) {
     throw new Error('El servidor no devolvió un estado de Stripe válido.');
   }
   return result;
@@ -76,6 +88,15 @@ export const fetchCheckoutStatus = async (sessionId: string): Promise<CheckoutSt
   const response = await portalApi.get<CheckoutStatusResponse>(
     `/api/portal/checkout/session/${encodeURIComponent(sessionId)}`,
   );
+  return validateCheckoutStatusResponse(response.data, sessionId);
+};
+
+export const fetchLatestCheckoutStatus = async (): Promise<CheckoutStatusResponse> => {
+  const response = await portalApi.get<CheckoutStatusResponse>('/api/portal/checkout/latest');
+  const sessionId = response.data?.sessionId;
+  if (!sessionId) {
+    throw new Error('El servidor no devolvió una sesión de Stripe válida.');
+  }
   return validateCheckoutStatusResponse(response.data, sessionId);
 };
 

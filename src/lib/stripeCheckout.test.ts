@@ -11,6 +11,7 @@ const result = (overrides: Partial<CheckoutStatusResponse> = {}): CheckoutStatus
   paymentStatus: 'paid',
   nivel: 'premium',
   activated: true,
+  continuationUrl: null,
   membership: {
     nivel: 'premium',
     status: 'active',
@@ -84,5 +85,9 @@ describe('validateCheckoutStatusResponse', () => {
     expect(() => validateCheckoutStatusResponse(result({ sessionId: 'cs_other' }), 'cs_123')).toThrow(
       'estado de Stripe válido',
     );
+    expect(() => validateCheckoutStatusResponse(
+      result({ continuationUrl: 'javascript:alert(1)' }),
+      'cs_123',
+    )).toThrow('estado de Stripe válido');
   });
 });
