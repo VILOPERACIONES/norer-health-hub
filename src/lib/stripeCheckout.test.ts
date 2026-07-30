@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  isCheckoutNotFoundError,
   resolveCheckoutViewState,
   validateCheckoutStatusResponse,
   type CheckoutStatusResponse,
@@ -18,6 +19,26 @@ const result = (overrides: Partial<CheckoutStatusResponse> = {}): CheckoutStatus
     validUntil: '2026-08-30T00:00:00.000Z',
   },
   ...overrides,
+});
+
+describe('isCheckoutNotFoundError', () => {
+  it('solo acepta el 404 explícito del endpoint nuevo', () => {
+    expect(isCheckoutNotFoundError({
+      response: {
+        status: 404,
+        data: { code: 'checkout_not_found' },
+      },
+    })).toBe(true);
+  });
+
+  it('no confunde una ruta inexistente de la API anterior con ausencia de pago', () => {
+    expect(isCheckoutNotFoundError({
+      response: {
+        status: 404,
+        data: { error: 'Route not found' },
+      },
+    })).toBe(false);
+  });
 });
 
 describe('resolveCheckoutViewState', () => {

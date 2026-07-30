@@ -100,6 +100,17 @@ export const fetchLatestCheckoutStatus = async (): Promise<CheckoutStatusRespons
   return validateCheckoutStatusResponse(response.data, sessionId);
 };
 
+export const isCheckoutNotFoundError = (error: unknown): boolean => {
+  const requestError = error as {
+    response?: {
+      status?: number;
+      data?: { code?: string };
+    };
+  };
+  return requestError.response?.status === 404
+    && requestError.response?.data?.code === 'checkout_not_found';
+};
+
 export type CheckoutViewState =
   | 'missing'
   | 'checking'
