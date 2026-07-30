@@ -9,6 +9,7 @@ import {
   RefreshCw, Zap, Star, ChevronDown,
 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
+import { requestStripeCheckout, type CheckoutTier } from '@/lib/stripeCheckout';
 import { usePortalAuthStore } from '@/store/portalAuth';
 import { PortalPhotoHistory } from '@/components/PortalPhotoHistory';
 
@@ -180,7 +181,7 @@ function TiempoCard({ t }: { t: any }) {
 }
 
 // ─── Upgrade button ────────────────────────────────────────────────────────────
-function UpgradeButton({ nivel, label, color = 'green' }: { nivel: 'basica' | 'premium'; label: string; color?: 'green' | 'blue' | 'ghost' }) {
+function UpgradeButton({ nivel, label, color = 'green' }: { nivel: CheckoutTier; label: string; color?: 'green' | 'blue' | 'ghost' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -188,10 +189,11 @@ function UpgradeButton({ nivel, label, color = 'green' }: { nivel: 'basica' | 'p
     setLoading(true);
     setError(null);
     try {
-      const res = await portalApi.post('/api/portal/checkout', { nivel });
-      if (res.data?.url) window.location.href = res.data.url;
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Error al generar el pago. Intenta de nuevo.');
+      const session = await requestStripeCheckout(nivel);
+      window.location.assign(session.url);
+    } catch (err: unknown) {
+      const requestError = err as { response?: { data?: { error?: string } } };
+      setError(requestError.response?.data?.error || 'Error al generar el pago. Intenta de nuevo.');
       setLoading(false);
     }
   };

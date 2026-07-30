@@ -1,134 +1,181 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Crown, Zap, Activity, CheckCircle2, MessageCircle, BarChart3, Infinity, ClipboardList } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Clock3,
+  Home,
+  LoaderCircle,
+  RefreshCw,
+  ShieldCheck,
+  WifiOff,
+} from 'lucide-react';
+import {
+  fetchCheckoutStatus,
+  resolveCheckoutViewState,
+} from '@/lib/stripeCheckout';
 
-type Tier = 'premium' | 'basica' | 'gratis';
-
-const TIER_CONFIG = {
-  premium: {
-    label: 'Plan Premium',
-    accent: '#22c55e',
-    accentBg: '#0f2e1a',
-    accentBorder: '#22c55e25',
-    Icon: Crown,
-    features: [
-      { Icon: MessageCircle, text: 'Chat ilimitado con Eyder' },
-      { Icon: ClipboardList, text: 'Respuestas basadas en tu plan personalizado' },
-      { Icon: BarChart3, text: 'Análisis completo de composición corporal' },
-      { Icon: Infinity, text: 'Sin límite de preguntas diarias' },
-    ],
+const COPY = {
+  missing: {
+    eyebrow: 'Regreso incompleto',
+    title: 'No pudimos identificar el pago',
+    body: 'La dirección de regreso no contiene la sesión de Stripe. No vuelvas a pagar si ya recibiste un cargo; regresa al portal y contacta a tu nutriólogo.',
+    Icon: AlertCircle,
+    color: '#f59e0b',
   },
-  basica: {
-    label: 'Plan Básico',
-    accent: '#60a5fa',
-    accentBg: '#0f1e35',
-    accentBorder: '#60a5fa25',
-    Icon: Zap,
-    features: [
-      { Icon: MessageCircle, text: 'Chat ilimitado con el agente nutricional' },
-      { Icon: ClipboardList, text: 'Consultas sobre equivalencias SMAE' },
-      { Icon: Infinity, text: 'Sin límite de preguntas diarias' },
-    ],
+  checking: {
+    eyebrow: 'Verificación segura',
+    title: 'Confirmando tu pago',
+    body: 'Estamos consultando la sesión directamente con Stripe. Puedes mantener esta pantalla abierta.',
+    Icon: LoaderCircle,
+    color: '#60a5fa',
   },
-  gratis: {
-    label: 'Cuenta Gratis',
-    accent: '#f59e0b',
-    accentBg: '#1c1000',
-    accentBorder: '#f59e0b25',
-    Icon: Activity,
-    features: [
-      { Icon: MessageCircle, text: '5 preguntas al día' },
-      { Icon: ClipboardList, text: 'Consultas generales de nutrición' },
-    ],
+  confirmed: {
+    eyebrow: 'Pago confirmado',
+    title: 'Tu membresía está activa',
+    body: 'Stripe confirmó el pago y tu acceso ya quedó actualizado en Norder Health.',
+    Icon: CheckCircle2,
+    color: '#22c55e',
   },
-};
+  processing: {
+    eyebrow: 'Pago recibido',
+    title: 'Estamos activando tu acceso',
+    body: 'Stripe ya confirmó el pago. La activación puede tardar unos segundos; no necesitas volver a pagar.',
+    Icon: Clock3,
+    color: '#60a5fa',
+  },
+  not_paid: {
+    eyebrow: 'Pago pendiente',
+    title: 'El pago no está confirmado',
+    body: 'La sesión no aparece pagada en Stripe. Puedes volver al portal e iniciar un nuevo intento cuando estés listo.',
+    Icon: AlertCircle,
+    color: '#f59e0b',
+  },
+  error: {
+    eyebrow: 'Sin conexión de confirmación',
+    title: 'No pudimos verificarlo todavía',
+    body: 'Tu pago no se pierde por cerrar esta pantalla o quedarte sin internet. Reintenta la verificación cuando recuperes conexión.',
+    Icon: WifiOff,
+    color: '#f59e0b',
+  },
+} as const;
 
 export default function PaymentSuccess() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const nivelParam = searchParams.get('nivel') as Tier | null;
-  const tier: Tier = (nivelParam === 'premium' || nivelParam === 'basica') ? nivelParam : 'premium';
-  const config = TIER_CONFIG[tier];
-  const TierIcon = config.Icon;
+  const sessionId = searchParams.get('session_id');
 
-  // Auto-redirect after 8s
+  const query = useQuery({
+    queryKey: ['stripe-checkout-status', sessionId],
+    queryFn: () => fetchCheckoutStatus(sessionId as string),
+    enabled: Boolean(sessionId),
+    retry: 2,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 5000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+    refetchInterval: current => {
+      const data = current.state.data;
+      return data?.status === 'complete' && !data.activated ? 2500 : false;
+    },
+  });
+
+  const state = resolveCheckoutViewState({
+    sessionId,
+    isLoading: query.isPending,
+    isError: query.isError,
+    result: query.data,
+  });
+  const copy = COPY[state];
+  const StateIcon = copy.Icon;
+
   useEffect(() => {
-    const t = setTimeout(() => navigate('/norder-health', { replace: true }), 8000);
-    return () => clearTimeout(t);
-  }, [navigate]);
+    if (state !== 'confirmed') return undefined;
+    const timer = window.setTimeout(() => {
+      navigate('/norder-health', { replace: true });
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [navigate, state]);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-[#0a0a0a] px-6 py-12 select-none">
-
-      {/* Logo NORDER */}
-      <div className="relative mb-8">
-        <div className="w-24 h-24 rounded-[26px] bg-[#0d0d0d] border border-[#1a1a1a] flex items-center justify-center shadow-2xl">
-          <svg viewBox="0 0 512 512" className="w-16 h-16">
-            <defs>
-              <linearGradient id="ng" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stopColor="#22c55e" />
-                <stop offset="100%" stopColor="#16a34a" />
-              </linearGradient>
-            </defs>
-            <circle cx="256" cy="220" r="130" fill="url(#ng)" />
-            <text x="256" y="272" fontFamily="system-ui,sans-serif" fontSize="140" fontWeight="800" fill="white" textAnchor="middle">N</text>
-          </svg>
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#0a0a0a] px-6 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-7 flex justify-center">
+          <div
+            className="flex h-20 w-20 items-center justify-center rounded-[24px] border"
+            style={{ background: `${copy.color}12`, borderColor: `${copy.color}35` }}
+          >
+            <StateIcon
+              size={34}
+              strokeWidth={2}
+              style={{ color: copy.color }}
+              className={state === 'checking' ? 'animate-spin' : ''}
+            />
+          </div>
         </div>
-        {/* Check badge */}
-        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#22c55e] flex items-center justify-center shadow-lg shadow-[#22c55e]/30">
-          <CheckCircle2 size={18} className="text-black" strokeWidth={2.5} />
-        </div>
-      </div>
 
-      {/* Headline */}
-      <p className="text-[11px] text-[#444] font-bold uppercase tracking-widest mb-2">Pago confirmado</p>
-      <h1 className="text-[28px] font-black text-white text-center leading-tight tracking-tight mb-1">
-        ¡Bienvenido a<br />Norder Health!
-      </h1>
+        <p
+          className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.2em]"
+          style={{ color: copy.color }}
+        >
+          {copy.eyebrow}
+        </p>
+        <h1 className="text-center text-[28px] font-black leading-tight tracking-tight text-white">
+          {copy.title}
+        </h1>
+        <p className="mt-3 text-center text-[13px] leading-relaxed text-[#666]">
+          {copy.body}
+        </p>
 
-      {/* Plan badge */}
-      <div
-        className="mt-4 mb-8 inline-flex items-center gap-2 px-4 py-2 rounded-full border"
-        style={{ background: config.accentBg, borderColor: config.accentBorder }}
-      >
-        <TierIcon size={13} style={{ color: config.accent }} strokeWidth={2.5} />
-        <span className="text-[12px] font-bold uppercase tracking-widest" style={{ color: config.accent }}>
-          {config.label}
-        </span>
-      </div>
-
-      {/* Features */}
-      <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#1a1a1a] rounded-[20px] px-5 py-5 mb-8">
-        <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-bold mb-4">Lo que tienes disponible</p>
-        <div className="flex flex-col gap-3.5">
-          {config.features.map(({ Icon, text }) => (
-            <div key={text} className="flex items-center gap-3">
-              <div
-                className="w-8 h-8 rounded-[9px] flex items-center justify-center flex-shrink-0"
-                style={{ background: config.accentBg }}
-              >
-                <Icon size={14} style={{ color: config.accent }} strokeWidth={2} />
+        {query.data?.membership && state === 'confirmed' && (
+          <div className="mt-7 rounded-[18px] border border-[#1b3523] bg-[#0d1710] p-4">
+            <div className="flex items-center gap-3">
+              <ShieldCheck size={18} className="text-[#22c55e]" />
+              <div>
+                <p className="text-[12px] font-bold capitalize text-white">
+                  Plan {query.data.membership.nivel}
+                </p>
+                <p className="mt-0.5 text-[10px] text-[#56705d]">
+                  Acceso verificado directamente con Stripe
+                </p>
               </div>
-              <p className="text-[13px] text-[#888] leading-snug">{text}</p>
             </div>
-          ))}
+          </div>
+        )}
+
+        <div className="mt-8 flex flex-col gap-3">
+          {['processing', 'error'].includes(state) && (
+            <button
+              type="button"
+              onClick={() => query.refetch()}
+              disabled={query.isFetching}
+              className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-white py-4 text-[14px] font-bold text-black disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={query.isFetching ? 'animate-spin' : ''} />
+              Revisar nuevamente
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => navigate('/norder-health', { replace: true })}
+            className={`flex w-full items-center justify-center gap-2 rounded-[15px] py-4 text-[14px] font-bold ${
+              state === 'confirmed'
+                ? 'bg-[#22c55e] text-black'
+                : 'border border-[#222] bg-[#111] text-[#aaa]'
+            }`}
+          >
+            <Home size={16} />
+            Ir al portal
+          </button>
         </div>
+
+        {state === 'confirmed' && (
+          <p className="mt-4 text-center text-[10px] text-[#333]">
+            Regresando automáticamente al portal…
+          </p>
+        )}
       </div>
-
-      {/* CTA */}
-      <button
-        onClick={() => navigate('/norder-health', { replace: true })}
-        className="w-full max-w-sm py-4 rounded-[16px] font-bold text-[15px] transition-all active:scale-[0.98] shadow-lg"
-        style={{
-          background: config.accent,
-          color: tier === 'basica' ? 'white' : 'black',
-          boxShadow: `0 8px 24px ${config.accent}30`,
-        }}
-      >
-        Ir al portal
-      </button>
-
-      <p className="text-[11px] text-[#2a2a2a] mt-4">Redirigiendo automáticamente en unos segundos...</p>
     </div>
   );
 }
