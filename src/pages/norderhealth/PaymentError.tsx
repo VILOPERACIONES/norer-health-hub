@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import {
   fetchLatestCheckoutStatus,
+  isCheckoutNotFoundError,
   requestStripeCheckout,
   type CheckoutTier,
 } from '@/lib/stripeCheckout';
@@ -35,15 +36,14 @@ export default function PaymentError() {
   const latestQuery = useQuery({
     queryKey: ['stripe-checkout-latest'],
     queryFn: fetchLatestCheckoutStatus,
-    retry: (attempt, error: RequestError) => error.response?.status !== 404 && attempt < 2,
+    retry: (attempt, error: RequestError) => !isCheckoutNotFoundError(error) && attempt < 2,
     retryDelay: attempt => Math.min(1000 * 2 ** attempt, 5000),
     refetchOnReconnect: true,
     refetchOnWindowFocus: true,
   });
 
   const checkout = latestQuery.data;
-  const notFound = latestQuery.isError
-    && (latestQuery.error as RequestError)?.response?.status === 404;
+  const notFound = latestQuery.isError && isCheckoutNotFoundError(latestQuery.error);
   const verificationError = latestQuery.isError && !notFound;
   const paid = checkout?.status === 'complete'
     && ['paid', 'no_payment_required'].includes(checkout.paymentStatus);
