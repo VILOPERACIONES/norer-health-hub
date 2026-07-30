@@ -1,74 +1,245 @@
-import { useNavigate } from 'react-router-dom';
-import { XCircle, RefreshCw, ArrowLeft, CreditCard, ShieldAlert, HeadphonesIcon } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import {
+  ArrowLeft,
+  CheckCircle2,
+  CreditCard,
+  LoaderCircle,
+  RefreshCw,
+  RotateCcw,
+  ShieldCheck,
+} from 'lucide-react';
+import {
+  fetchLatestCheckoutStatus,
+  requestStripeCheckout,
+  type CheckoutTier,
+} from '@/lib/stripeCheckout';
+
+type RequestError = {
+  response?: {
+    status?: number;
+    data?: { error?: string };
+  };
+  message?: string;
+};
 
 export default function PaymentError() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedTier = searchParams.get('nivel');
+  const fallbackTier: CheckoutTier = requestedTier === 'basica' ? 'basica' : 'premium';
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const latestQuery = useQuery({
+    queryKey: ['stripe-checkout-latest'],
+    queryFn: fetchLatestCheckoutStatus,
+    retry: (attempt, error: RequestError) => error.response?.status !== 404 && attempt < 2,
+    retryDelay: attempt => Math.min(1000 * 2 ** attempt, 5000),
+    refetchOnReconnect: true,
+    refetchOnWindowFocus: true,
+  });
+
+  const checkout = latestQuery.data;
+  const notFound = latestQuery.isError
+    && (latestQuery.error as RequestError)?.response?.status === 404;
+  const verificationError = latestQuery.isError && !notFound;
+  const paid = checkout?.status === 'complete'
+    && ['paid', 'no_payment_required'].includes(checkout.paymentStatus);
+  const canContinue = checkout?.status === 'open' && Boolean(checkout.continuationUrl);
+  const canRecover = checkout?.status === 'expired' && Boolean(checkout.continuationUrl);
+  const canCreateNew = notFound
+    || (checkout?.status === 'expired' && !checkout.continuationUrl);
+  const tier = checkout?.nivel || fallbackTier;
+
+  useEffect(() => {
+    if (!checkout || (!paid && !checkout.activated)) return;
+    navigate(
+      `/norder-health/activado?session_id=${encodeURIComponent(checkout.sessionId)}`,
+      { replace: true },
+    );
+  }, [checkout, navigate, paid]);
+
+  const createNewCheckout = async () => {
+    setCreating(true);
+    setCreateError(null);
+    try {
+      const session = await requestStripeCheckout(tier);
+      window.location.assign(session.url);
+    } catch (requestError: unknown) {
+      const checkoutError = requestError as RequestError;
+      setCreateError(
+        checkoutError.response?.data?.error
+        || checkoutError.message
+        || 'No pudimos iniciar un nuevo intento de pago.',
+      );
+      setCreating(false);
+    }
+  };
+
+  const continueCheckout = () => {
+    if (checkout?.continuationUrl) {
+      window.location.assign(checkout.continuationUrl);
+    }
+  };
+
+  const presentation = (() => {
+    if (latestQuery.isPending) {
+      return {
+        eyebrow: 'Verificación segura',
+        title: 'Revisando tu último intento',
+        body: 'Antes de ofrecer otro pago, estamos consultando directamente con Stripe.',
+        Icon: LoaderCircle,
+        iconClass: 'animate-spin',
+      };
+    }
+    if (paid || checkout?.activated) {
+      return {
+        eyebrow: 'Pago detectado',
+        title: 'Confirmando tu acceso',
+        body: 'Encontramos el pago en Stripe. Te llevaremos a la confirmación de tu membresía.',
+        Icon: CheckCircle2,
+        iconClass: '',
+      };
+    }
+    if (canContinue) {
+      return {
+        eyebrow: 'Pago pausado',
+        title: 'Puedes continuar donde te quedaste',
+        body: 'La sesión sigue abierta en Stripe. No crearemos otro cobro: volverás al mismo checkout.',
+        Icon: ArrowLeft,
+        iconClass: '',
+      };
+    }
+    if (checkout?.status === 'expired') {
+      return {
+        eyebrow: 'Sesión vencida',
+        title: canRecover ? 'Stripe preparó una recuperación' : 'Puedes iniciar un intento nuevo',
+        body: canRecover
+          ? 'La sesión anterior ya no puede cobrar. Stripe abrirá una copia segura para que continúes.'
+          : 'Stripe confirmó que la sesión anterior expiró y ya no puede procesar un pago.',
+        Icon: ArrowLeft,
+        iconClass: '',
+      };
+    }
+    if (checkout?.status === 'complete') {
+      return {
+        eyebrow: 'Confirmación pendiente',
+        title: 'El pago todavía se está procesando',
+        body: 'No inicies otro pago. Revisaremos nuevamente con Stripe cuando la confirmación esté disponible.',
+        Icon: RefreshCw,
+        iconClass: '',
+      };
+    }
+    if (notFound) {
+      return {
+        eyebrow: 'Sin intento reciente',
+        title: 'No encontramos un pago pendiente',
+        body: 'Puedes iniciar un checkout nuevo para continuar con tu membresía.',
+        Icon: CreditCard,
+        iconClass: '',
+      };
+    }
+    return {
+      eyebrow: 'Sin conexión de confirmación',
+      title: 'No pudimos verificar el pago',
+      body: 'Por seguridad no iniciaremos otro cobro hasta poder consultar nuevamente con Stripe.',
+      Icon: RefreshCw,
+      iconClass: '',
+    };
+  })();
+
+  const StateIcon = presentation.Icon;
+  const primaryLoading = creating || latestQuery.isFetching || Boolean(paid);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[100dvh] bg-[#0a0a0a] px-6 py-12 select-none">
-
-      {/* Logo NORDER con X */}
-      <div className="relative mb-8">
-        <div className="w-24 h-24 rounded-[26px] bg-[#0d0d0d] border border-[#1a1a1a] flex items-center justify-center shadow-2xl">
-          <svg viewBox="0 0 512 512" className="w-16 h-16" style={{ opacity: 0.4 }}>
-            <circle cx="256" cy="220" r="130" fill="#333" />
-            <text x="256" y="272" fontFamily="system-ui,sans-serif" fontSize="140" fontWeight="800" fill="white" textAnchor="middle">N</text>
-          </svg>
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#0a0a0a] px-6 py-12">
+      <div className="w-full max-w-sm">
+        <div className="mb-7 flex justify-center">
+          <div className="flex h-20 w-20 items-center justify-center rounded-[24px] border border-[#3a2a13] bg-[#1b1308]">
+            <StateIcon
+              size={34}
+              className={`text-[#f59e0b] ${presentation.iconClass}`}
+              strokeWidth={2}
+            />
+          </div>
         </div>
-        <div className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-[#f87171] flex items-center justify-center shadow-lg shadow-[#f87171]/20">
-          <XCircle size={18} className="text-white" strokeWidth={2.5} />
+
+        <p className="mb-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-[#f59e0b]">
+          {presentation.eyebrow}
+        </p>
+        <h1 className="text-center text-[28px] font-black leading-tight tracking-tight text-white">
+          {presentation.title}
+        </h1>
+        <p className="mt-3 text-center text-[13px] leading-relaxed text-[#666]">
+          {presentation.body}
+        </p>
+
+        <div className="mt-7 rounded-[18px] border border-[#1c1c1c] bg-[#101010] p-4">
+          <div className="flex items-start gap-3">
+            <ShieldCheck size={18} className="mt-0.5 flex-shrink-0 text-[#22c55e]" />
+            <p className="text-[11px] leading-relaxed text-[#666]">
+              Norder Health solo activa tu membresía después de confirmar la sesión directamente con Stripe.
+            </p>
+          </div>
         </div>
-      </div>
 
-      {/* Headline */}
-      <p className="text-[11px] text-[#444] font-bold uppercase tracking-widest mb-2">Pago no completado</p>
-      <h1 className="text-[26px] font-black text-white text-center leading-tight tracking-tight mb-3">
-        No se procesó<br />el pago
-      </h1>
-      <p className="text-[13px] text-[#555] text-center leading-relaxed mb-8 max-w-xs">
-        No se realizó ningún cargo. Puedes intentarlo de nuevo o contactar soporte si el problema persiste.
-      </p>
+        {createError && (
+          <div className="mt-4 rounded-[12px] border border-[#4a1f1f] bg-[#1a0d0d] px-4 py-3">
+            <p className="text-center text-[11px] leading-relaxed text-[#f87171]">
+              {createError}
+            </p>
+          </div>
+        )}
 
-      {/* Possible reasons */}
-      <div className="w-full max-w-sm bg-[#0f0f0f] border border-[#1a1a1a] rounded-[20px] px-5 py-5 mb-8">
-        <p className="text-[10px] text-[#3a3a3a] uppercase tracking-widest font-bold mb-4">Posibles causas</p>
-        <div className="flex flex-col gap-3.5">
-          {[
-            { Icon: CreditCard, text: 'Fondos insuficientes o tarjeta inválida' },
-            { Icon: ShieldAlert, text: 'Pago rechazado por tu banco' },
-            { Icon: ArrowLeft, text: 'Cancelaste el proceso de pago' },
-          ].map(({ Icon, text }) => (
-            <div key={text} className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-[9px] bg-[#1a1010] flex items-center justify-center flex-shrink-0">
-                <Icon size={14} className="text-[#f87171]" strokeWidth={2} />
-              </div>
-              <p className="text-[13px] text-[#666] leading-snug">{text}</p>
-            </div>
-          ))}
+        <div className="mt-8 flex flex-col gap-3">
+          {(canContinue || canRecover) && (
+            <button
+              type="button"
+              onClick={continueCheckout}
+              className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-white py-4 text-[14px] font-bold text-black"
+            >
+              <CreditCard size={16} />
+              {canRecover ? 'Recuperar pago' : 'Continuar el mismo pago'}
+            </button>
+          )}
+
+          {canCreateNew && (
+            <button
+              type="button"
+              onClick={createNewCheckout}
+              disabled={creating}
+              className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-white py-4 text-[14px] font-bold text-black disabled:opacity-50"
+            >
+              {creating
+                ? <LoaderCircle size={16} className="animate-spin" />
+                : <CreditCard size={16} />}
+              Iniciar Plan {tier === 'basica' ? 'Básico' : 'Premium'}
+            </button>
+          )}
+
+          {(verificationError || checkout?.status === 'complete') && (
+            <button
+              type="button"
+              onClick={() => latestQuery.refetch()}
+              disabled={primaryLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-[15px] bg-white py-4 text-[14px] font-bold text-black disabled:opacity-50"
+            >
+              <RefreshCw size={16} className={latestQuery.isFetching ? 'animate-spin' : ''} />
+              Revisar nuevamente
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => navigate('/norder-health', { replace: true })}
+            className="flex w-full items-center justify-center gap-2 rounded-[15px] border border-[#222] bg-[#111] py-4 text-[14px] font-bold text-[#aaa]"
+          >
+            <RotateCcw size={16} />
+            Volver al portal
+          </button>
         </div>
-      </div>
-
-      {/* CTAs */}
-      <div className="w-full max-w-sm flex flex-col gap-3">
-        <button
-          onClick={() => navigate('/norder-health', { replace: true })}
-          className="w-full py-4 rounded-[16px] font-bold text-[15px] bg-white text-black transition-all active:scale-[0.98] flex items-center justify-center gap-2.5"
-        >
-          <RefreshCw size={16} strokeWidth={2.5} />
-          Intentar de nuevo
-        </button>
-        <button
-          onClick={() => navigate('/norder-health', { replace: true })}
-          className="w-full py-3.5 rounded-[16px] text-[14px] font-semibold text-[#444] bg-transparent border border-[#1e1e1e] transition-all active:scale-[0.98] flex items-center justify-center gap-2.5 hover:border-[#2a2a2a] hover:text-[#666]"
-        >
-          <ArrowLeft size={15} strokeWidth={2} />
-          Volver al portal
-        </button>
-      </div>
-
-      <div className="mt-8 flex items-center gap-1.5 text-[11px] text-[#2a2a2a]">
-        <HeadphonesIcon size={11} strokeWidth={2} />
-        <span>¿Problemas? Contacta a tu nutriólogo</span>
       </div>
     </div>
   );
