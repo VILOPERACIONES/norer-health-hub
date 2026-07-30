@@ -107,6 +107,32 @@ describe('requestStripeCheckout', () => {
       sessionId: 'cs_new',
     });
   });
+
+  it('acepta continuar al portal cuando la suscripción ya está activa', async () => {
+    vi.spyOn(portalApi, 'get').mockRejectedValueOnce({
+      response: {
+        status: 404,
+        data: { code: 'checkout_not_found' },
+      },
+    });
+    vi.spyOn(portalApi, 'post').mockResolvedValueOnce({
+      data: {
+        url: 'https://crm-norder-health.vercel.app/norder-health',
+        flow: 'already_active',
+        subscriptionId: 'sub_123',
+        nivelActual: 'premium',
+        message: 'Tu suscripción ya está activa. No se generó un cobro nuevo.',
+      },
+    });
+
+    await expect(requestStripeCheckout(
+      'premium',
+      '12345678-1234-1234-1234-123456789abc',
+    )).resolves.toMatchObject({
+      flow: 'already_active',
+      nivelActual: 'premium',
+    });
+  });
 });
 
 describe('resolveCheckoutViewState', () => {

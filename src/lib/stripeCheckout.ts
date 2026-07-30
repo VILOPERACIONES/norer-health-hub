@@ -5,8 +5,10 @@ export type CheckoutTier = 'basica' | 'premium';
 export interface CheckoutSessionResponse {
   url: string;
   sessionId?: string;
-  flow?: 'checkout' | 'subscription_update';
+  flow?: 'checkout' | 'subscription_update' | 'already_active';
   subscriptionId?: string;
+  message?: string;
+  nivelActual?: CheckoutTier | null;
 }
 
 export interface CheckoutStatusResponse {
@@ -79,7 +81,13 @@ export const requestStripeCheckout = async (
     nivel,
     attemptId,
   });
-  if (!response.data?.url || (!response.data.sessionId && response.data.flow !== 'subscription_update')) {
+  if (
+    !response.data?.url
+    || (
+      !response.data.sessionId
+      && !['subscription_update', 'already_active'].includes(response.data.flow || '')
+    )
+  ) {
     throw new Error('Stripe no devolvió una sesión de pago válida.');
   }
   return response.data;
