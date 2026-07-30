@@ -73,6 +73,7 @@ export const requestStripeCheckout = async (
   nivel: CheckoutTier,
   attemptId = createCheckoutAttemptId(),
 ): Promise<CheckoutSessionResponse> => {
+  await ensureCheckoutApiReady();
   rememberCheckoutAttempt(nivel, attemptId);
   const response = await portalApi.post<CheckoutSessionResponse>('/api/portal/checkout', {
     nivel,
@@ -109,6 +110,31 @@ export const isCheckoutNotFoundError = (error: unknown): boolean => {
   };
   return requestError.response?.status === 404
     && requestError.response?.data?.code === 'checkout_not_found';
+};
+
+export const isLegacyCheckoutApiError = (error: unknown): boolean => {
+  const requestError = error as {
+    response?: {
+      status?: number;
+      data?: { code?: string };
+    };
+  };
+  return requestError.response?.status === 404
+    && requestError.response?.data?.code !== 'checkout_not_found';
+};
+
+export const ensureCheckoutApiReady = async (): Promise<void> => {
+  try {
+    await fetchLatestCheckoutStatus();
+  } catch (error) {
+    if (isCheckoutNotFoundError(error)) return;
+    if (isLegacyCheckoutApiError(error)) {
+      throw new Error(
+        'El servidor de pagos está pendiente de actualización. No se creó un nuevo checkout.',
+      );
+    }
+    throw error;
+  }
 };
 
 export type CheckoutViewState =

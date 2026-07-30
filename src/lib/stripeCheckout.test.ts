@@ -1,10 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import portalApi from './portalApi';
 import {
   isCheckoutNotFoundError,
+  isLegacyCheckoutApiError,
+  requestStripeCheckout,
   resolveCheckoutViewState,
   validateCheckoutStatusResponse,
   type CheckoutStatusResponse,
 } from './stripeCheckout';
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 const result = (overrides: Partial<CheckoutStatusResponse> = {}): CheckoutStatusResponse => ({
   sessionId: 'cs_123',
@@ -38,6 +45,67 @@ describe('isCheckoutNotFoundError', () => {
         data: { error: 'Route not found' },
       },
     })).toBe(false);
+  });
+});
+
+describe('isLegacyCheckoutApiError', () => {
+  it('detecta el 404 genérico de una API que todavía no tiene recuperación', () => {
+    expect(isLegacyCheckoutApiError({
+      response: {
+        status: 404,
+        data: { error: 'Route not found' },
+      },
+    })).toBe(true);
+  });
+
+  it('no bloquea el 404 explícito que permite crear el primer checkout', () => {
+    expect(isLegacyCheckoutApiError({
+      response: {
+        status: 404,
+        data: { code: 'checkout_not_found' },
+      },
+    })).toBe(false);
+  });
+});
+
+describe('requestStripeCheckout', () => {
+  it('no crea una sesión huérfana contra la API anterior', async () => {
+    vi.spyOn(portalApi, 'get').mockRejectedValueOnce({
+      response: {
+        status: 404,
+        data: { error: 'Route not found' },
+      },
+    });
+    const post = vi.spyOn(portalApi, 'post');
+
+    await expect(requestStripeCheckout(
+      'premium',
+      '12345678-1234-1234-1234-123456789abc',
+    )).rejects.toThrow('pendiente de actualización');
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('permite crear el primer Checkout cuando la API nueva confirma que no existe otro', async () => {
+    vi.spyOn(portalApi, 'get').mockRejectedValueOnce({
+      response: {
+        status: 404,
+        data: { code: 'checkout_not_found' },
+      },
+    });
+    vi.spyOn(portalApi, 'post').mockResolvedValueOnce({
+      data: {
+        url: 'https://checkout.stripe.com/c/pay/cs_new',
+        sessionId: 'cs_new',
+      },
+    });
+
+    await expect(requestStripeCheckout(
+      'basica',
+      '12345678-1234-1234-1234-123456789abc',
+    )).resolves.toEqual({
+      url: 'https://checkout.stripe.com/c/pay/cs_new',
+      sessionId: 'cs_new',
+    });
   });
 });
 
