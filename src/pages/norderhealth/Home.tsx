@@ -184,12 +184,22 @@ function TiempoCard({ t }: { t: any }) {
 function UpgradeButton({ nivel, label, color = 'green' }: { nivel: CheckoutTier; label: string; color?: 'green' | 'blue' | 'ghost' }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [activePlan, setActivePlan] = useState<{ message: string; url: string } | null>(null);
 
   const handleUpgrade = async () => {
     setLoading(true);
     setError(null);
+    setActivePlan(null);
     try {
       const session = await requestStripeCheckout(nivel);
+      if (session.flow === 'already_active') {
+        setActivePlan({
+          message: session.message || 'Tu suscripción ya está activa. No se generó otro cobro.',
+          url: session.url,
+        });
+        setLoading(false);
+        return;
+      }
       window.location.assign(session.url);
     } catch (err: unknown) {
       const requestError = err as {
@@ -221,6 +231,18 @@ function UpgradeButton({ nivel, label, color = 'green' }: { nivel: CheckoutTier;
           : <Star size={14} strokeWidth={2.5} />}
         {label}
       </button>
+      {activePlan && (
+        <div className="mt-2 rounded-[10px] border border-[#22c55e]/25 bg-[#0f2e1a] p-2.5 text-center">
+          <p className="text-[10.5px] leading-relaxed text-[#86efac]">{activePlan.message}</p>
+          <button
+            type="button"
+            onClick={() => window.location.assign(activePlan.url)}
+            className="mt-2 text-[11px] font-bold text-[#22c55e] underline underline-offset-2"
+          >
+            Continuar al sistema
+          </button>
+        </div>
+      )}
       {error && <p className="text-[10px] text-[#f87171] mt-1.5 text-center">{error}</p>}
     </div>
   );
