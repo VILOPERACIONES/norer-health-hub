@@ -192,8 +192,15 @@ function UpgradeButton({ nivel, label, color = 'green' }: { nivel: CheckoutTier;
       const session = await requestStripeCheckout(nivel);
       window.location.assign(session.url);
     } catch (err: unknown) {
-      const requestError = err as { response?: { data?: { error?: string } } };
-      setError(requestError.response?.data?.error || 'Error al generar el pago. Intenta de nuevo.');
+      const requestError = err as {
+        response?: { data?: { error?: string } };
+        message?: string;
+      };
+      setError(
+        requestError.response?.data?.error
+        || requestError.message
+        || 'Error al generar el pago. Intenta de nuevo.',
+      );
       setLoading(false);
     }
   };
