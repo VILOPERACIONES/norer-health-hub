@@ -3,6 +3,7 @@ import { Search, Plus, Edit2, Trash2, X, Check, BookOpen, SlidersHorizontal, Min
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
+import { invalidateSmaeCache } from '@/components/SmaeIngredientePicker';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 interface EquivalenciaExtra {
@@ -438,11 +439,13 @@ const EquivalenciasSMAE = () => {
       if (editando) {
         await api.put(`/api/alimentos-smae/${editando.id}`, form);
         setAlimentos(prev => prev.map(a => a.id === editando.id ? { ...a, ...form } : a));
+        invalidateSmaeCache(); // Fuerza recarga del catálogo en SmaeIngredientePicker
         toast({ title: 'Alimento actualizado' });
       } else {
         const { data } = await api.post('/api/alimentos-smae', form);
         const nuevo = data?.data || data;
         setAlimentos(prev => [nuevo, ...prev]);
+        invalidateSmaeCache(); // Fuerza recarga del catálogo en SmaeIngredientePicker
         toast({ title: 'Alimento agregado al catálogo' });
       }
       setShowModal(false);
@@ -457,6 +460,7 @@ const EquivalenciasSMAE = () => {
     try {
       await api.delete(`/api/alimentos-smae/${a.id}`);
       setAlimentos(prev => prev.filter(x => x.id !== a.id));
+      invalidateSmaeCache(); // Fuerza recarga del catálogo en SmaeIngredientePicker
       toast({ title: 'Alimento eliminado del catálogo' });
     } catch (err: any) {
       toast({ title: 'Error', description: 'No se pudo eliminar.', variant: 'destructive' });
