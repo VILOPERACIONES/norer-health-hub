@@ -25,6 +25,51 @@ export interface CheckoutStatusResponse {
   } | null;
 }
 
+const isLocalHostname = (hostname: string) => ['localhost', '127.0.0.1'].includes(hostname);
+
+export const validateCheckoutSessionResponse = (
+  value: unknown,
+  currentOrigin = typeof window !== 'undefined' ? window.location.origin : undefined,
+): CheckoutSessionResponse => {
+  const result = value as CheckoutSessionResponse | null;
+  const validFlowWithoutSession = ['subscription_update', 'already_active']
+    .includes(result?.flow || '');
+
+  let destination: URL | null = null;
+  let browserOrigin: URL | null = null;
+  try {
+    destination = result?.url ? new URL(result.url) : null;
+    browserOrigin = currentOrigin ? new URL(currentOrigin) : null;
+  } catch {
+    destination = null;
+  }
+
+  const browserIsLocal = Boolean(browserOrigin && isLocalHostname(browserOrigin.hostname));
+  const destinationIsLocal = Boolean(destination && isLocalHostname(destination.hostname));
+  const secureProtocol = destination?.protocol === 'https:'
+    || (browserIsLocal && destinationIsLocal && destination?.protocol === 'http:');
+  const safeDestination = result?.flow === 'already_active'
+    ? Boolean(
+      destination
+      && secureProtocol
+      && (browserIsLocal || destination.origin === browserOrigin?.origin),
+    )
+    : Boolean(
+      destination
+      && secureProtocol
+      && (destination.hostname === 'stripe.com' || destination.hostname.endsWith('.stripe.com')),
+    );
+
+  if (
+    !result
+    || !safeDestination
+    || (!result.sessionId && !validFlowWithoutSession)
+  ) {
+    throw new Error('El servidor no devolvió un destino de pago seguro.');
+  }
+  return result;
+};
+
 export const validateCheckoutStatusResponse = (
   value: unknown,
   expectedSessionId: string,
@@ -81,16 +126,7 @@ export const requestStripeCheckout = async (
     nivel,
     attemptId,
   });
-  if (
-    !response.data?.url
-    || (
-      !response.data.sessionId
-      && !['subscription_update', 'already_active'].includes(response.data.flow || '')
-    )
-  ) {
-    throw new Error('Stripe no devolvió una sesión de pago válida.');
-  }
-  return response.data;
+  return validateCheckoutSessionResponse(response.data);
 };
 
 export const fetchCheckoutStatus = async (sessionId: string): Promise<CheckoutStatusResponse> => {

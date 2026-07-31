@@ -5,6 +5,7 @@ import {
   isLegacyCheckoutApiError,
   requestStripeCheckout,
   resolveCheckoutViewState,
+  validateCheckoutSessionResponse,
   validateCheckoutStatusResponse,
   type CheckoutStatusResponse,
 } from './stripeCheckout';
@@ -132,6 +133,34 @@ describe('requestStripeCheckout', () => {
       flow: 'already_active',
       nivelActual: 'premium',
     });
+  });
+});
+
+describe('validateCheckoutSessionResponse', () => {
+  it('rechaza un regreso a localhost cuando el portal está en producción', () => {
+    expect(() => validateCheckoutSessionResponse({
+      url: 'http://localhost:5173/norder-health',
+      flow: 'already_active',
+      subscriptionId: 'sub_123',
+    }, 'https://crm-norder-health.vercel.app')).toThrow('destino de pago seguro');
+  });
+
+  it('rechaza un dominio ajeno aunque use HTTPS', () => {
+    expect(() => validateCheckoutSessionResponse({
+      url: 'https://example.com/checkout',
+      sessionId: 'cs_123',
+    }, 'https://crm-norder-health.vercel.app')).toThrow('destino de pago seguro');
+  });
+
+  it('acepta Stripe y el regreso al mismo portal', () => {
+    expect(validateCheckoutSessionResponse({
+      url: 'https://checkout.stripe.com/c/pay/cs_123',
+      sessionId: 'cs_123',
+    }, 'https://crm-norder-health.vercel.app')).toMatchObject({ sessionId: 'cs_123' });
+    expect(validateCheckoutSessionResponse({
+      url: 'https://crm-norder-health.vercel.app/norder-health',
+      flow: 'already_active',
+    }, 'https://crm-norder-health.vercel.app')).toMatchObject({ flow: 'already_active' });
   });
 });
 
