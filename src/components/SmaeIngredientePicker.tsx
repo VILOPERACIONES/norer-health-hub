@@ -150,19 +150,37 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
   useEffect(() => { loadSmae().then(setAllAlimentos); }, []);
 
   // ─── Re-derivar ancla piezas + grupo + grPorEq desde catálogo al cargar ingrediente ──
-  // Necesario tras reload: si el nutriólogo actualizó la equivalencia en Equivalencias SMAE
-  // (ej. 20g → 30g), al abrir un platillo que usa ese alimento, el anchor se sincroniza
-  // automáticamente con el valor del catálogo, sin necesidad de re-seleccionar el alimento.
+  // Si el nutriólogo actualizó la equivalencia en Equivalencias SMAE (ej: 20g → 60g por Eq),
+  // al abrir cualquier platillo que use ese alimento:
+  //   • El ancla (smaeGrPorEq) se actualiza al valor del catálogo.
+  //   • Los GRAMOS se recalculan manteniendo fijo el número de Eq guardado.
+  //     Ejemplo: platillo tenía 2 Eq → nuevo ancla 60g → cantidad = 2 × 60 = 120g
+  //   • onUpdate() propaga el cambio al padre para que se vea en pantalla.
+  //   • El usuario aún debe presionar GUARDAR para persistir en BD.
   useEffect(() => {
     if (allAlimentos.length === 0 || !ing.descripcion) return;
     const match = allAlimentos.find(a => a.nombre === ing.descripcion);
     if (match) {
       if (smaePiezasPorEq === 0 && match.cantidadPorcion) setSmaePiezasPorEq(match.cantidadPorcion);
       if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
-      // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana:
-      // esto refleja automáticamente cambios en Equivalencias SMAE sin re-seleccionar.
+
+      // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana.
       if (match.pesoGramos > 0 && match.pesoGramos !== smaeGrPorEq) {
-        setSmaeGrPorEq(match.pesoGramos);
+        const newAnchor = match.pesoGramos;
+        setSmaeGrPorEq(newAnchor);
+
+        // Mantener las Eq fijas y recalcular los gramos con el nuevo ancla.
+        // Se usa ing.eqCantidad (valor guardado en BD) como fuente de verdad del Eq count.
+        const storedEq = Number(ing.eqCantidad) || 0;
+        if (storedEq > 0 && (ing.unidad || 'GR').toUpperCase() === 'GR') {
+          const newGrams = parseFloat((storedEq * newAnchor).toFixed(1));
+          setCantidad(newGrams.toString());
+          onUpdate({
+            smaeGrPorEq: newAnchor,
+            cantidad: newGrams,
+            unidad: 'GR',
+          });
+        }
       }
     }
   }, [allAlimentos, ing.descripcion]);
