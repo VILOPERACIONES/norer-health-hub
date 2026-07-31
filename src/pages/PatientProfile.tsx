@@ -330,7 +330,7 @@ const PatientProfile = () => {
 
   const handleChangeTier = async (tier: 'gratis' | 'basico' | 'premium') => {
     if (!paciente || isChangingTier) return;
-    const nivelMap = { gratis: 'ninguna', basico: 'basico', premium: 'premium' } as const;
+    const nivelMap = { gratis: 'ninguna', basico: 'basica', premium: 'premium' } as const;
     setIsChangingTier(true);
     try {
       await api.put(`/api/portal/activar/${id}`, { activar: true, nivelMembresia: nivelMap[tier] });
@@ -564,7 +564,9 @@ const PatientProfile = () => {
 
             {paciente.portalActivo && (() => {
               const nivel = (paciente as any).nivelMembresia || 'ninguna';
-              const currentTier = ['premium', 'norder_health'].includes(nivel) ? 'premium' : nivel === 'basico' ? 'basico' : 'gratis';
+              const currentTier = ['premium', 'norder_health'].includes(nivel)
+                ? 'premium'
+                : (nivel === 'basica' || nivel === 'basico') ? 'basico' : 'gratis';
               const tiers = [
                 { key: 'gratis', label: 'Gratis', desc: '5 preguntas/día', active: 'bg-[#1c1000] text-[#f59e0b] border-[#f59e0b]/40' },
                 { key: 'basico', label: 'Básico', desc: 'Equivalencias generales', active: 'bg-[#0a1628] text-[#60a5fa] border-[#60a5fa]/40' },
