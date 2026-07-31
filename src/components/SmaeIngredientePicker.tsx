@@ -57,11 +57,26 @@ interface Props {
 }
 
 // ─── Caché en módulo ─────────────────────────────────────────────────────────
+// TTL de 5 minutos como red de seguridad automática.
+// Además, se puede invalidar explícitamente llamando a invalidateSmaeCache()
+// (por ejemplo, desde EquivalenciasSMAE al guardar un cambio).
+const SMAE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
 let _smaeCache: SmaeAlimento[] | null = null;
+let _smaeCacheTimestamp = 0;
+
+export const invalidateSmaeCache = () => {
+  _smaeCache = null;
+  _smaeCacheTimestamp = 0;
+};
+
 const loadSmae = async (): Promise<SmaeAlimento[]> => {
-  if (_smaeCache) return _smaeCache;
+  const now = Date.now();
+  if (_smaeCache && (now - _smaeCacheTimestamp) < SMAE_CACHE_TTL_MS) {
+    return _smaeCache;
+  }
   const { data } = await api.get('/api/alimentos-smae');
   _smaeCache = data?.data || data || [];
+  _smaeCacheTimestamp = now;
   return _smaeCache!;
 };
 
@@ -134,15 +149,21 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
   // ─── Carga catálogo una sola vez ───────────────────────────────────────────
   useEffect(() => { loadSmae().then(setAllAlimentos); }, []);
 
-  // ─── Re-derivar ancla piezas + grupo desde catálogo al cargar ingrediente ──
-  // Necesario tras reload: BD solo guarda smaeGrPorEq, no piezas/eq ni grupoKey.
+  // ─── Re-derivar ancla piezas + grupo + grPorEq desde catálogo al cargar ingrediente ──
+  // Necesario tras reload: si el nutriólogo actualizó la equivalencia en Equivalencias SMAE
+  // (ej. 20g → 30g), al abrir un platillo que usa ese alimento, el anchor se sincroniza
+  // automáticamente con el valor del catálogo, sin necesidad de re-seleccionar el alimento.
   useEffect(() => {
     if (allAlimentos.length === 0 || !ing.descripcion) return;
-    if (smaePiezasPorEq > 0 && smaeGrupoKey) return;
     const match = allAlimentos.find(a => a.nombre === ing.descripcion);
     if (match) {
       if (smaePiezasPorEq === 0 && match.cantidadPorcion) setSmaePiezasPorEq(match.cantidadPorcion);
       if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
+      // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana:
+      // esto refleja automáticamente cambios en Equivalencias SMAE sin re-seleccionar.
+      if (match.pesoGramos > 0 && match.pesoGramos !== smaeGrPorEq) {
+        setSmaeGrPorEq(match.pesoGramos);
+      }
     }
   }, [allAlimentos, ing.descripcion]);
 
