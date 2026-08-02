@@ -27,7 +27,6 @@ import {
   type RemovedMealTime,
 } from '@/lib/mealTimeOrdering';
 import { reorderDishGroups, reorderIngredientWithinDish } from '@/lib/ingredientOrdering';
-import { getIngredientEquivalences, scaleIngredientEquivalences } from '@/lib/smaeScaling';
 
 const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
@@ -48,6 +47,16 @@ const emptyIngrediente = (): Ingrediente => ({
   equivalencias: [],
   nota: ''
 });
+
+/** Redondeo inteligente para porciones prácticas:
+ *  - Parte decimal >= 0.5 → redondea arriba
+ *  - Parte decimal < 0.5  → redondea abajo
+ *  Nunca devuelve < 0. Si el valor es 0, devuelve 0.
+ */
+const smartRound = (val: number): number => {
+  if (val <= 0) return 0;
+  return Math.round(val); // Math.round ya hace >=0.5 up, <0.5 down
+};
 
 export const CreateEditPlanForm = ({
   pacienteId: propPacienteId,
@@ -560,30 +569,28 @@ export const CreateEditPlanForm = ({
 
         if (!barridoTiempoKey) return tiempo;
 
-        const totalsByGroup: Record<string, number> = {};
-        tiempo.ingredientes.forEach(ing => {
-          if (!ing.platillo) return;
-          const primary = getIngredientEquivalences(ing)[0];
-          if (!primary?.grupo) return;
-          const key = getBarridoKey(primary.grupo);
-          totalsByGroup[key] = (totalsByGroup[key] || 0) + (Number(primary.cantidad) || 0);
-        });
-
         return {
           ...tiempo,
           ingredientes: tiempo.ingredientes.map(ing => {
-            if (!ing.platillo) return ing;
-            const primary = getIngredientEquivalences(ing)[0];
-            if (!primary?.grupo) return ing;
-            const bKey = getBarridoKey(primary.grupo);
-            const assignedEq = Number(assignedBarrido.distribucion[barridoTiempoKey]?.[bKey]) || 0;
-            const currentTotal = totalsByGroup[bKey] || 0;
+            if (ing.platillo && ing.eqGrupo) {
+              const bKey = getBarridoKey(ing.eqGrupo);
+              const assignedEq = Number(assignedBarrido.distribucion[barridoTiempoKey]?.[bKey]) || 0;
 
-            // Cero significa libre/no asignado. Conservamos la receta en lugar de
-            // borrar cantidades; para valores positivos, todo el grupo comparte
-            // un solo factor y su suma termina exactamente en el presupuesto.
-            if (assignedEq <= 0 || currentTotal <= 0) return ing;
-            return scaleIngredientEquivalences(ing, assignedEq / currentTotal);
+              if (assignedEq >= 0) {
+                // EXCEPCIÓN: Si es verdura y el barrido le asignó 0 (libre), no la desaparecemos a 0.
+                // Mantenemos la porción base que traía el platillo.
+                if (assignedEq === 0 && bKey === 'verduras') {
+                  return ing;
+                }
+
+                const baseEq = Number(ing.eqCantidad) || 1;
+                const rawCant = (Number(ing.cantidad) / baseEq) * Number(assignedEq);
+                // Redondeo inteligente: no puede decirle al paciente "come 1.33 plátanos"
+                const newCant = smartRound(rawCant);
+                return { ...ing, cantidad: newCant, eqCantidad: assignedEq };
+              }
+            }
+            return ing;
           })
         };
       })
@@ -1846,6 +1853,27 @@ export const CreateEditPlanForm = ({
                                 {/* Lista de platillos renderizada siempre por defecto (TODOS) */}
                                 <div className="max-h-[260px] overflow-y-auto space-y-1 custom-scrollbar">
                                   {(() => {
+                                    // Mapa label (eqGrupo del platillo) → key (barrido distribucion)
+                                    const LABEL_TO_KEY: Record<string, string> = {
+                                      'Verduras': 'verduras', 'Verdura': 'verduras',
+                                      'Frutas': 'frutas', 'Fruta': 'frutas',
+                                      'Cereal s/grasa': 'cerealSinGr', 'C y T sin grasa': 'cerealSinGr',
+                                      'Cereal c/grasa': 'cerealConGr', 'C y T con grasa': 'cerealConGr',
+                                      'Leguminosas': 'leguminosas',
+                                      'AOA Muy Bajo': 'aoaMuyBajo', 'AOA muy bajo': 'aoaMuyBajo',
+                                      'AOA Bajo': 'aoaBajo', 'AOA bajo': 'aoaBajo',
+                                      'AOA Moderado': 'aoaModerado', 'AOA moderado': 'aoaModerado',
+                                      'AOA Alto': 'aoaAlto', 'AOA alto': 'aoaAlto',
+                                      'Leche descremada': 'lecheDesc', 'Leche Descrem.': 'lecheDesc',
+                                      'Leche semidescremada': 'lecheSemi', 'Leche Semi': 'lecheSemi',
+                                      'Leche entera': 'lecheEntera', 'Leche Entera': 'lecheEntera',
+                                      'Leche azucarada': 'lecheAz', 'Leche Azucarada': 'lecheAz',
+                                      'Grasa s/prot': 'grasaSinProt', 'A y G sin proteína': 'grasaSinProt',
+                                      'Grasa c/prot': 'grasaConProt', 'A y G con proteína': 'grasaConProt',
+                                      'Az sin grasa': 'azSinGr', 'Azúcar s/grasa': 'azSinGr',
+                                      'Az con grasa': 'azConGr', 'Azúcar c/grasa': 'azConGr',
+                                    };
+
                                     const results = platilloLibrary.filter(p => {
                                       if (platilloSearch) {
                                         return p.nombre.toLowerCase().includes(platilloSearch.toLowerCase()) ||
@@ -1869,69 +1897,62 @@ export const CreateEditPlanForm = ({
                                             : undefined;
                                           const distTiempo = d && barridoTiempo ? d[barridoTiempo.id] : null;
 
-                                          const prepared = p.ingredientes.map((i: any) => {
-                                            let parsedEquivalences: any[] = [];
-                                            if (Array.isArray(i.equivalencias)) parsedEquivalences = i.equivalencias;
-                                            else if (typeof i.equivalencias === 'string' && i.equivalencias.trim()) {
-                                              try { parsedEquivalences = JSON.parse(i.equivalencias); } catch { parsedEquivalences = []; }
+                                          const ings = p.ingredientes.map((i: any, idx: number) => {
+                                            let scaledCant = Number(i.cantidad);
+                                            let scaledEq = Number(i.eqCantidad);
+
+                                            // Unidades discretas (procesados, empaquetados): NO escalar cantidad
+                                            const UNIDADES_DISCRETAS = ['PZ', 'PAQUETE', 'BOTELLA', 'PIEZA', 'LATA', 'BOLSA', 'BARRA', 'SOBRE', 'TARRO', 'FRASCO'];
+                                            const esDiscreta = UNIDADES_DISCRETAS.includes((i.unidad || '').toUpperCase().trim());
+
+                                            // Parsear equivalencias si vienen como string
+                                            let eqArray = [];
+                                            if (Array.isArray(i.equivalencias)) {
+                                              eqArray = i.equivalencias;
+                                            } else if (typeof i.equivalencias === 'string' && i.equivalencias.trim() !== '') {
+                                              try { eqArray = JSON.parse(i.equivalencias); } catch (e) { }
                                             }
-                                            const equivalencias = parsedEquivalences.filter(
-                                              (e: any) => e?.grupo && String(e.grupo).trim() && Number(e.cantidad) > 0,
+
+                                            // Sanitizar equivalencias heredadas: eliminar entradas fantasma con grupo vacío
+                                            const rawEquivs = eqArray.filter(
+                                              (e: any) => e.grupo && String(e.grupo).trim() !== '' && e.cantidad !== '' && e.cantidad != null
                                             );
-                                            const primaryEq = Number(equivalencias[0]?.cantidad) || Number(i.eqCantidad) || 0;
-                                            const currentAmount = Number(i.cantidad) || 0;
-                                            const derivedGramsPerEq = String(i.unidad || '').toUpperCase().trim() === 'GR'
-                                              && currentAmount > 0 && primaryEq > 0
-                                              ? currentAmount / primaryEq
-                                              : 0;
+
+                                            // Si tiene más de una equivalencia o fue ingresado sin gramos, se considera complejo y no se escala
+                                            const esComplejo = rawEquivs.length > 1 || (Number(i.cantidad) === 0);
+
+                                            if (!esDiscreta && !esComplejo && i.eqGrupo && distTiempo) {
+                                              // Traduce el label del platillo al key del barrido
+                                              const barridoKey = LABEL_TO_KEY[i.eqGrupo] || i.eqGrupo;
+                                              const assigned = distTiempo[barridoKey];
+                                              if (assigned != null && assigned > 0) {
+                                                const baseEq = Number(i.eqCantidad) || 1;
+                                                // Redondeo inteligente: no puede decirle "come 1.33 plátanos"
+                                                scaledCant = smartRound((Number(i.cantidad) / baseEq) * assigned);
+                                                scaledEq = assigned;
+                                              }
+                                            }
+
+                                            // Calcular factor de escala para equivalencias
+                                            const origCant = Number(i.cantidad) || 0;
+                                            const scaleFactor = (scaledCant !== origCant && origCant > 0) ? (scaledCant / origCant) : 1;
+
+                                            const cleanEquivencias = rawEquivs.length > 0
+                                              ? rawEquivs.map((e: any) => ({
+                                                grupo: e.grupo,
+                                                // Escalar cada grupo proporcionalmente al mismo factor que la cantidad física
+                                                cantidad: scaleFactor !== 1 ? smartRound(Number(e.cantidad) * scaleFactor) : Number(e.cantidad),
+                                              }))
+                                              : i.eqGrupo ? [{ cantidad: scaledEq, grupo: i.eqGrupo }] : [];
+
                                             return {
                                               ...i,
-                                              cantidad: currentAmount,
-                                              eqCantidad: Number(i.eqCantidad) || 0,
-                                              smaeGrPorEq: derivedGramsPerEq || Number(i.smaeGrPorEq) || 0,
-                                              equivalencias: equivalencias.length > 0
-                                                ? equivalencias
-                                                : (i.eqGrupo && Number(i.eqCantidad) > 0
-                                                  ? [{ cantidad: Number(i.eqCantidad), grupo: i.eqGrupo }]
-                                                  : []),
-                                            } as Ingrediente;
-                                          });
-
-                                          // Sumamos primero el platillo completo por grupo. Así, si pollo y
-                                          // queso pertenecen ambos a AOA, comparten el presupuesto en vez de
-                                          // recibir cada uno la asignación completa.
-                                          const dishTotals: Record<string, number> = {};
-                                          prepared.forEach(ingredient => {
-                                            const primary = getIngredientEquivalences(ingredient)[0];
-                                            if (!primary?.grupo) return;
-                                            const key = groupToBarridoKey(normalizeGroup(primary.grupo));
-                                            dishTotals[key] = (dishTotals[key] || 0) + Number(primary.cantidad);
-                                          });
-
-                                          const alreadyUsed: Record<string, number> = {};
-                                          tiempo.ingredientes.forEach(ingredient => {
-                                            getIngredientEquivalences(ingredient).forEach(eq => {
-                                              const key = groupToBarridoKey(normalizeGroup(eq.grupo));
-                                              alreadyUsed[key] = (alreadyUsed[key] || 0) + Number(eq.cantidad);
-                                            });
-                                          });
-
-                                          const ings = prepared.map((ingredient, idx) => {
-                                            const primary = getIngredientEquivalences(ingredient)[0];
-                                            const key = primary?.grupo
-                                              ? groupToBarridoKey(normalizeGroup(primary.grupo))
-                                              : '';
-                                            const assigned = key && distTiempo ? Number(distTiempo[key]) : 0;
-                                            const remaining = assigned - (alreadyUsed[key] || 0);
-                                            const dishTotal = dishTotals[key] || 0;
-                                            const factor = assigned > 0 && remaining > 0 && dishTotal > 0
-                                              ? remaining / dishTotal
-                                              : 1;
-                                            const scaled = scaleIngredientEquivalences(ingredient, factor);
-                                            return {
-                                              ...scaled,
+                                              cantidad: scaledCant,
+                                              eqCantidad: scaledEq,
+                                              smaeGrPorEq: Number(i.smaeGrPorEq) || 0,
+                                              equivalencias: cleanEquivencias,
                                               platillo: p.nombre,
-                                              orden: (tiempo.ingredientes.length || 0) + idx + 1,
+                                              orden: (tiempo.ingredientes.length || 0) + idx + 1
                                             };
                                           });
 
