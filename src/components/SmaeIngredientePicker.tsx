@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, Check, Plus } from 'lucide-react';
 import api from '@/lib/api';
+import { useToast } from '@/components/ui/use-toast';
 import type { Ingrediente, EquivalenciaItem } from '@/types';
 import { normalizeGroup, SMAE_GROUP_LABELS } from '@/lib/smaeGroups';
 import { amountPerBaseEquivalent, buildScaledCatalogEquivalences } from '@/lib/smaeCatalogScaling';
@@ -55,6 +56,10 @@ interface Props {
   gapByGroup?: Record<string, number>;
   onUpdate: (updated: Partial<Ingrediente>) => void;
   onRemove: () => void;
+  /** Si es true, oculta el botón de guardar en catálogo SMAE.
+   *  Usar cuando el picker se renderiza desde CreateEditPlan (menú de paciente)
+   *  para evitar creaciones accidentales en el catálogo global. */
+  readonlyCatalog?: boolean;
 }
 
 // ─── Caché en módulo ─────────────────────────────────────────────────────────
@@ -82,7 +87,8 @@ const loadSmae = async (): Promise<SmaeAlimento[]> => {
 };
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onUpdate, onRemove }: Props) => {
+export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onUpdate, onRemove, readonlyCatalog = false }: Props) => {
+  const { toast } = useToast();
   const [allAlimentos, setAllAlimentos] = useState<SmaeAlimento[]>([]);
   const [query, setQuery] = useState(ing.descripcion || '');
   const [results, setResults] = useState<SmaeAlimento[]>([]);
@@ -146,6 +152,9 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
   const hasUserTyped = useRef(false);
   const lastSentUpdate = useRef<string>('');
   const isFocused = useRef(false); // Bloqueo de sincronización mientras se escribe
+  // Guard: evita que el efecto de sincronización del catálogo se dispare más de una vez
+  // por descripción de ingrediente, previniendo el loop de re-renders que crashea en Windows.
+  const catalogSyncedFor = useRef<string>('');
 
   // ─── Carga catálogo una sola vez ───────────────────────────────────────────
   useEffect(() => { loadSmae().then(setAllAlimentos); }, []);
@@ -160,17 +169,27 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
   //   • El usuario aún debe presionar GUARDAR para persistir en BD.
   useEffect(() => {
     if (allAlimentos.length === 0 || !ing.descripcion) return;
+    // Guard: si ya sincronizamos este ingrediente, no volver a hacerlo para evitar
+    // el loop onUpdate → prop change → useEffect → onUpdate en navegadores Windows.
+    if (catalogSyncedFor.current === ing.descripcion) return;
     const match = allAlimentos.find(a => a.nombre === ing.descripcion);
     if (match) {
+      // Marcar como sincronizado ANTES de hacer cualquier setState/onUpdate
+      catalogSyncedFor.current = ing.descripcion;
+
       const baseEq = match.equivalentesBase && match.equivalentesBase > 0 ? match.equivalentesBase : 1;
       if (smaePiezasPorEq === 0 && match.cantidadPorcion) {
         setSmaePiezasPorEq(amountPerBaseEquivalent(match.cantidadPorcion, baseEq));
       }
       if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
 
-      // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana.
-      if (match.pesoGramos > 0 && match.pesoGramos !== smaeGrPorEq) {
-        const newAnchor = match.pesoGramos;
+      // Si el catálogo tiene un ancla (gramos por 1 eq) distinta al guardado en BD, el catálogo gana.
+      // OJO: el ancla real es pesoGramos ÷ equivalentesBase (igual que en handleSelect), NO pesoGramos
+      // a secas. Comparar/usar pesoGramos crudo aquí rompía los alimentos con equivalentesBase != 1
+      // (ej. 117g = 4 eq → ancla correcta 29.25g/eq se recalculaba con 117g/eq).
+      const catalogAnchor = amountPerBaseEquivalent(match.pesoGramos, baseEq);
+      if (catalogAnchor > 0 && catalogAnchor !== smaeGrPorEq) {
+        const newAnchor = catalogAnchor;
         setSmaeGrPorEq(newAnchor);
 
         // Mantener las Eq fijas y recalcular los gramos con el nuevo ancla.
@@ -555,7 +574,13 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
       handleSelect(newFood);
       setShowQuickModal(false);
       setQuickGramos(''); setQuickPorcion('');
-    } catch (err) {
+    } catch (err: any) {
+      const duplicado = err?.response?.status === 409;
+      toast({
+        title: duplicado ? 'Ya existe' : 'Error',
+        description: err?.response?.data?.error || 'No se pudo guardar el alimento.',
+        variant: 'destructive',
+      });
       console.error('Error al guardar alimento rápido:', err);
     } finally {
       setIsSavingQuick(false);
@@ -662,7 +687,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
                 <div className="p-3 text-[12px] text-[#888] text-center w-full">No se encontraron resultados</div>
               )}
             </div>
-            {query.trim().length >= 2 && (
+            {query.trim().length >= 2 && !readonlyCatalog && (
               <button type="button"
                 onMouseDown={(e) => { e.preventDefault(); setShowQuickModal(true); setShowDropdown(false); }}
                 className="w-full text-center px-3 py-2.5 hover:bg-[#1a1a1a] transition-colors border-t border-[#333] text-[#90c2ff] font-medium text-[12px] flex items-center justify-center bg-[#111]">
@@ -672,8 +697,8 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
           </div>
         )}
 
-        {/* Quick Modal */}
-        {showQuickModal && (
+        {/* Quick Modal — solo visible cuando el catálogo NO es readonly */}
+        {showQuickModal && !readonlyCatalog && (
           <div className="bg-[#1a1a1a] border border-[#333] rounded-[8px] p-3 mt-2 space-y-3 animate-slide-up relative z-40 shadow-xl">
             <p className="text-[12px] font-bold text-white mb-2">⭐ Añadir "{query}" al Catálogo SMAE</p>
             <div className="grid grid-cols-2 gap-3">

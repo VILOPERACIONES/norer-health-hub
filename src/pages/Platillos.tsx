@@ -106,8 +106,13 @@ const Platillos = () => {
       setIsEditing(false);
       setCurrentPlatillo(null);
       fetchPlatillos();
-    } catch (err) {
-      toast({ title: 'Error', description: 'No se pudo guardar el platillo', variant: 'destructive' });
+    } catch (err: any) {
+      const duplicado = err?.response?.status === 409;
+      toast({
+        title: duplicado ? 'Ya existe' : 'Error',
+        description: err?.response?.data?.error || 'No se pudo guardar el platillo',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -460,7 +465,7 @@ const Platillos = () => {
 
       {/* ─── Modal de Vista Previa ─── */}
       {previewPlatillo && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/75 p-4 animate-in fade-in duration-200">
           <div className="bg-bg-surface w-full max-w-lg rounded-2xl shadow-2xl border border-border-subtle overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
             <div className="flex items-center justify-between p-5 bg-bg-base/50 border-b border-border-subtle">

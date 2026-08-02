@@ -70,11 +70,25 @@ const Dashboard = () => {
       .slice(0, 10);
   }, [topClientesRaw, pacientesData]);
 
+  // ── KPI "Menús pendientes" ────────────────────────────────────────────────
+  // Solo se evalúan las valoraciones de HOY que aún no tienen su menú enviado.
+  // Esto funciona como cuenta regresiva: empieza con las consultas del día
+  // y baja a 0 conforme el nutriólogo va completando cada menú.
   const ultimosPendientes = useMemo(() => {
     const pendItems: any[] = [];
+    const hoy = new Date();
+    const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
+
     pacientesData.forEach((pac: any) => {
       const valArr: any[] = pac.valoraciones || [];
+
+      // Evaluar todas las valoraciones de hoy (un paciente podría tener varias en el día)
       valArr.forEach((val: any) => {
+        if (!val.fecha) return;
+        const fechaVal = val.fecha.substring(0, 10); // 'YYYY-MM-DD'
+        if (fechaVal !== hoyStr) return;
+
+        // Enriquecer con plan si aún no está adjunto
         if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
           const planAsociado = pac.planes.find((pl: any) => pl.valoracionId === val.id);
           if (planAsociado) {
@@ -83,10 +97,9 @@ const Dashboard = () => {
             val.estadoEnvio = planAsociado.estadoEnvio;
           }
         }
+
         const statusInfo = getBadgeForValuation(val);
         if (statusInfo.text !== 'Enviado') {
-          // Próxima sesión: fuente primaria = cita vinculada a la valoración (val.tieneCita)
-          // Fallback = plan.proximaSesion (guardado al confirmar desde el plan)
           const planData = val.plan;
           const proximaSesion = val.tieneCita
             ? (val.proximaCita || true)
@@ -157,10 +170,7 @@ const Dashboard = () => {
     ? ((r.pacientesNuevosHoy ?? 0) / r.pacientesNuevosMes * 100).toFixed(1)
     : '0.0';
 
-  // % de pacientes con plan pendiente sobre el total
-  const pctPendientes = r?.pacientesTotales > 0
-    ? (planesPendientes / r.pacientesTotales * 100).toFixed(1)
-    : '0.0';
+
 
   // % de consultas de hoy sobre el total del mes
   const pctConsultasHoy = r?.consultasMes > 0
@@ -193,15 +203,17 @@ const Dashboard = () => {
       subColor: r?.pacientesNuevosHoy > 0 ? 'text-emerald-400' : 'text-[#8a8a8a]',
     },
     {
-      label: 'Menús pendientes',
+      label: 'Menús pendientes hoy',
       value: planesPendientes,
       icon: MessageSquare,
       badge: {
-        text: `${pctPendientes}%`,
-        color: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
+        text: planesPendientes > 0 ? `${planesSinAsignar + planesEnProceso + planesListos} por completar` : '¡Todo al día! ✨',
+        color: planesPendientes > 0 ? 'text-amber-400' : 'text-emerald-400',
       },
-      sub: `${planesSinAsignar} Pendiente · ${planesEnProceso} En proceso · ${planesListos} Listo`,
-      subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-[#555]',
+      sub: planesPendientes > 0
+        ? `${planesSinAsignar} Pendiente · ${planesEnProceso} En proceso · ${planesListos} Listo`
+        : 'Sin menús pendientes por hoy',
+      subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-emerald-400',
     },
     {
       label: 'Consultas hoy',
