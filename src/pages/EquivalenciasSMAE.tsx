@@ -451,7 +451,12 @@ const EquivalenciasSMAE = () => {
       setShowModal(false);
       setEditando(null);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.response?.data?.message || 'No se pudo guardar.', variant: 'destructive' });
+      const duplicado = err?.response?.status === 409;
+      toast({
+        title: duplicado ? 'Ya existe' : 'Error',
+        description: err.response?.data?.error || 'No se pudo guardar.',
+        variant: 'destructive',
+      });
       throw err;
     }
   };
