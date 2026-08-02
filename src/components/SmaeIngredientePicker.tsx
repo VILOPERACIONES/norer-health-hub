@@ -3,6 +3,7 @@ import { Search, X, Check, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import type { Ingrediente, EquivalenciaItem } from '@/types';
 import { normalizeGroup, SMAE_GROUP_LABELS } from '@/lib/smaeGroups';
+import { amountPerBaseEquivalent, buildScaledCatalogEquivalences } from '@/lib/smaeCatalogScaling';
 
 // ─── Label legible por grupo SMAE ─────────────────────────────────────────────
 const GRUPO_LABELS: Record<string, string> = {
@@ -161,7 +162,10 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     if (allAlimentos.length === 0 || !ing.descripcion) return;
     const match = allAlimentos.find(a => a.nombre === ing.descripcion);
     if (match) {
-      if (smaePiezasPorEq === 0 && match.cantidadPorcion) setSmaePiezasPorEq(match.cantidadPorcion);
+      const baseEq = match.equivalentesBase && match.equivalentesBase > 0 ? match.equivalentesBase : 1;
+      if (smaePiezasPorEq === 0 && match.cantidadPorcion) {
+        setSmaePiezasPorEq(amountPerBaseEquivalent(match.cantidadPorcion, baseEq));
+      }
       if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
 
       // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana.
@@ -261,17 +265,17 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     setQuery(alimento.nombre);
     setShowDropdown(false);
 
-    const grPorEq = alimento.pesoGramos;          // ancla
+    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
+    const grPorEq = amountPerBaseEquivalent(alimento.pesoGramos, baseEq);
     const grupoKey = alimento.grupo;
     const eqLabel = GRUPO_LABELS[grupoKey] || grupoKey;
     const grupoColor = GRUPO_COLORS[grupoKey] || '#8a8a8a';
 
     // Porción por defecto: porción casera si existe, si no pesoGramos en GR
-    const baseCant = alimento.cantidadPorcion ?? grPorEq;
+    const baseCant = alimento.cantidadPorcion ?? alimento.pesoGramos;
     const uFinal = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
 
     // eq que aporta 1 porción del grupo base (editable en catálogo, default 1)
-    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
     let eqVal = baseEq;
     let finalCant = baseCant;
 
@@ -284,28 +288,21 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
       finalCant = parseFloat((baseCant * portions).toFixed(2));
     }
 
-    const newEquivs: EquivalenciaItem[] = [{ cantidad: eqVal, grupo: eqLabel }];
+    const eqsExtra = Array.isArray(alimento.equivalencias) ? alimento.equivalencias : [];
+    const allEquivs = buildScaledCatalogEquivalences(eqLabel, baseEq, eqVal, eqsExtra);
 
     setSmaeGrPorEq(grPorEq);
-    setSmaePiezasPorEq(alimento.cantidadPorcion || 0);
+    setSmaePiezasPorEq(amountPerBaseEquivalent(alimento.cantidadPorcion, baseEq));
     setSmaeGrupoKey(grupoKey);
     setCantidad(finalCant.toString());
     setUnidad(uFinal);
-    setEquivalencias(newEquivs);
-
-    // Restaurar equivalencias adicionales del catálogo SMAE si existen
-    // (se incorporan como grupos adicionales en el array de equivalencias)
-    const eqsExtra = Array.isArray(alimento.equivalencias) ? alimento.equivalencias : [];
-    if (eqsExtra.length > 0) {
-      const allEquivs = [...newEquivs, ...eqsExtra];
-      setEquivalencias(allEquivs);
-    }
+    setEquivalencias(allEquivs);
     const updates: Partial<Ingrediente> = {
       descripcion: alimento.nombre,
       cantidad: finalCant,
       unidad: uFinal,
       smaeGrPorEq: grPorEq,
-      equivalencias: newEquivs,
+      equivalencias: allEquivs,
       eqCantidad: eqVal,
       eqGrupo: eqLabel,
     };
@@ -652,7 +649,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
                     <div>
                       <p className="text-[13px] font-bold text-white m-0">{a.nombre}</p>
                       <p className="text-[11px] font-medium text-[#b0b0b0] m-0">
-                        {a.pesoGramos}g = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${String(a.unidadPorcion || '').toLowerCase()}` : `${a.pesoGramos}g`} por porción
+                        {amountPerBaseEquivalent(a.pesoGramos, a.equivalentesBase)} {a.unidadBase || 'g'} = 1 eq · {a.pesoGramos} {a.unidadBase || 'g'} = {a.equivalentesBase || 1} eq por porción
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
