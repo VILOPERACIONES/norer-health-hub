@@ -211,9 +211,9 @@ const ModalAlimento = ({
             </p>
           </div>
 
-          {/* Cantidad ancla por 1 equivalente */}
+          {/* Cantidad física de la porción de referencia */}
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-text-secondary m-0">Cantidad por 1 equivalente *</label>
+            <label className="text-[12px] font-medium text-text-secondary m-0">Cantidad de la porción de referencia *</label>
             <div className="flex gap-2">
               <input
                 type="number"
@@ -254,9 +254,7 @@ const ModalAlimento = ({
               />
             )}
             <p className="text-[11px] text-text-muted m-0">
-              {form.unidadBase === 'g' || form.unidadBase === 'ml'
-                ? `Cuántos ${form.unidadBase} equivalen a 1 porción del grupo seleccionado`
-                : `Cuántas unidades (${form.unidadBase || 'unidad'}) equivalen a 1 porción del grupo seleccionado`}
+              Esta cantidad completa equivale a los {form.equivalentesBase || 1} eq indicados arriba.
             </p>
           </div>
 
@@ -566,7 +564,7 @@ const EquivalenciasSMAE = () => {
                 <tr className="border-b border-border-subtle">
                   <th className="px-6 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Alimento</th>
                   <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Grupo</th>
-                  <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider text-center">1 eq =</th>
+                  <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider text-center">Porción / 1 eq</th>
                   <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider">Porción casera</th>
                   <th className="px-4 py-3 text-[11px] font-medium text-text-muted uppercase tracking-wider w-20"></th>
                 </tr>
@@ -597,8 +595,8 @@ const EquivalenciasSMAE = () => {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="text-[14px] font-bold text-text-primary">{a.pesoGramos}</span>
-                      <span className="text-[12px] text-text-muted ml-1">{a.unidadBase || 'g'}</span>
+                      <span className="text-[14px] font-bold text-text-primary">{a.pesoGramos} {a.unidadBase || 'g'}</span>
+                      <span className="text-[11px] text-text-muted ml-1">/ {Number(a.equivalentesBase) > 0 ? Number(a.equivalentesBase) : 1} eq</span>
                     </td>
                     <td className="px-4 py-3">
                       {a.porcionCasera ? (

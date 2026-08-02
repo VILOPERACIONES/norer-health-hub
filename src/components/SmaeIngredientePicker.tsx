@@ -3,6 +3,7 @@ import { Search, X, Check, Plus } from 'lucide-react';
 import api from '@/lib/api';
 import type { Ingrediente, EquivalenciaItem } from '@/types';
 import { normalizeGroup, SMAE_GROUP_LABELS } from '@/lib/smaeGroups';
+import { getAmountPerEquivalent, roundSmaeMeasure } from '@/lib/smaeScaling';
 
 // ─── Label legible por grupo SMAE ─────────────────────────────────────────────
 const GRUPO_LABELS: Record<string, string> = {
@@ -161,7 +162,10 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     if (allAlimentos.length === 0 || !ing.descripcion) return;
     const match = allAlimentos.find(a => a.nombre === ing.descripcion);
     if (match) {
-      if (smaePiezasPorEq === 0 && match.cantidadPorcion) setSmaePiezasPorEq(match.cantidadPorcion);
+      const baseEq = match.equivalentesBase && match.equivalentesBase > 0 ? match.equivalentesBase : 1;
+      if (smaePiezasPorEq === 0 && match.cantidadPorcion) {
+        setSmaePiezasPorEq(getAmountPerEquivalent(match.cantidadPorcion, baseEq));
+      }
       if (!smaeGrupoKey && match.grupo) setSmaeGrupoKey(match.grupo);
 
       // Si el catálogo tiene un pesoGramos distinto al guardado en BD, el catálogo gana.
@@ -207,7 +211,9 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     if ((ing.unidad || 'GR').toUpperCase() !== unidad.toUpperCase()) setUnidad((ing.unidad || 'GR').toUpperCase());
 
     let effectiveGrPorEq = ing.smaeGrPorEq || 0;
-    if (effectiveGrPorEq === 0 && Number(ing.cantidad) > 0 && Number(ing.eqCantidad) > 0) {
+    // Compatibilidad con ingredientes guardados antes de corregir el ancla:
+    // en GR, la relación física actual cantidad/eq es la fuente consistente.
+    if ((ing.unidad || 'GR').toUpperCase() === 'GR' && Number(ing.cantidad) > 0 && Number(ing.eqCantidad) > 0) {
       effectiveGrPorEq = parseFloat((Number(ing.cantidad) / Number(ing.eqCantidad)).toFixed(3));
     }
     if (effectiveGrPorEq !== smaeGrPorEq) setSmaeGrPorEq(effectiveGrPorEq);
@@ -261,19 +267,21 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     setQuery(alimento.nombre);
     setShowDropdown(false);
 
-    const grPorEq = alimento.pesoGramos;          // ancla
+    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
+    const grPorEq = getAmountPerEquivalent(alimento.pesoGramos, baseEq); // ancla real por 1 eq
     const grupoKey = alimento.grupo;
     const eqLabel = GRUPO_LABELS[grupoKey] || grupoKey;
     const grupoColor = GRUPO_COLORS[grupoKey] || '#8a8a8a';
 
     // Porción por defecto: porción casera si existe, si no pesoGramos en GR
-    const baseCant = alimento.cantidadPorcion ?? grPorEq;
-    const uFinal = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
+    const baseCant = alimento.cantidadPorcion ?? alimento.pesoGramos;
+    const rawUnit = alimento.cantidadPorcion ? (alimento.unidadPorcion || 'PZA') : 'GR';
+    const uFinal = rawUnit.toUpperCase() === 'G' ? 'GR' : rawUnit.toUpperCase();
 
     // eq que aporta 1 porción del grupo base (editable en catálogo, default 1)
-    const baseEq = alimento.equivalentesBase && alimento.equivalentesBase > 0 ? alimento.equivalentesBase : 1;
     let eqVal = baseEq;
     let finalCant = baseCant;
+    let portionFactor = 1;
 
     // Auto-escalado a la carta (Eliminamos el bloqueo de "unidades discretas" porque al
     // agregar alimentos individuales sí queremos que multiplique la porción, ej: 1 eq = 17 fresas -> 2 eq = 34 fresas)
@@ -282,12 +290,13 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
       const portions = missing / baseEq;   // cuántas porciones llenan el faltante
       eqVal = missing;
       finalCant = parseFloat((baseCant * portions).toFixed(2));
+      portionFactor = portions;
     }
 
     const newEquivs: EquivalenciaItem[] = [{ cantidad: eqVal, grupo: eqLabel }];
 
     setSmaeGrPorEq(grPorEq);
-    setSmaePiezasPorEq(alimento.cantidadPorcion || 0);
+    setSmaePiezasPorEq(getAmountPerEquivalent(alimento.cantidadPorcion, baseEq));
     setSmaeGrupoKey(grupoKey);
     setCantidad(finalCant.toString());
     setUnidad(uFinal);
@@ -296,16 +305,20 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
     // Restaurar equivalencias adicionales del catálogo SMAE si existen
     // (se incorporan como grupos adicionales en el array de equivalencias)
     const eqsExtra = Array.isArray(alimento.equivalencias) ? alimento.equivalencias : [];
-    if (eqsExtra.length > 0) {
-      const allEquivs = [...newEquivs, ...eqsExtra];
-      setEquivalencias(allEquivs);
-    }
+    const allEquivs: EquivalenciaItem[] = [
+      ...newEquivs,
+      ...eqsExtra.map(eq => ({
+        ...eq,
+        cantidad: roundSmaeMeasure(Number(eq.cantidad) * portionFactor),
+      })),
+    ];
+    setEquivalencias(allEquivs);
     const updates: Partial<Ingrediente> = {
       descripcion: alimento.nombre,
       cantidad: finalCant,
       unidad: uFinal,
       smaeGrPorEq: grPorEq,
-      equivalencias: newEquivs,
+      equivalencias: allEquivs,
       eqCantidad: eqVal,
       eqGrupo: eqLabel,
     };
@@ -652,7 +665,7 @@ export const SmaeIngredientePicker = ({ ingrediente: ing, index, gapByGroup, onU
                     <div>
                       <p className="text-[13px] font-bold text-white m-0">{a.nombre}</p>
                       <p className="text-[11px] font-medium text-[#b0b0b0] m-0">
-                        {a.pesoGramos}g = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${String(a.unidadPorcion || '').toLowerCase()}` : `${a.pesoGramos}g`} por porción
+                        {getAmountPerEquivalent(a.pesoGramos, a.equivalentesBase)} {a.unidadBase || 'g'} = 1 eq · {a.cantidadPorcion ? `${a.cantidadPorcion} ${String(a.unidadPorcion || '').toLowerCase()}` : `${a.pesoGramos} ${a.unidadBase || 'g'}`} = {a.equivalentesBase || 1} eq
                       </p>
                     </div>
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded whitespace-nowrap flex-shrink-0"
