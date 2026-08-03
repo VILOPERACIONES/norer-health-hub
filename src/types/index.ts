@@ -245,6 +245,7 @@ export interface Ingrediente {
   eqGrupo?: string;              // legacy – primer grupo
   equivalencias?: EquivalenciaItem[]; // multi-grupo
   smaeGrPorEq?: number;          // gramos por 1 eq (ancla SMAE, persiste en BD)
+  alimentoSmaeId?: string;       // referencia al catálogo AlimentoSMAE (para resolver datos frescos)
   fijarEq?: boolean;             // true = no auto-escalar (alimentos procesados)
   nota?: string;
   orden?: number;
