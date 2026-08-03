@@ -1916,13 +1916,6 @@ export const CreateEditPlanForm = ({
                                             let scaledCant = Number(i.cantidad);
                                             let scaledEq = Number(i.eqCantidad);
 
-                                            // Unidades discretas (procesados, empaquetados): NO escalar cantidad
-                                            // "PZ"/"PIEZA" quedan fuera a propósito: es la unidad de alimentos naturales
-                                            // (huevo, fruta) que SÍ deben poder escalar (1→3 piezas). Lo empacado real
-                                            // (lata, botella, barra, paquete, sobre, tarro, frasco) sigue protegido.
-                                            const UNIDADES_DISCRETAS = ['PAQUETE', 'BOTELLA', 'LATA', 'BOLSA', 'BARRA', 'SOBRE', 'TARRO', 'FRASCO'];
-                                            const esDiscreta = UNIDADES_DISCRETAS.includes((i.unidad || '').toUpperCase().trim());
-
                                             // Parsear equivalencias si vienen como string
                                             let eqArray: any[] = [];
                                             if (Array.isArray(i.equivalencias)) {
@@ -1940,7 +1933,7 @@ export const CreateEditPlanForm = ({
                                             const mainGrupo = i.eqGrupo ||
                                               (rawEquivs.length > 0 ? String(rawEquivs[0]?.grupo || '') : '');
 
-                                            if (!esDiscreta && mainGrupo && distTiempo) {
+                                            if (mainGrupo && distTiempo) {
                                               // Traduce el label al key canónico del barrido usando la función centralizada
                                               const barridoKey = groupToBarridoKey(normalizeGroup(mainGrupo));
                                               const assigned = Number(distTiempo[barridoKey]);
@@ -1948,9 +1941,10 @@ export const CreateEditPlanForm = ({
                                               if (assigned > 0) {
                                                 // Ancla: usamos smaeGrPorEq si existe, si no derivamos de cantidad/eqCantidad.
                                                 // El ancla siempre está en gramos por 1 eq — solo aplica si la unidad
-                                                // del ingrediente es GR. En unidades caseras (taza, cda...) que no
-                                                // están en UNIDADES_DISCRETAS, usarla desalinearía cantidad↔unidad
-                                                // (ej. "300 taza"), así que ahí se cae al fallback proporcional.
+                                                // del ingrediente es GR. En cualquier otra unidad (pieza, taza, paquete,
+                                                // lata...) usarla desalinearía cantidad↔unidad (ej. "300 taza"), así
+                                                // que ahí se cae al fallback proporcional (regla de tres, ya siempre
+                                                // redondeado a entero por smartRound).
                                                 const unidadEsGramos = !i.unidad || String(i.unidad).toUpperCase().trim() === 'GR';
                                                 const smaeAnchor = unidadEsGramos ? Number(i.smaeGrPorEq) : 0;
                                                 const baseGrPorEq = smaeAnchor > 0
