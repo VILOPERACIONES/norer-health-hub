@@ -27,6 +27,7 @@ import {
   type RemovedMealTime,
 } from '@/lib/mealTimeOrdering';
 import { reorderDishGroups, reorderIngredientWithinDish } from '@/lib/ingredientOrdering';
+import { PacienteResumenSidebar } from '@/components/PacienteResumenSidebar';
 
 const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
@@ -2076,164 +2077,17 @@ export const CreateEditPlanForm = ({
 
           {/* ─── Resumen clínico sidebar ─── */}
           {!isBasePlan && pacienteInfo && (
-            <aside className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar space-y-3">
-              <div className="bg-[#111] border border-[#2a2a2a] rounded-[12px] p-4">
-                <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-1">{pacienteNombre}</p>
-                <p className="text-[10px] font-bold text-[#3a3a3a] uppercase tracking-widest">Resumen clínico · Solo lectura</p>
-              </div>
-
-              <div className="space-y-2">
-                {/* Información prioritaria antes de elaborar el menú */}
-                <SidebarSeccion titulo="Alimentos a evitar / No consume">
-                  {alimentosAEvitar.length > 0 ? (
-                    <ul className="space-y-1">
-                      {alimentosAEvitar.map((alimento, index) => (
-                        <li key={`${alimento}-${index}`} className="text-[12px] text-red-300 flex items-start gap-1.5 break-words">
-                          <span className="mt-0.5 shrink-0 text-red-500">✕</span>
-                          <span>{alimento}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-[11px] text-[#666] italic">Sin información registrada.</p>
-                  )}
-                </SidebarSeccion>
-
-                {/* Número de comidas */}
-                {valData?.barridoEquivalencias?.tiempos?.length > 0 && (
-                  <SidebarSeccion titulo="Número de comidas">
-                    <p className="text-[12px] font-bold text-white leading-snug">
-                      {valData.barridoEquivalencias.tiempos.length} tiempos:{' '}
-                      {valData.barridoEquivalencias.tiempos.map(getBarridoTiempoNombre).join(', ')}
-                    </p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Ejercicio */}
-                {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (
-                  <SidebarSeccion titulo="Ejercicio">
-                    <div className="space-y-0.5">
-                      {pacienteInfo.ejercicio?.objetivo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Objetivo:</span> {pacienteInfo.ejercicio.objetivo}</p>}
-                      {pacienteInfo.ejercicio?.disciplina && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Disciplina:</span> {pacienteInfo.ejercicio.disciplina}</p>}
-                      {pacienteInfo.ejercicio?.frecuencia && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Frecuencia:</span> {pacienteInfo.ejercicio.frecuencia}</p>}
-
-                    </div>
-                  </SidebarSeccion>
-                )}
-
-                {/* Suplementos activos */}
-                {suplementosDetalle.filter((s: any) => s.activo && s.nombre).length > 0 && (
-                  <SidebarSeccion titulo="Suplementos activos">
-                    <ul className="space-y-1">
-                      {suplementosDetalle.filter((s: any) => s.activo && s.nombre).map((s: any, i: number) => (
-                        <li key={i} className="text-[12px] text-[#e0e0e0] flex items-start gap-1.5">
-                          <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                          <span><span className="font-semibold text-white">{s.nombre}</span>{s.indicaciones && <span className="text-[#8a8a8a]"> — {s.indicaciones}</span>}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </SidebarSeccion>
-                )}
-
-                {/* Notas clínicas */}
-                {valData?.comentarios && (
-                  <SidebarSeccion titulo="Notas clínicas">
-                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.comentarios}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Patología */}
-                {pacienteInfo?.antecedentes?.patologia && (
-                  <SidebarSeccion titulo="Patología"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p></SidebarSeccion>
-                )}
-
-                {/* Fármacos */}
-                {((pacienteInfo?.antecedentes?.farmacosDetalle?.length ?? 0) > 0 || pacienteInfo?.antecedentes?.farmacos) && (
-                  <SidebarSeccion titulo="Fármacos">
-                    {pacienteInfo?.antecedentes?.farmacosDetalle && pacienteInfo.antecedentes.farmacosDetalle.length > 0 ? (
-                      <ul className="list-disc list-inside space-y-0.5">
-                        {pacienteInfo.antecedentes.farmacosDetalle.map((f, i) => (
-                          <li key={i} className="text-[12px] text-[#e0e0e0]">
-                            {f.nombre}{f.tiempoTomando ? ` — ${f.tiempoTomando}` : ''}{!f.activo ? ' (ya no)' : ''}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.farmacos}</p>
-                    )}
-                  </SidebarSeccion>
-                )}
-
-                {/* Alergias */}
-                {pacienteInfo?.antecedentes?.alergias && (
-                  <SidebarSeccion titulo="Alergias"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p></SidebarSeccion>
-                )}
-
-                {/* Ciclo menstrual */}
-                {pacienteInfo?.antecedentes?.cicloMenstrual && (
-                  <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
-                )}
-
-                {/* Alimentos que sí le gustan */}
-                {pacienteInfo?.antecedentes?.alimentosGustan && (
-                  <SidebarSeccion titulo="Le gustan / Consume">
-                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Tránsito intestinal */}
-                {pacienteInfo?.antecedentes?.estrenimiento && (
-                  <SidebarSeccion titulo="Tránsito Intestinal">
-                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.estrenimiento}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Agua (reporte del paciente en entrevista) */}
-                {pacienteInfo?.antecedentes?.agua && (
-                  <SidebarSeccion titulo="Agua al día (reporte paciente)">
-                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.agua}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Esquema de hidratación prescrito en consulta */}
-                {valData?.esqueHidratacion && (
-                  <SidebarSeccion titulo="Esquema de Hidratación">
-                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.esqueHidratacion}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Signos y síntomas */}
-                {pacienteInfo?.antecedentes?.signosYSintomas && (
-                  <SidebarSeccion titulo="Signos y Síntomas">
-                    <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.signosYSintomas}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Hora y duración entrenamiento */}
-                {(pacienteInfo?.ejercicio?.horaEntrenamiento || pacienteInfo?.ejercicio?.tiempo) && (
-                  <SidebarSeccion titulo="Entrenamiento">
-                    <div className="space-y-0.5">
-                      {pacienteInfo.ejercicio?.horaEntrenamiento && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Hora:</span> {pacienteInfo.ejercicio.horaEntrenamiento}</p>}
-                      {pacienteInfo.ejercicio?.tiempo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Duración:</span> {pacienteInfo.ejercicio.tiempo}</p>}
-                    </div>
-                  </SidebarSeccion>
-                )}
-
-                {/* Historial suplementos */}
-                {pacienteInfo?.antecedentes?.historialProductos && (
-                  <SidebarSeccion titulo="Historial suplementos">
-                    <p className="text-[12px] text-[#8a8a8a] italic">{pacienteInfo.antecedentes.historialProductos}</p>
-                  </SidebarSeccion>
-                )}
-
-                {/* Notas de entrenamiento */}
-                {valData?.notasLibres && (
-                  <SidebarSeccion titulo="Notas de Entrenamiento">
-                    <p className="text-[12px] text-[#e0e0e0] whitespace-pre-wrap leading-relaxed">{valData.notasLibres}</p>
-                  </SidebarSeccion>
-                )}
-              </div>
-            </aside>
+            <PacienteResumenSidebar
+              className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar"
+              pacienteNombre={pacienteNombre}
+              pacienteInfo={pacienteInfo}
+              alimentosAEvitar={alimentosAEvitar}
+              tiemposNombres={valData?.barridoEquivalencias?.tiempos?.map(getBarridoTiempoNombre)}
+              suplementosDetalle={suplementosDetalle}
+              comentarios={valData?.comentarios}
+              esqueHidratacion={valData?.esqueHidratacion}
+              notasLibres={valData?.notasLibres}
+            />
           )}
         </div>{/* closes flex wrapper */}
 
@@ -2318,15 +2172,6 @@ export const CreateEditPlanForm = ({
     </>
   );
 };
-
-function SidebarSeccion({ titulo, children }: { titulo: string; children: React.ReactNode }) {
-  return (
-    <div className="border border-[#2a2a2a] rounded-[8px] p-3 bg-[#0f0f0f]">
-      <p className="text-[9px] font-black text-[#555] uppercase tracking-widest mb-1.5">{titulo}</p>
-      {children}
-    </div>
-  );
-}
 
 export default function CreateEditPlan() {
   const { id, planId } = useParams<{ id: string, planId: string }>();
