@@ -287,7 +287,12 @@ const PatientProfile = () => {
           pesoEvolucion: chartNumber(v.pesoActual ?? v.peso),
           grasaEvolucion: chartNumber(v.pctGrasa ?? v.pctGrasa2comp ?? v.pctGrasaCorporal4comp ?? v.pctGrasaCorp),
           masaMagraEvolucion: chartNumber(v.masaMagra ?? v.kgMasaMagra2comp ?? v.kgMasaMagra4comp),
-          kgGrasaEvolucion: chartNumber(v.masaGrasaReal ?? v.kgGrasa2comp)
+          kgGrasaEvolucion: chartNumber(v.masaGrasaReal ?? v.kgGrasa2comp),
+          glucosaEvolucion: chartNumber(v.glucosa),
+          trigliceridosEvolucion: chartNumber(v.trigliceridos),
+          colesterolEvolucion: chartNumber(v.colesterol),
+          creatininaEvolucion: chartNumber(v.creatinina),
+          acidoUricoEvolucion: chartNumber(v.acidoUrico),
         }))
         .sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
     },
@@ -310,6 +315,7 @@ const PatientProfile = () => {
 
   const [showFullExpediente, setShowFullExpediente] = useState(false);
   const [fatChartMode, setFatChartMode] = useState<'kg' | 'pct'>('pct');
+  const [labMarker, setLabMarker] = useState<'glucosa' | 'trigliceridos' | 'colesterol' | 'creatinina' | 'acidoUrico'>('glucosa');
   const [isActivatingPortal, setIsActivatingPortal] = useState(false);
   const [isChangingTier, setIsChangingTier] = useState(false);
 
@@ -900,6 +906,65 @@ const PatientProfile = () => {
             </ChartBox>
 
           </section>
+
+          {/* Historial de Laboratorio */}
+          {previewHistoryData.some((v: any) => v.glucosaEvolucion != null || v.trigliceridosEvolucion != null || v.colesterolEvolucion != null || v.creatininaEvolucion != null || v.acidoUricoEvolucion != null) && (
+            <section className="grid grid-cols-1 gap-6">
+              <ChartBox
+                title="Historial de Laboratorio"
+                extra={
+                  <div className="flex flex-wrap gap-1 bg-bg-elevated p-0.5 rounded-[6px] border border-border-subtle">
+                    {([
+                      { key: 'glucosa', label: 'Glucosa' },
+                      { key: 'trigliceridos', label: 'Triglicéridos' },
+                      { key: 'colesterol', label: 'Colesterol' },
+                      { key: 'creatinina', label: 'Creatinina' },
+                      { key: 'acidoUrico', label: 'Ác. Úrico' },
+                    ] as const).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => setLabMarker(key)}
+                        className={`px-3 py-1 text-[9px] font-bold uppercase tracking-wider rounded-[4px] transition-all ${labMarker === key ? 'bg-[#333] text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                }
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={previewHistoryData} margin={{ top: 10, right: 10, left: -25, bottom: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2a" vertical={false} />
+                    <XAxis
+                      dataKey="fecha"
+                      tickFormatter={(val) => formatDateShort(val)}
+                      tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                      axisLine={false}
+                      tickLine={false}
+                      dy={10}
+                    />
+                    <YAxis
+                      tick={{ fontSize: 10, fontWeight: 500, fill: '#8a8a8a' }}
+                      axisLine={false}
+                      tickLine={false}
+                      domain={['auto', 'auto']}
+                    />
+                    <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #2a2a2a', background: '#111', color: '#f0f0f0' }} labelStyle={{ display: 'none' }} />
+                    <Area
+                      key={labMarker}
+                      type="monotone"
+                      dataKey={`${labMarker}Evolucion`}
+                      name={{ glucosa: 'Glucosa (mg/dL)', trigliceridos: 'Triglicéridos (mg/dL)', colesterol: 'Colesterol (mg/dL)', creatinina: 'Creatinina (mg/dL)', acidoUrico: 'Ácido Úrico (mg/dL)' }[labMarker]}
+                      stroke="#f0f0f0"
+                      strokeWidth={2}
+                      fill="rgba(240, 240, 240, 0.05)"
+                      dot={{ r: 4, fill: '#111', stroke: '#f0f0f0', strokeWidth: 2 }}
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </ChartBox>
+            </section>
+          )}
 
           {/* LOG DE CONSULTAS */}
           <section className="space-y-6 pt-4" id="historial">

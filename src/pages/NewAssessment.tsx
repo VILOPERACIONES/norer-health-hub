@@ -99,7 +99,13 @@ const NewAssessment = () => {
     grasa: '',
     agua: '',
     musculo: '',
-    energia: '',
+  });
+  const [laboratorio, setLaboratorio] = useState({
+    glucosa: '',
+    trigliceridos: '',
+    colesterol: '',
+    creatinina: '',
+    acidoUrico: '',
   });
   const [onlineMeasurements, setOnlineMeasurements] = useState({ ...EMPTY_ONLINE_MEASUREMENTS });
   const [comentarios, setComentarios] = useState('');
@@ -247,7 +253,6 @@ const NewAssessment = () => {
         grasa: d.bioimpedancia.grasa || '',
         agua: d.bioimpedancia.agua || '',
         musculo: d.bioimpedancia.musculo || '',
-        energia: d.bioimpedancia.energia || '',
       });
     }
     if (d.onlineMeasurements) {
@@ -463,7 +468,6 @@ const NewAssessment = () => {
                 musculo: savedBio['Músculo (kg)'] != null
                   ? String(savedBio['Músculo (kg)'])
                   : (savedBio['Músculo %'] != null ? String(savedBio['Músculo %']) : ''),
-                energia: savedBio['Energía (kcal)'] != null ? String(savedBio['Energía (kcal)']) : '',
               });
               const savedPerimeters = val.perimetros || {};
               setOnlineMeasurements(onlineMeasurementsFromPerimeters(savedPerimeters));
@@ -476,6 +480,13 @@ const NewAssessment = () => {
               });
               setComentarios(val.comentarios || '');
               setPlanVinculadoId(val.plan?.id || null);
+              setLaboratorio({
+                glucosa: val.glucosa != null ? String(val.glucosa) : '',
+                trigliceridos: val.trigliceridos != null ? String(val.trigliceridos) : '',
+                colesterol: val.colesterol != null ? String(val.colesterol) : '',
+                creatinina: val.creatinina != null ? String(val.creatinina) : '',
+                acidoUrico: val.acidoUrico != null ? String(val.acidoUrico) : '',
+              });
 
               const rawItems = (val.temarioConsulta && Array.isArray(val.temarioConsulta))
                 ? val.temarioConsulta
@@ -728,11 +739,13 @@ const NewAssessment = () => {
     }
 
     if (!consultaEnLinea && compositionMethod === 'BIOIMPEDANCIA') {
+      // Energía está bloqueada a captura manual: se llena y guarda únicamente con el
+      // total calculado en el barrido de equivalencias de esta consulta.
       body.bioimpedancia = {
         'Grasa %': bioimpedancia.grasa.trim() === '' ? null : Number(bioimpedancia.grasa),
         'Agua %': bioimpedancia.agua.trim() === '' ? null : Number(bioimpedancia.agua),
         'Músculo (kg)': bioimpedancia.musculo.trim() === '' ? null : Number(bioimpedancia.musculo),
-        'Energía (kcal)': bioimpedancia.energia.trim() === '' ? null : Number(bioimpedancia.energia),
+        'Energía (kcal)': barridoData?.kcalTotal ? Math.round(barridoData.kcalTotal) : null,
       };
     } else if (isEdit) {
       // Al cambiar una valoración existente de bioimpedancia a antropometría,
@@ -743,6 +756,14 @@ const NewAssessment = () => {
         'Músculo (kg)': null,
         'Energía (kcal)': null,
       };
+    }
+
+    if (Object.values(laboratorio).some(v => v.trim() !== '')) {
+      body.glucosa = laboratorio.glucosa.trim() === '' ? null : parseFloat(laboratorio.glucosa);
+      body.trigliceridos = laboratorio.trigliceridos.trim() === '' ? null : parseFloat(laboratorio.trigliceridos);
+      body.colesterol = laboratorio.colesterol.trim() === '' ? null : parseFloat(laboratorio.colesterol);
+      body.creatinina = laboratorio.creatinina.trim() === '' ? null : parseFloat(laboratorio.creatinina);
+      body.acidoUrico = laboratorio.acidoUrico.trim() === '' ? null : parseFloat(laboratorio.acidoUrico);
     }
 
     if (measurementStatuses.pctGrasa === 'REGISTRADA' && pctGrasa) {
@@ -829,7 +850,6 @@ const NewAssessment = () => {
               // Historial de suplementación (registro permanente del expediente)
               suplementosDetalle: historialSupDetalle.filter(s => s.nombre.trim()),
             },
-            habitos,
           });
           setExpedienteModified(false);
         } catch (e) {
@@ -1682,10 +1702,22 @@ const NewAssessment = () => {
                           <Field label="Grasa corporal" value={bioimpedancia.grasa} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, grasa: value })); setIsGrasaModified(true); }} suffix="%" placeholder="Ej. 24.3" />
                           <Field label="Agua corporal" value={bioimpedancia.agua} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, agua: value })); setIsGrasaModified(true); }} suffix="%" placeholder="Ej. 52.1" />
                           <Field label="Músculo" value={bioimpedancia.musculo} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, musculo: value })); setIsGrasaModified(true); }} suffix="kg" placeholder="Ej. 31.8" />
-                          <Field label="Energía" value={bioimpedancia.energia} onChange={(value) => { setBioimpedancia(prev => ({ ...prev, energia: value })); setIsGrasaModified(true); }} suffix="kcal" placeholder="Ej. 1450" />
+                          <Field label="Energía" value={barridoData?.kcalTotal ? String(Math.round(barridoData.kcalTotal)) : ''} disabled suffix="kcal" placeholder="Se llena al completar el barrido" />
                         </>
                       )}
                     </div>
+
+                    <div className="mt-5 pt-4 border-t border-[#2a2a2a]">
+                      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a]">Laboratorio</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
+                        <Field label="Glucosa" value={laboratorio.glucosa} onChange={(value) => setLaboratorio(prev => ({ ...prev, glucosa: value }))} suffix="mg/dL" placeholder="Ej. 92" />
+                        <Field label="Triglicéridos" value={laboratorio.trigliceridos} onChange={(value) => setLaboratorio(prev => ({ ...prev, trigliceridos: value }))} suffix="mg/dL" placeholder="Ej. 130" />
+                        <Field label="Colesterol" value={laboratorio.colesterol} onChange={(value) => setLaboratorio(prev => ({ ...prev, colesterol: value }))} suffix="mg/dL" placeholder="Ej. 180" />
+                        <Field label="Creatinina" value={laboratorio.creatinina} onChange={(value) => setLaboratorio(prev => ({ ...prev, creatinina: value }))} suffix="mg/dL" placeholder="Ej. 0.9" />
+                        <Field label="Ácido Úrico" value={laboratorio.acidoUrico} onChange={(value) => setLaboratorio(prev => ({ ...prev, acidoUrico: value }))} suffix="mg/dL" placeholder="Ej. 5.2" />
+                      </div>
+                    </div>
+
                     {consultaEnLinea && (
                       <PhotoFollowup pacienteId={pacienteId!} valoracionId={valoracionId} onPendingChange={setPendingFollowupPhotos} />
                     )}

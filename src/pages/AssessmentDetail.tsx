@@ -12,6 +12,8 @@ import BarridosEquivalenciasManager, {
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AppointmentSummary } from '@/components/AppointmentSummary';
+import { PacienteResumenSidebar } from '@/components/PacienteResumenSidebar';
+import { buildAvoidFoods } from '@/lib/avoidFoods';
 
 // ─── Módulo Plan de la Consulta ───────────────────────────────────────────────
 const PlanSection = ({
@@ -156,6 +158,7 @@ const AssessmentDetail = () => {
   const [val, setVal] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [pacienteCitas, setPacienteCitas] = useState<any[]>([]);
+  const [pacienteInfo, setPacienteInfo] = useState<any>(null);
 
   // Barrido: estado controlado por el padre, se pasa al componente compartido
   const [barridoData, setBarridoData] = useState<BarridoCollection | null>(null);
@@ -177,6 +180,7 @@ const AssessmentDetail = () => {
       const { data } = await api.get(`/api/pacientes/${pacienteId}`);
       const paciente = data?.data || data;
       setPacienteCitas(paciente?.citas || []);
+      setPacienteInfo(paciente || null);
     } catch {
       // silenciar — las citas no son críticas para mostrar la valoración
     }
@@ -348,8 +352,13 @@ const AssessmentDetail = () => {
   };
   const isOnlineAssessment = val.medicionesEstado?.consultaEnLinea === true;
 
+  const pacienteNombreCompleto = `${val.paciente?.nombre || ''} ${val.paciente?.apellido || ''}`.trim();
+  const alimentosAEvitar = buildAvoidFoods(val?.evitar, pacienteInfo?.antecedentes?.alimentosNoGustan);
+  const tiemposNombres = barridoData?.tiempos?.map((t) => t.nombre).filter(Boolean);
+
   return (
-    <div className="space-y-8 animate-fade-in pb-20 w-full">
+    <div className="flex gap-6 items-start">
+    <div className="space-y-8 animate-fade-in pb-20 w-full min-w-0 flex-1">
       {ConfirmDialogComponent}
 
       {/* A1: Modal confirmación soft delete */}
@@ -856,6 +865,21 @@ const AssessmentDetail = () => {
         })()}
       </div>
 
+    </div>
+
+    {pacienteInfo && (
+      <PacienteResumenSidebar
+        className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar"
+        pacienteNombre={pacienteNombreCompleto}
+        pacienteInfo={pacienteInfo}
+        alimentosAEvitar={alimentosAEvitar}
+        tiemposNombres={tiemposNombres}
+        suplementosDetalle={val.suplementosDetalle || []}
+        comentarios={val.comentarios}
+        esqueHidratacion={val.esqueHidratacion}
+        notasLibres={val.notasLibres}
+      />
+    )}
     </div>
   );
 };
