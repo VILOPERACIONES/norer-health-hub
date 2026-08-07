@@ -20,6 +20,8 @@ export interface PacienteResumenSidebarProps {
   esqueHidratacion?: string;
   notasLibres?: string;
   className?: string;
+  /** Muestra la sección "Número de comidas". Default: false */
+  mostrarTiemposComida?: boolean;
 }
 
 export function PacienteResumenSidebar({
@@ -32,6 +34,7 @@ export function PacienteResumenSidebar({
   esqueHidratacion,
   notasLibres,
   className = '',
+  mostrarTiemposComida = false,
 }: PacienteResumenSidebarProps) {
   return (
     <aside className={`space-y-3 ${className}`}>
@@ -56,7 +59,7 @@ export function PacienteResumenSidebar({
           <SidebarSeccion titulo="Alergias"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alergias}</p></SidebarSeccion>
         )}
 
-        {tiemposNombres && tiemposNombres.length > 0 && (
+        {mostrarTiemposComida && tiemposNombres && tiemposNombres.length > 0 && (
           <SidebarSeccion titulo="Número de comidas">
             <p className="text-[12px] font-bold text-white leading-snug">
               {tiemposNombres.length} tiempos:{' '}
@@ -66,15 +69,57 @@ export function PacienteResumenSidebar({
         )}
 
         {/* Ejercicio */}
-        {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (
-          <SidebarSeccion titulo="Ejercicio">
-            <div className="space-y-0.5">
-              {pacienteInfo.ejercicio?.objetivo && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Objetivo:</span> {pacienteInfo.ejercicio.objetivo}</p>}
-              {pacienteInfo.ejercicio?.disciplina && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Disciplina:</span> {pacienteInfo.ejercicio.disciplina}</p>}
-              {pacienteInfo.ejercicio?.frecuencia && <p className="text-[12px] text-[#e0e0e0]"><span className="text-[#8a8a8a]">Frecuencia:</span> {pacienteInfo.ejercicio.frecuencia}</p>}
-            </div>
-          </SidebarSeccion>
-        )}
+        {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
+          const raw = pacienteInfo.ejercicio?.disciplina;
+          let disciplinas: { disciplina?: string; frecuencia?: string; tiempo?: string }[] = [];
+          if (raw) {
+            if (Array.isArray(raw)) {
+              disciplinas = raw;
+            } else if (typeof raw === 'string') {
+              try { disciplinas = JSON.parse(raw); } catch { disciplinas = [{ disciplina: raw }]; }
+            }
+          }
+          return (
+            <SidebarSeccion titulo="Ejercicio">
+              <div className="space-y-1">
+                {pacienteInfo.ejercicio?.objetivo && (
+                  <p className="text-[12px] text-[#e0e0e0] mb-1">
+                    <span className="text-[#8a8a8a]">Obj:</span> {pacienteInfo.ejercicio.objetivo}
+                  </p>
+                )}
+                {disciplinas.length > 0 ? (
+                  <ul className="space-y-0.5">
+                    {disciplinas.map((d, i) => {
+                      const partes = [
+                        d.disciplina,
+                        d.frecuencia,
+                        d.tiempo,
+                      ].filter(Boolean);
+                      return (
+                        <li key={i} className="text-[12px] text-[#e0e0e0]">
+                          {partes.map((p, pi) => (
+                            <span key={pi}>
+                              {pi === 0
+                                ? <span className="font-medium text-white capitalize">{p}</span>
+                                : <><span className="text-[#555] mx-1">//</span><span className="text-[#aaa]">{p}</span></>
+                              }
+                            </span>
+                          ))}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  pacienteInfo.ejercicio?.frecuencia && (
+                    <p className="text-[12px] text-[#e0e0e0]">
+                      <span className="text-[#8a8a8a]">Frecuencia:</span> {pacienteInfo.ejercicio.frecuencia}
+                    </p>
+                  )
+                )}
+              </div>
+            </SidebarSeccion>
+          );
+        })()}
 
         {/* Suplementos activos */}
         {suplementosDetalle.filter((s: any) => s.activo && s.nombre).length > 0 && (

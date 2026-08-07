@@ -245,11 +245,11 @@ const Dashboard = () => {
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-[28px] font-bold text-[#f0f0f0] m-0 tracking-tight">
+          <h1 className="text-[28px] font-bold text-[#f0f0f0] m-4 tracking-tight">
             Bienvenido de vuelta, {userName}! 
           </h1>
           <p className="text-[14px] font-normal text-[#8a8a8a] mt-1">
-            Work Hard. Play Hard.
+            ¡NEW ORDER begins here!
           </p>
         </div>
         <div className="flex gap-4 w-full md:w-auto">
