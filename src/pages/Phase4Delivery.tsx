@@ -107,7 +107,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   const handleSaveMeta = async () => {
     setSaving(true);
     try {
-      await api.put(`/api/planes/${planId}/pdf-meta`, { pdfCustomMeta: meta });
+      await api.put(`/api/planes/${planId}/pdf-meta`, meta);
     } catch (e) {
       toast({ title: 'Error al asegurar la configuración', variant: 'destructive' });
     } finally {
