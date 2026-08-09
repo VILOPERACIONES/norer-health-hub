@@ -71,22 +71,16 @@ const Dashboard = () => {
   }, [topClientesRaw, pacientesData]);
 
   // ── KPI "Menús pendientes" ────────────────────────────────────────────────
-  // Solo se evalúan las valoraciones de HOY que aún no tienen su menú enviado.
-  // Esto funciona como cuenta regresiva: empieza con las consultas del día
-  // y baja a 0 conforme el nutriólogo va completando cada menú.
+  // Se evalúan TODAS las valoraciones (sin filtrar por fecha) que aún no
+  // tienen su menú enviado — acumulado histórico, no solo el día de hoy.
   const ultimosPendientes = useMemo(() => {
     const pendItems: any[] = [];
-    const hoy = new Date();
-    const hoyStr = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(hoy.getDate()).padStart(2, '0')}`;
 
     pacientesData.forEach((pac: any) => {
       const valArr: any[] = pac.valoraciones || [];
 
-      // Evaluar todas las valoraciones de hoy (un paciente podría tener varias en el día)
       valArr.forEach((val: any) => {
         if (!val.fecha) return;
-        const fechaVal = val.fecha.substring(0, 10); // 'YYYY-MM-DD'
-        if (fechaVal !== hoyStr) return;
 
         // Enriquecer con plan si aún no está adjunto
         if (!val.plan && pac.planes && Array.isArray(pac.planes)) {
@@ -203,7 +197,7 @@ const Dashboard = () => {
       subColor: r?.pacientesNuevosHoy > 0 ? 'text-emerald-400' : 'text-[#8a8a8a]',
     },
     {
-      label: 'Menús pendientes hoy',
+      label: 'Menús pendientes',
       value: planesPendientes,
       icon: MessageSquare,
       badge: {
@@ -212,7 +206,7 @@ const Dashboard = () => {
       },
       sub: planesPendientes > 0
         ? `${planesSinAsignar} Pendiente · ${planesEnProceso} En proceso · ${planesListos} Listo`
-        : 'Sin menús pendientes por hoy',
+        : 'Sin menús pendientes',
       subColor: planesPendientes > 0 ? 'text-amber-400' : 'text-emerald-400',
     },
     {
