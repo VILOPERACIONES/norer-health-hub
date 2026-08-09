@@ -90,8 +90,8 @@ const Requirements = () => {
     
     const get = tmb * parseFloat(actividad);
     const gct = get * 1.1; // ETA 10%
-    
-    return { tmb, get, gct };
+
+    return { tmb, get, gct, h };
   }, [formula, actividad, peso, edad, sexo, paciente]);
 
   const macroData = useMemo(() => {
@@ -124,6 +124,9 @@ const Requirements = () => {
     try {
       const payload = {
         peso: parseFloat(peso),
+        talla: energeticData.h,
+        edad,
+        sexo,
         formula,
         actividad,
         tmb: energeticData.tmb,
