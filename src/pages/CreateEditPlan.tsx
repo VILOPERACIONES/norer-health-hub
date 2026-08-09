@@ -740,6 +740,7 @@ export const CreateEditPlanForm = ({
           eqCantidad: ing.eqCantidad,
           eqGrupo: ing.eqGrupo ? normalizeGroup(ing.eqGrupo) : '',
           smaeGrPorEq: ing.smaeGrPorEq,
+          alimentoSmaeId: ing.alimentoSmaeId,
         };
       });
 
