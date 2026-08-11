@@ -27,13 +27,14 @@ const PhoneInput = ({ label, ladaValue, onLadaChange, phoneValue, onPhoneChange,
         onChange={(e) => onLadaChange(e.target.value)}
         className="w-[110px] bg-bg-elevated rounded-[8px] px-2 py-3 text-[14px] font-normal text-text-primary tracking-tight outline-none focus:border-[#444] transition-all border border-border-subtle hover:border-border-default appearance-none cursor-pointer text-center"
       >
-        <option value="52">+52 (MX)</option>
-        <option value="1">+1 (US/CA)</option>
-        <option value="34">+34 (ES)</option>
-        <option value="54">+54 (AR)</option>
-        <option value="57">+57 (CO)</option>
-        <option value="56">+56 (CL)</option>
-        <option value="51">+51 (PE)</option>
+        <option value="52">🇲🇽 +52 (MX)</option>
+        <option value="1">🇺🇸 +1 (US/CA)</option>
+        <option value="33">🇫🇷 +33 (FR)</option>
+        <option value="34">🇪🇸 +34 (ES)</option>
+        <option value="54">🇦🇷 +54 (AR)</option>
+        <option value="57">🇨🇴 +57 (CO)</option>
+        <option value="56">🇨🇱 +56 (CL)</option>
+        <option value="51">🇵🇪 +51 (PE)</option>
       </select>
       <input
         type="tel"

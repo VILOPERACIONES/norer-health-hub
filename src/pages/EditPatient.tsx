@@ -22,13 +22,14 @@ const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = 
 );
 
 const LADAS = [
-  { code: '52', label: '+52 (MX)' },
-  { code: '1', label: '+1 (US/CA)' },
-  { code: '34', label: '+34 (ES)' },
-  { code: '54', label: '+54 (AR)' },
-  { code: '57', label: '+57 (CO)' },
-  { code: '56', label: '+56 (CL)' },
-  { code: '51', label: '+51 (PE)' },
+  { code: '52', label: '🇲🇽 +52 (MX)' },
+  { code: '1', label: '🇺🇸 +1 (US/CA)' },
+  { code: '33', label: '🇫🇷 +33 (FR)' },
+  { code: '34', label: '🇪🇸 +34 (ES)' },
+  { code: '54', label: '🇦🇷 +54 (AR)' },
+  { code: '57', label: '🇨🇴 +57 (CO)' },
+  { code: '56', label: '🇨🇱 +56 (CL)' },
+  { code: '51', label: '🇵🇪 +51 (PE)' },
 ];
 
 const PhoneInput = ({ label, ladaValue, onLadaChange, phoneValue, onPhoneChange, placeholder }: any) => (
@@ -137,7 +138,7 @@ const EditPatient = () => {
             // parse lada from stored number (e.g. "529993670065" -> lada="52", telefono="9993670065")
             ...(() => {
               const raw = (p.telefono || '').replace(/\D/g, '');
-              const knownLadas = ['52', '1', '34', '54', '57', '56', '51'];
+              const knownLadas = ['52', '1', '33', '34', '54', '57', '56', '51'];
               const matched = knownLadas.find(l => raw.startsWith(l));
               return matched
                 ? { lada: matched, telefono: raw.slice(matched.length) }
