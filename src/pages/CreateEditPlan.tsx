@@ -280,8 +280,12 @@ export const CreateEditPlanForm = ({
               setProximaSesionHora('');
             }
             setNotas(p.notasGenerales || p.notas || '');
-            setMenus(mapMenusFromBackend(p.menus));
+            const mappedMenus = mapMenusFromBackend(p.menus);
+            setMenus(mappedMenus);
             setSuplementosDetalle(p.suplementosDetalle || []);
+            // Guardar los menus mapeados para pasarlos a autoScaleIngredients
+            // y evitar la race condition donde el estado React aún no se actualizó.
+            (window as any).__pendingMappedMenus = mappedMenus;
           }
         }
 
@@ -332,7 +336,12 @@ export const CreateEditPlanForm = ({
           // la última vez, y el contador de faltantes nunca refleja cambios hechos en la valoración
           // después de crear el plan (había que editar a mano un campo del panel para que disparara).
           if (isEdit && normalizedBarrido) {
-            autoScaleIngredients(normalizedBarrido);
+            // Usar los menus mapeados directamente para evitar race condition:
+            // setMenus() del plan aún no se ha comprometido en React cuando llegamos aquí,
+            // por lo que prevMenus en autoScaleIngredients tendría el estado vacío inicial.
+            const syncMenus = (window as any).__pendingMappedMenus as Menu[] | undefined;
+            delete (window as any).__pendingMappedMenus;
+            autoScaleIngredients(normalizedBarrido, syncMenus);
           }
 
           // Logica especifica para crear uno nuevo (inicializar vacios, auto calcular macro iniciales)
@@ -559,24 +568,77 @@ export const CreateEditPlanForm = ({
     return undefined;
   };
 
-  const autoScaleIngredients = (nextBarridoData: BarridoCollection | BarridoData) => {
+  const autoScaleIngredients = (nextBarridoData: BarridoCollection | BarridoData, baseMenus?: Menu[]) => {
     const variants = getBarridoVariantes(nextBarridoData);
     if (!variants.length) return;
 
-    setMenus(prevMenus => prevMenus.map(menu => {
+    setMenus(prevMenus => (baseMenus ?? prevMenus).map(menu => {
       const assignedId = String(menu.barridoEquivalencias?.id || 'principal');
       const assignedBarrido = variants.find(item => item.id === assignedId) || variants[0];
-      return {
-      ...menu,
-      barridoEquivalencias: assignedBarrido,
-      tiempos: menu.tiempos.map((tiempo, tIdx) => {
-        const barridoTiempoKey = findBarridoTiempo(assignedBarrido.tiempos, menu.tiempos, tIdx)?.id;
+
+      // ── PASO 1: reconciliar tiempos del menú con el barrido actualizado ──────
+      // Se utiliza un conjunto de índices usados (usedIndices) para garantizar que NINGÚN
+      // tiempo del menú sea reclamado más de una vez, evitando duplicación de platillos.
+      const norm = (s?: string) => (s || '').toLowerCase().trim();
+      const barridoTiempos = assignedBarrido.tiempos;
+      const existingTiempos = menu.tiempos || [];
+      const usedIndices = new Set<number>();
+
+      const reconciliatedTiempos = barridoTiempos.map((barridoT, bIdx) => {
+        // Intento 1: match por barridoTiempoId exacto
+        let matchedIdx = barridoT.id
+          ? existingTiempos.findIndex((t, i) => !usedIndices.has(i) && t.barridoTiempoId === barridoT.id)
+          : -1;
+
+        // Intento 2: match por nombre normalizado exacto
+        if (matchedIdx === -1) {
+          const bName = norm(barridoT.nombre);
+          if (bName) {
+            matchedIdx = existingTiempos.findIndex((t, i) => !usedIndices.has(i) && norm(t.nombre) === bName);
+          }
+        }
+
+        // Intento 3: match por posición ordinal en la lista si la posición no ha sido tomada
+        if (matchedIdx === -1 && bIdx < existingTiempos.length && !usedIndices.has(bIdx)) {
+          matchedIdx = bIdx;
+        }
+
+        if (matchedIdx !== -1) {
+          usedIndices.add(matchedIdx);
+          const existing = existingTiempos[matchedIdx];
+          return {
+            ...existing,
+            nombre: formatMealTimeName(barridoT.nombre),
+            barridoTiempoId: barridoT.id,
+            ingredientes: (existing.ingredientes || []).map(ing => ({
+              ...ing,
+              equivalencias: Array.isArray(ing.equivalencias) ? [...ing.equivalencias] : []
+            }))
+          };
+        }
+
+        // Nuevo tiempo en el barrido: se crea 100% vacío sin heredar platillos de otros tiempos
+        return {
+          barridoTiempoId: barridoT.id,
+          nombre: formatMealTimeName(barridoT.nombre),
+          ingredientes: [] as any[],
+          nota: '',
+          bebida: '',
+          suplTiempo: '',
+          suplNotas: '',
+          ademas: '',
+        };
+      });
+
+      // ── PASO 2: escalar ingredientes con el barrido nuevo ──────────────────
+      const scaledTiempos = reconciliatedTiempos.map((tiempo, tIdx) => {
+        const barridoTiempoKey = findBarridoTiempo(assignedBarrido.tiempos, reconciliatedTiempos, tIdx)?.id;
 
         if (!barridoTiempoKey) return tiempo;
 
         return {
           ...tiempo,
-          ingredientes: tiempo.ingredientes.map(ing => {
+          ingredientes: tiempo.ingredientes.map((ing: any) => {
             // Determinar el grupo principal del ingrediente (legacy eqGrupo o primer item de equivalencias[])
             const mainGrupo = ing.eqGrupo ||
               (Array.isArray(ing.equivalencias) && ing.equivalencias.length > 0
@@ -624,8 +686,13 @@ export const CreateEditPlanForm = ({
             return ing;
           })
         };
-      })
-    };
+      });
+
+      return {
+        ...menu,
+        barridoEquivalencias: assignedBarrido,
+        tiempos: scaledTiempos,
+      };
     }));
   };
 
@@ -670,10 +737,11 @@ export const CreateEditPlanForm = ({
   };
 
   const updateTiempoName = (tiempoIdx: number, nombre: string) => {
+    const formatted = formatMealTimeName(nombre);
     setMenus(prev => prev.map(menu => ({
       ...menu,
       tiempos: menu.tiempos.map((tiempo, index) =>
-        index === tiempoIdx ? { ...tiempo, nombre } : tiempo
+        index === tiempoIdx ? { ...tiempo, nombre: formatted } : tiempo
       ),
     })));
   };
@@ -833,6 +901,22 @@ export const CreateEditPlanForm = ({
     return [...budgetedItems, ...extraItems];
   };
 
+  const [savingBarrido, setSavingBarrido] = useState(false);
+
+  const handleActualizarBarrido = async () => {
+    if (!valData?.barridoEquivalencias || !pacienteId || !valoracionId) return;
+    setSavingBarrido(true);
+    try {
+      await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`, valData.barridoEquivalencias);
+      autoScaleIngredients(valData.barridoEquivalencias);
+      toast({ title: 'Barrido actualizado y sincronizado', description: 'Se guardaron los cambios en la valoración y se ajustaron los tiempos del menú.' });
+    } catch (err: any) {
+      toast({ title: 'Error al actualizar barrido', description: err.response?.data?.message || 'No se pudo guardar el barrido.', variant: 'destructive' });
+    } finally {
+      setSavingBarrido(false);
+    }
+  };
+
   const handleSave = async () => {
     if (macroSum !== 100) {
       toast({ title: 'ERROR ESTRATÉGICO', description: 'La distribución de macronutrientes debe sumar el 100% de la carga energética.', variant: 'destructive' });
@@ -939,6 +1023,16 @@ export const CreateEditPlanForm = ({
         const { data } = await api.post(url, body);
         serverData = data?.data || data;
       }
+
+      // Persistir cambios del barrido en la valoración si se modificó desde esta vista
+      if (!isBasePlan && pacienteId && valoracionId && valData?.barridoEquivalencias) {
+        try {
+          await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionId}/barrido`, valData.barridoEquivalencias);
+        } catch (e) {
+          console.warn('No se pudo guardar el barrido actualizado en la valoración:', e);
+        }
+      }
+
       toast({ title: 'MENÚ GUARDADO' });
 
       if (onSaved) {
@@ -1317,7 +1411,7 @@ export const CreateEditPlanForm = ({
                 </div>
 
                 {showBarridoRef && (
-                  <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="p-6 border-t border-[#2a2a2a] animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
                     <BarridosEquivalenciasManager
                       value={valData.barridoEquivalencias}
                       onChange={(data) => {
@@ -1325,6 +1419,26 @@ export const CreateEditPlanForm = ({
                         autoScaleIngredients(data);
                       }}
                     />
+                    <div className="flex items-center justify-between pt-4 mt-2 border-t border-[#2a2a2a]">
+                      <div className="text-[12px] text-accent-red font-medium">
+                        {valData?.barridoEquivalencias && getBarridoVariantes(valData.barridoEquivalencias).some(item => item.isValid === false) && (
+                          <span className="flex items-center gap-1.5"><AlertCircle className="w-4 h-4" /> La distribución de comidas no descuadra con las porciones planeadas.</span>
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleActualizarBarrido}
+                        disabled={savingBarrido || !valData?.barridoEquivalencias}
+                        className="flex items-center gap-2 px-5 py-2.5 bg-brand-primary text-bg-base rounded-[8px] text-[13px] font-bold hover:bg-[#e0e0e0] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {savingBarrido ? (
+                          <div className="w-4 h-4 border-2 border-white/20 border-t-white dark:border-black/20 dark:border-t-black rounded-full animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-4 h-4" />
+                        )}
+                        Actualizar barrido
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1449,10 +1563,10 @@ export const CreateEditPlanForm = ({
                             </button>
                           </div>
                           <input
-                            value={tiempo.nombre}
+                            value={formatMealTimeName(tiempo.nombre)}
                             onChange={(e) => updateTiempoName(ti, e.target.value)}
-                            className="text-[14px] font-semibold text-white bg-transparent border-none outline-none min-w-0 flex-1"
-                            placeholder="Nombre del tiempo"
+                            className="text-[14px] font-semibold text-white bg-transparent border-none outline-none min-w-0 flex-1 uppercase tracking-wide"
+                            placeholder="NOMBRE DEL TIEMPO"
                           />
                           <button
                             type="button"

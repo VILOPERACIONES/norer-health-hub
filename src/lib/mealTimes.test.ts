@@ -3,16 +3,16 @@ import { formatMealTimeName } from './mealTimes';
 
 describe('formatMealTimeName', () => {
   it.each([
-    ['COLACIÓN', 'Colación'],
-    ['COLACION 2', 'Colación 2'],
-    ['PRE ENTRENO', 'Pre-entreno'],
-    ['POST-ENTRENO', 'Post-entreno'],
-    ['DESAYUNO', 'Desayuno'],
+    ['COLACIÓN', 'COLACIÓN'],
+    ['COLACION 2', 'COLACIÓN 2'],
+    ['PRE ENTRENO', 'PRE-ENTRENO'],
+    ['POST-ENTRENO', 'POST-ENTRENO'],
+    ['DESAYUNO', 'DESAYUNO'],
   ])('convierte %s a %s', (input, expected) => {
     expect(formatMealTimeName(input)).toBe(expected);
   });
 
-  it('conserva nombres personalizados', () => {
-    expect(formatMealTimeName('Snack AM')).toBe('Snack AM');
+  it('formatea nombres personalizados a mayúsculas conservando acentos', () => {
+    expect(formatMealTimeName('Snack AM')).toBe('SNACK AM');
   });
 });

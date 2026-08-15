@@ -868,7 +868,15 @@ const NewAssessment = () => {
         toast({ title: 'Valoración guardada correctamente' });
       }
 
-      if (valoracionResId && barridoData && getBarridoVariantes(barridoData).some(item => item.kcalTotal > 0)) {
+      // Guardar barrido si existe y tiene tiempos definidos.
+      // En edición siempre persistimos aunque kcalTotal sea 0 (el usuario puede haber
+      // borrado tiempos o editado nombres sin recalcular aún).
+      const barridoTieneContenido = barridoData && (
+        isEdit
+          ? Array.isArray((barridoData as any).tiempos) && (barridoData as any).tiempos.length > 0
+          : getBarridoVariantes(barridoData).some(item => item.kcalTotal > 0)
+      );
+      if (valoracionResId && barridoTieneContenido) {
         try { await api.post(`/api/pacientes/${pacienteId}/valoraciones/${valoracionResId}/barrido`, barridoData); } catch { }
       }
 

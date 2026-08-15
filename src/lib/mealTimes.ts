@@ -1,13 +1,16 @@
 const MEAL_TIME_NAMES: Record<string, string> = {
-  desayuno: 'Desayuno',
-  colacion: 'Colación',
-  almuerzo: 'Almuerzo',
-  comida: 'Comida',
-  cena: 'Cena',
-  'pre entreno': 'Pre-entreno',
-  'pre-entreno': 'Pre-entreno',
-  'post entreno': 'Post-entreno',
-  'post-entreno': 'Post-entreno',
+  desayuno: 'DESAYUNO',
+  colacion: 'COLACIÓN',
+  almuerzo: 'ALMUERZO',
+  comida: 'COMIDA',
+  cena: 'CENA',
+  snack: 'SNACK',
+  merienda: 'MERIENDA',
+  colaciones: 'COLACIONES',
+  'pre entreno': 'PRE-ENTRENO',
+  'pre-entreno': 'PRE-ENTRENO',
+  'post entreno': 'POST-ENTRENO',
+  'post-entreno': 'POST-ENTRENO',
 };
 
 export const formatMealTimeName = (value: unknown): string => {
@@ -22,5 +25,9 @@ export const formatMealTimeName = (value: unknown): string => {
   const base = suffixMatch?.[1] ?? normalized;
   const suffix = suffixMatch?.[2] ?? '';
 
-  return MEAL_TIME_NAMES[base] ? `${MEAL_TIME_NAMES[base]}${suffix}` : original;
+  if (MEAL_TIME_NAMES[base]) {
+    return `${MEAL_TIME_NAMES[base]}${suffix}`;
+  }
+
+  return original.toUpperCase();
 };

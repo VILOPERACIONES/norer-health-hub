@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { DEFAULT_RECALL_24, type Recall24Row } from '@/lib/recall24';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { encodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
@@ -126,6 +127,7 @@ const NewPatient = () => {
   const update = (field: string, value: any) => setForm({ ...form, [field]: value });
 
   const [suplementosIniciales, setSuplementosIniciales] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
+  const [habitos, setHabitos] = useState<Recall24Row[]>(DEFAULT_RECALL_24.map((row) => ({ ...row })));
 
   const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
   const addDisciplina = () => setDisciplinas([...disciplinas, { disciplina: '', frecuencia: '', tiempo: '' }]);
@@ -195,6 +197,8 @@ const NewPatient = () => {
         agua: form.agua,
         suplementosDetalle: suplementosIniciales.filter(s => s.nombre.trim()),
       },
+
+      habitos,
 
 
     };
@@ -293,6 +297,60 @@ const NewPatient = () => {
 
         </FormSection>
 
+        <FormSection title="Dietética" icon={BookOpen} defaultOpen={false}>
+          <div className="col-span-full space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-[13px] text-text-secondary m-0">Registro de horarios y alimentos del paciente. Esta información pertenece únicamente al expediente.</p>
+              <button
+                type="button"
+                onClick={() => setHabitos((rows) => [...rows, { label: 'Colación', hora: '', ayer: '', usualmente: '' }])}
+                className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
+              >
+                <Plus className="w-3 h-3" /> Agregar tiempo
+              </button>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-[12px]">
+                <thead>
+                  <tr className="border-b border-border-subtle">
+                    {['Tiempo', 'Hora', 'Ayer', 'Usualmente'].map((label) => (
+                      <th key={label} className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-3">{label}</th>
+                    ))}
+                    <th className="w-10" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-subtle/50">
+                  {habitos.map((row, index) => (
+                    <tr key={index}>
+                      {(['label', 'hora', 'ayer', 'usualmente'] as const).map((field) => (
+                        <td key={field} className="py-2 pr-3">
+                          <input
+                            type="text"
+                            value={row[field]}
+                            onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
+                            placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Descripción...'}
+                            className="w-full bg-bg-elevated rounded-[6px] px-3 py-2 text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
+                          />
+                        </td>
+                      ))}
+                      <td className="py-2">
+                        <button
+                          type="button"
+                          onClick={() => setHabitos((rows) => rows.filter((_, itemIndex) => itemIndex !== index))}
+                          className="p-2 text-text-muted hover:text-accent-red rounded-[6px] hover:bg-bg-elevated transition-colors"
+                          title="Eliminar tiempo"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </FormSection>
+
         <FormSection title="Anamnesis y Suplementación" icon={Shield} defaultOpen={false}>
           <div className="col-span-full space-y-3">
             <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none block">
@@ -365,14 +423,13 @@ const NewPatient = () => {
               </div>
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 col-span-full">
-            <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
-            <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
-            <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
-          </div>
+
         </FormSection>
 
         <FormSection title="Perfil Clínico" icon={Heart} defaultOpen={false}>
+          <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
+          <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
+          <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
           <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
           <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
           <Input label="Fármacos / Medicamentos" value={form.farmacos} onChange={(v: string) => update('farmacos', v)} placeholder="Metformina 500mg, Eutirox..." />
