@@ -1,10 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Plus, Search, Utensils, Trash2, Save, X, Edit2, ChevronLeft, Check, ChevronsUpDown, ChevronDown, Copy } from 'lucide-react';
 import api from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateAfterPlatilloChange } from '@/lib/invalidation';
 import {
   Command,
   CommandEmpty,
@@ -25,30 +28,23 @@ import type { Platillo, Ingrediente } from '@/types';
 const DEFAULT_CATEGORIAS = ['DESAYUNO', 'COLACIÓN', 'ALMUERZO', 'CENA', 'PRE-ENTRENO', 'POST-ENTRENO', 'OTROS'];
 
 const Platillos = () => {
-  const [platillos, setPlatillos] = useState<Platillo[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [currentPlatillo, setCurrentPlatillo] = useState<Partial<Platillo> | null>(null);
   const [previewPlatillo, setPreviewPlatillo] = useState<Platillo | null>(null);
 
-  useEffect(() => {
-    fetchPlatillos();
-  }, []);
-
-  const fetchPlatillos = async () => {
-    try {
-      setLoading(true);
+  const { data: platillos = [], isLoading: loading } = useQuery({
+    queryKey: queryKeys.platillos.all(),
+    queryFn: async () => {
       const { data } = await api.get('/api/platillos');
-      setPlatillos(data?.data || []);
-    } catch (err) {
-      toast({ title: 'Error', description: 'No se pudieron cargar los platillos', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return (data?.data || []) as Platillo[];
+    },
+    staleTime: 60 * 1000,
+    placeholderData: (prev) => prev,
+  });
 
   const handleCreate = () => {
     setCurrentPlatillo({
@@ -82,7 +78,7 @@ const Platillos = () => {
     if (!confirm('¿Estás seguro de eliminar este platillo?')) return;
     try {
       await api.delete(`/api/platillos/${id}`);
-      setPlatillos(platillos.filter(p => p.id !== id));
+      invalidateAfterPlatilloChange(queryClient);
       toast({ title: 'Eliminado', description: 'Platillo eliminado correctamente' });
     } catch (err) {
       toast({ title: 'Error', description: 'No se pudo eliminar el platillo', variant: 'destructive' });
@@ -105,7 +101,7 @@ const Platillos = () => {
       }
       setIsEditing(false);
       setCurrentPlatillo(null);
-      fetchPlatillos();
+      invalidateAfterPlatilloChange(queryClient);
     } catch (err: any) {
       const duplicado = err?.response?.status === 409;
       toast({

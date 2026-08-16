@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateAfterPacienteChange, invalidateAfterValoracionChange } from '@/lib/invalidation';
 import { Edit, Plus, ChevronDown, X, User, Phone, Mail, Clock, Calendar, Shield, Hash, Activity, Heart, ClipboardList, Trash2, ArrowLeft, Send, FileText, RotateCcw, ArchiveRestore } from 'lucide-react';
 import api from '@/lib/api';
 import type { Paciente, Valoracion, Plan } from '@/types';
@@ -259,7 +261,7 @@ const PatientProfile = () => {
   const queryClient = useQueryClient();
   // ── Datos del paciente (con cache React Query) ────────────────────────────
   const { data: paciente, isLoading: loadingPaciente } = useQuery({
-    queryKey: ['paciente', id],
+    queryKey: queryKeys.pacientes.detail(id!),
     queryFn: async () => {
       const res = await api.get(`/api/pacientes/${id}`);
       return res.data?.data || res.data;
@@ -270,7 +272,7 @@ const PatientProfile = () => {
   });
 
   const { data: valoraciones = [], isLoading: loadingValoraciones } = useQuery({
-    queryKey: ['valoraciones', id],
+    queryKey: queryKeys.valoraciones.byPaciente(id!),
     queryFn: async () => {
       const res = await api.get(`/api/pacientes/${id}/valoraciones`);
       const vals = res.data?.data || res.data || [];
@@ -303,7 +305,7 @@ const PatientProfile = () => {
 
   // B9: Query para consultas archivadas
   const { data: archivadas = [], isLoading: loadingArchivadas, refetch: refetchArchivadas } = useQuery({
-    queryKey: ['valoraciones-archivadas', id],
+    queryKey: queryKeys.valoraciones.archived(id!),
     queryFn: async () => {
       const res = await api.get(`/api/pacientes/${id}/valoraciones/archivadas`);
       return res.data?.data || res.data || [];
@@ -325,7 +327,7 @@ const PatientProfile = () => {
     try {
       const newState = !paciente.portalActivo;
       await api.put(`/api/portal/activar/${id}`, { activar: newState });
-      queryClient.invalidateQueries({ queryKey: ['paciente', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pacientes.detail(id!) });
       toast({ title: newState ? 'Portal Norder Health activado' : 'Portal desactivado' });
     } catch {
       toast({ title: 'Error', description: 'No se pudo cambiar el estado del portal', variant: 'destructive' });
@@ -340,7 +342,7 @@ const PatientProfile = () => {
     setIsChangingTier(true);
     try {
       await api.put(`/api/portal/activar/${id}`, { activar: true, nivelMembresia: nivelMap[tier] });
-      queryClient.invalidateQueries({ queryKey: ['paciente', id] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pacientes.detail(id!) });
       toast({ title: `Plan cambiado a ${tier.charAt(0).toUpperCase() + tier.slice(1)}` });
     } catch {
       toast({ title: 'Error', description: 'No se pudo cambiar el plan', variant: 'destructive' });
@@ -383,7 +385,7 @@ const PatientProfile = () => {
     try {
       await api.delete(`/api/pacientes/${id}`);
       toast({ title: 'EXPEDIENTE ELIMINADO', description: 'El paciente y toda su data han sido borrados del sistema.' });
-      queryClient.invalidateQueries({ queryKey: ['pacientes'] });
+      invalidateAfterPacienteChange(queryClient, id);
       navigate('/pacientes');
     } catch (err) {
       toast({ title: 'Error de Purga', description: 'No se pudo eliminar el expediente. Verifique la conexión con el servidor.', variant: 'destructive' });
@@ -399,7 +401,7 @@ const PatientProfile = () => {
     try {
       await api.delete(`/api/pacientes/${id}/valoraciones/${archiveTarget.id}`);
       toast({ title: 'Consulta Archivada', description: 'Se ocultó del historial.' });
-      queryClient.invalidateQueries({ queryKey: ['valoraciones', id] });
+      invalidateAfterValoracionChange(queryClient, id!);
       refetchArchivadas();
     } catch (err: any) {
       toast({ title: 'Error', description: err.response?.data?.error || 'No se pudo archivar la consulta.', variant: 'destructive' });
@@ -414,7 +416,7 @@ const PatientProfile = () => {
     try {
       await api.patch(`/api/pacientes/${id}/valoraciones/${valoracionId}/restore`);
       toast({ title: 'Consulta Restaurada', description: 'La consulta vuelve a estar activa en el expediente.' });
-      queryClient.invalidateQueries({ queryKey: ['valoraciones', id] });
+      invalidateAfterValoracionChange(queryClient, id!);
       refetchArchivadas();
     } catch (err: any) {
       toast({ title: 'Error', description: err.response?.data?.error || 'No se pudo restaurar la consulta.', variant: 'destructive' });

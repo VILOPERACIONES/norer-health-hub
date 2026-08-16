@@ -6,6 +6,8 @@ import api from '@/lib/api';
 import { Menu, TiempoComida, Ingrediente, Plan, Platillo } from '@/types';
 import { formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterPlanChange } from '@/lib/invalidation';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { Input } from '@/components/ui/input';
 import { normalizeBarridoData, type BarridoData, type BarridoTiempo } from '@/components/BarridoEquivalencias';
@@ -76,6 +78,7 @@ export const CreateEditPlanForm = ({
 }) => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const isEdit = !!propPlanId;
   const isBasePlan = !propPacienteId;
@@ -1035,6 +1038,9 @@ export const CreateEditPlanForm = ({
 
       toast({ title: 'MENÚ GUARDADO' });
 
+      // Invalidar cache para que Dashboard, Pendientes y perfil se actualicen
+      invalidateAfterPlanChange(queryClient, pacienteId);
+
       if (onSaved) {
         onSaved(serverData?.id || planId);
       } else {
@@ -1141,6 +1147,7 @@ export const CreateEditPlanForm = ({
     try {
       await api.delete(`/api/planes/${planId}`);
       toast({ title: 'MENÚ ELIMINADO' });
+      invalidateAfterPlanChange(queryClient, pacienteId);
       navigate('/planes');
     } catch (err) {
       toast({ title: 'Error al eliminar', variant: 'destructive' });

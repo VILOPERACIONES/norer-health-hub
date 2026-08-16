@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterValoracionChange } from '@/lib/invalidation';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import BarridosEquivalenciasManager, {
@@ -925,9 +926,8 @@ const NewAssessment = () => {
 
       if (!isEdit) clearDraft();
 
-      // IMPORTANT: Invalidate the cache so the Profile page fetches fresh data
-      queryClient.invalidateQueries({ queryKey: ['paciente', pacienteId] });
-      queryClient.invalidateQueries({ queryKey: ['valoraciones', pacienteId] });
+      // Invalidar cache para que Profile, Dashboard, Pendientes se actualicen
+      invalidateAfterValoracionChange(queryClient, pacienteId!);
 
       if (redirectAPlan && valoracionResId) {
         setValoracionIdGuardada(valoracionResId);

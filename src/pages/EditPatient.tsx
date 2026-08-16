@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, Plus, Trash2 } from 'lucide-react';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterPacienteChange } from '@/lib/invalidation';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 import { DEFAULT_RECALL_24, normalizeRecall24, type Recall24Row } from '@/lib/recall24';
@@ -100,6 +102,7 @@ const EditPatient = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [suplementosIniciales, setSuplementosIniciales] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
@@ -278,6 +281,7 @@ const EditPatient = () => {
 
     try {
       await api.put(`/api/pacientes/${id}`, payload);
+      invalidateAfterPacienteChange(queryClient, id);
       toast({ title: 'Expediente actualizado correctamente' });
       navigate(`/pacientes/${id}`);
     } catch (err: any) {

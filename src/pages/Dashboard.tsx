@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
 import { usePatients } from '@/hooks/usePatients';
 import { 
   Users, UserPlus, ClipboardList, Activity, Plus,
@@ -24,7 +25,7 @@ const Dashboard = () => {
 
   // Queries para métricas, alertas y top clientes
   const { data: metricas } = useQuery({
-    queryKey: ['dashboard', 'metricas'],
+    queryKey: queryKeys.dashboard.metricas(),
     queryFn: async () => {
       const res = await api.get('/api/dashboard/metricas');
       return res.data?.data || res.data;
@@ -35,7 +36,7 @@ const Dashboard = () => {
   });
 
   const { data: alertas = [] } = useQuery({
-    queryKey: ['dashboard', 'alertas'],
+    queryKey: queryKeys.dashboard.alertas(),
     queryFn: async () => {
       const res = await api.get('/api/dashboard/alertas');
       return res.data?.data || res.data || [];
@@ -46,7 +47,7 @@ const Dashboard = () => {
   });
 
   const { data: topClientesRaw } = useQuery({
-    queryKey: ['dashboard', 'top-clientes'],
+    queryKey: queryKeys.dashboard.topClientes(),
     queryFn: async () => {
       const res = await api.get('/api/dashboard/top-clientes');
       return res.data?.data || res.data || [];

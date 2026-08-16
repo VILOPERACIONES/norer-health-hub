@@ -4,6 +4,8 @@ import { ArrowLeft, Save, User, Activity, Heart, Shield, Clock, BookOpen, Chevro
 import { DEFAULT_RECALL_24, type Recall24Row } from '@/lib/recall24';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterPacienteChange } from '@/lib/invalidation';
 import { encodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
@@ -106,6 +108,7 @@ const FormSection = ({ title, icon: Icon, children, defaultOpen = true }: { titl
 const NewPatient = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [saving, setSaving] = useState(false);
 
   const [form, setForm] = useState({
@@ -207,6 +210,9 @@ const NewPatient = () => {
       const response = await api.post('/api/pacientes', payload);
       const serverData = response.data?.data || response.data;
       const patientId = serverData?.id;
+
+      // Invalidar cache para que la lista de pacientes, dashboard y pendientes se actualicen
+      invalidateAfterPacienteChange(queryClient, patientId);
 
       toast({ title: 'Expediente digitalizado correctamente' });
       if (patientId) navigate(`/pacientes/${patientId}`);

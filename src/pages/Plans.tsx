@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Trash2, Edit3 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateAfterPlanChange } from '@/lib/invalidation';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
@@ -16,7 +18,7 @@ const Plans = () => {
   const queryClient = useQueryClient();
 
   const { data: planesBase = [], isLoading: loading } = useQuery({
-    queryKey: ['planes-base'],
+    queryKey: queryKeys.planes.base(),
     queryFn: async () => {
       const { data } = await api.get('/api/planes?tipo=base');
       return data?.data || data || [];
@@ -38,7 +40,7 @@ const Plans = () => {
     try {
       await api.delete(`/api/planes/${id}`);
       toast({ title: 'MENÚ ELIMINADO' });
-      queryClient.invalidateQueries({ queryKey: ['planes-base'] });
+      invalidateAfterPlanChange(queryClient);
     } catch (err) {
       toast({ title: 'Error al eliminar', variant: 'destructive' });
     }

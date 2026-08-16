@@ -47,8 +47,8 @@ const queryClient = new QueryClient({
       staleTime: 60 * 1000,
       // Cache se mantiene 10 minutos en background
       gcTime: 10 * 60 * 1000,
-      // Solo refresca si los datos están stale al volver a la pestaña
-      refetchOnWindowFocus: false,
+      // Refresca datos stale al volver a la pestaña (respeta staleTime de 1 min)
+      refetchOnWindowFocus: 'always',
       // Solo 1 retry en error para no esperar demasiado
       retry: 1,
       // No refetch al reconectar para evitar doble carga

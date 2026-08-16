@@ -1,13 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/lib/api';
 import type { Paciente } from '@/types';
-
-const KEY = 'pacientes';
+import { queryKeys } from '@/lib/queryKeys';
+import { invalidateAfterPacienteChange } from '@/lib/invalidation';
 
 // ── Fetch todos los pacientes (con búsqueda opcional) ─────────────────────────
 export const usePatients = (search = '') => {
   return useQuery({
-    queryKey: [KEY, search],
+    queryKey: queryKeys.pacientes.list(search),
     queryFn: async () => {
       const url = `/api/pacientes${search ? `?buscar=${encodeURIComponent(search)}` : ''}`;
       const { data } = await api.get(url);
@@ -23,7 +23,7 @@ export const usePatients = (search = '') => {
 // ── Fetch paciente individual ─────────────────────────────────────────────────
 export const usePaciente = (id: string | undefined) => {
   return useQuery({
-    queryKey: [KEY, id],
+    queryKey: queryKeys.pacientes.detail(id!),
     queryFn: async () => {
       const { data } = await api.get(`/api/pacientes/${id}`);
       return (data?.data || data) as Paciente;
@@ -40,8 +40,7 @@ export const useCreatePaciente = () => {
   return useMutation({
     mutationFn: (body: Partial<Paciente>) => api.post('/api/pacientes', body),
     onSuccess: () => {
-      // Invalida la lista general para que recargue con el nuevo paciente
-      qc.invalidateQueries({ queryKey: [KEY] });
+      invalidateAfterPacienteChange(qc);
     },
   });
 };
@@ -52,8 +51,7 @@ export const useUpdatePaciente = (id: string) => {
   return useMutation({
     mutationFn: (body: Partial<Paciente>) => api.put(`/api/pacientes/${id}`, body),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: [KEY, id] });
-      qc.invalidateQueries({ queryKey: [KEY] });
+      invalidateAfterPacienteChange(qc, id);
     },
   });
 };

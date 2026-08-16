@@ -7,6 +7,8 @@ import type { Plan } from '@/types';
 import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
+import { useQueryClient } from '@tanstack/react-query';
+import { invalidateAfterPlanChange } from '@/lib/invalidation';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 import { formatMealTimeName } from '@/lib/mealTimes';
 import { getMenuTimesForDisplay } from '@/lib/menuEquivalencias';
@@ -16,6 +18,7 @@ import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDe
 export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
     const navigate = useNavigate();
     const { toast } = useToast();
+    const queryClient = useQueryClient();
 
     const pacienteId = propPacienteId;
     const planId = propPlanId;
@@ -187,6 +190,8 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
             });
             setShowDeliveryDialog(false);
             setPlan((prev) => prev ? { ...prev, estadoEnvio: 'enviado' } as Plan : prev);
+            // Invalidar cache para que Dashboard y Pendientes reflejen el envío
+            invalidateAfterPlanChange(queryClient, pacienteId);
         } catch (err: any) {
             toast({
                 title: 'Error al enviar',
