@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { usePortalAuthStore } from '@/store/portalAuth';
+import { shouldClearSessionOnUnauthorized } from '@/lib/unauthorizedHandling';
 
 const isDev = import.meta.env.DEV;
 const API_BASE = import.meta.env.VITE_API_URL
@@ -20,7 +21,7 @@ portalApi.interceptors.request.use((config) => {
 portalApi.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    if (shouldClearSessionOnUnauthorized(error.response?.status, error.config?.url)) {
       usePortalAuthStore.getState().clearPortalAuth();
       window.location.href = '/norder-health/login';
     }

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '@/store/auth';
+import { shouldClearSessionOnUnauthorized } from '@/lib/unauthorizedHandling';
 
 // Timeout de 30s — agendar citas en Cal.com toma su tiempo porque envía correos y procesa webhooks internamente.
 const api = axios.create({ timeout: 30_000 });
@@ -19,7 +20,7 @@ api.interceptors.response.use(
     const config = error.config as any;
 
     // Token expirado → logout y redirigir
-    if (error.response?.status === 401) {
+    if (shouldClearSessionOnUnauthorized(error.response?.status, config?.url)) {
       useAuthStore.getState().logout();
       window.location.href = '/login';
       return Promise.reject(error);
