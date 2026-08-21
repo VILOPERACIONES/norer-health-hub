@@ -4,6 +4,7 @@ import BarridoEquivalencias, {
   normalizeBarridoData,
   type BarridoData,
 } from './BarridoEquivalencias';
+import type { Recall24Row } from '@/lib/recall24';
 
 export interface BarridoVariante extends BarridoData {
   id: string;
@@ -46,9 +47,16 @@ interface Props {
   value: BarridoCollection | BarridoData | null;
   onChange: (value: BarridoCollection) => void;
   maxVariants?: number;
+  habitos?: Recall24Row[];
+  /** Tiempos (por id de barrido, y por nombre como respaldo legacy) ya usados por un Plan del paciente — no se borran al re-sincronizar con Dietética. */
+  tiemposEnUso?: { ids: string[]; nombres: string[] } | null;
+  /** Se disparan cuando el usuario agrega/renombra/quita un tiempo directamente en algún barrido, para reflejarlo de vuelta en Dietética. */
+  onTiempoAdded?: (nombre: string) => void;
+  onTiempoRenamed?: (idx: number, nombre: string) => void;
+  onTiempoRemoved?: (idx: number) => void;
 }
 
-const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2 }: Props) => {
+const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved }: Props) => {
   const initialVariantsRef = useRef<BarridoVariante[] | null>(null);
   if (!initialVariantsRef.current) initialVariantsRef.current = getBarridoVariantes(value);
   const variants = value ? getBarridoVariantes(value) : initialVariantsRef.current;
@@ -133,6 +141,11 @@ const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2 }: Prop
             <BarridoEquivalencias
               value={variant}
               onChange={data => updateVariant(index, data)}
+              habitos={habitos}
+              tiemposEnUso={tiemposEnUso}
+              onTiempoAdded={onTiempoAdded}
+              onTiempoRenamed={onTiempoRenamed}
+              onTiempoRemoved={onTiempoRemoved}
             />
           </div>
         </div>

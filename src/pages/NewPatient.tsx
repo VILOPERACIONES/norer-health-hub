@@ -263,7 +263,7 @@ const NewPatient = () => {
           <Select label="Somatotipo" value={form.complexion} onChange={(v: string) => update('complexion', v)} options={['', 'Ectomorfo', 'Mesomorfo', 'Endomorfo']} />
         </FormSection>
 
-        <FormSection title="Dinámica Deportiva" icon={Activity} defaultOpen={false}>
+        <FormSection title="Dinámica Deportiva" icon={Activity}>
           <Input label="Objetivo" value={form.objetivo} onChange={(v: string) => update('objetivo', v)} placeholder="Ej: Aumento de masa muscular, pérdida de grasa" />
           <Input label="Gimnasio de Origen" value={form.gymOrigen} onChange={(v: string) => update('gymOrigen', v)} placeholder="Nombre del club" />
           <Input label="Hora de Entrenamiento" value={form.horaEntrenamiento} onChange={(v: string) => update('horaEntrenamiento', v)} placeholder="Ej: 7:00am / Tarde" />
@@ -303,23 +303,23 @@ const NewPatient = () => {
 
         </FormSection>
 
-        <FormSection title="Dietética" icon={BookOpen} defaultOpen={false}>
+        <FormSection title="Dietética" icon={BookOpen}>
           <div className="col-span-full space-y-4">
-            <div className="flex items-center justify-between gap-4">
-              <p className="text-[13px] text-text-secondary m-0">Registro de horarios y alimentos del paciente. Esta información pertenece únicamente al expediente.</p>
+            <p className="text-[13px] text-text-secondary m-0">Registro de horarios y alimentos del paciente. Esta información pertenece únicamente al expediente.</p>
+            <div className="flex justify-start">
               <button
                 type="button"
-                onClick={() => setHabitos((rows) => [...rows, { label: 'Colación', hora: '', ayer: '', usualmente: '' }])}
+                onClick={() => setHabitos((rows) => [{ label: 'Colación', hora: '', notas: '' }, ...rows])}
                 className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
               >
                 <Plus className="w-3 h-3" /> Agregar tiempo
               </button>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[720px] text-[12px]">
+            <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+              <table className="w-full min-w-[560px] text-[12px]">
                 <thead>
                   <tr className="border-b border-border-subtle">
-                    {['Tiempo', 'Hora', 'Ayer', 'Usualmente'].map((label) => (
+                    {['Tiempo', 'Hora', 'Notas'].map((label) => (
                       <th key={label} className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-3">{label}</th>
                     ))}
                     <th className="w-10" />
@@ -328,13 +328,13 @@ const NewPatient = () => {
                 <tbody className="divide-y divide-border-subtle/50">
                   {habitos.map((row, index) => (
                     <tr key={index}>
-                      {(['label', 'hora', 'ayer', 'usualmente'] as const).map((field) => (
+                      {(['label', 'hora', 'notas'] as const).map((field) => (
                         <td key={field} className="py-2 pr-3">
                           <input
                             type="text"
                             value={row[field]}
                             onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
-                            placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Descripción...'}
+                            placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Notas (opcional)'}
                             className="w-full bg-bg-elevated rounded-[6px] px-3 py-2 text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
                           />
                         </td>
@@ -354,10 +354,14 @@ const NewPatient = () => {
                 </tbody>
               </table>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
+              <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
+            </div>
           </div>
         </FormSection>
 
-        <FormSection title="Anamnesis y Suplementación" icon={Shield} defaultOpen={false}>
+        <FormSection title="Anamnesis y Suplementación" icon={Shield}>
           <div className="col-span-full space-y-3">
             <label className="text-[12px] font-medium text-text-secondary uppercase tracking-widest ml-1 leading-none block">
               Suplementos Actuales del Paciente
@@ -371,9 +375,18 @@ const NewPatient = () => {
                   <div></div>
                 </div>
               )}
+              <div className="flex justify-start pb-1">
+                <button
+                  type="button"
+                  onClick={() => setSuplementosIniciales([{ id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }, ...suplementosIniciales])}
+                  className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
+                >
+                  <Plus className="w-4 h-4" /> Agregar Suplemento
+                </button>
+              </div>
               <div className="space-y-2 max-h-[200px] overflow-y-auto">
                 {suplementosIniciales.map((sup, idx) => (
-                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a]">
+                  <div key={sup.id} className="grid grid-cols-[1.5fr_2fr_48px_40px] gap-3 items-center bg-[#181818] p-3 rounded-[8px] border border-[#2a2a2a] animate-fade-in">
                     <input
                       type="text"
                       value={sup.nombre}
@@ -418,24 +431,11 @@ const NewPatient = () => {
                   <p className="text-[12px] text-[#8a8a8a] text-center py-4">Sin suplementos registrados.</p>
                 )}
               </div>
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => setSuplementosIniciales([...suplementosIniciales, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }])}
-                  className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
-                >
-                  <Plus className="w-4 h-4" /> Agregar Suplemento
-                </button>
-              </div>
             </div>
           </div>
-
         </FormSection>
 
-        <FormSection title="Perfil Clínico" icon={Heart} defaultOpen={false}>
-          <Input label="Alergias Alimentarias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Lácteos, Maní" />
-          <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
-          <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
+        <FormSection title="Perfil Clínico" icon={Heart}>
           <Input label="Patologías" value={form.patologia} onChange={(v: string) => update('patologia', v)} placeholder="Diabetes, Hipertensión..." />
           <Input label="Cirugías o Traumas" value={form.cirugias} onChange={(v: string) => update('cirugias', v)} placeholder="Ninguna" />
           <Input label="Fármacos / Medicamentos" value={form.farmacos} onChange={(v: string) => update('farmacos', v)} placeholder="Metformina 500mg, Eutirox..." />
@@ -450,7 +450,7 @@ const NewPatient = () => {
       </div>
 
       {/* Barra guardar sticky */}
-      <div className="sticky bottom-0 -mx-3 sm:-mx-4 md:-mx-6 lg:-mx-8 px-3 sm:px-4 md:px-6 lg:px-8 py-3 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-[#1a1a1a] flex items-center justify-between z-20">
+      <div className="sticky -bottom-6 -ml-3 sm:-ml-4 md:-ml-6 lg:-ml-8 -mr-3 sm:-mr-4 md:-mr-6 lg:-mr-[37px] pl-3 sm:pl-4 md:pl-6 lg:pl-8 pr-3 sm:pr-4 md:pr-6 lg:pr-[37px] pt-3 pb-9 bg-[#0a0a0a]/95 backdrop-blur-md border-t border-[#1a1a1a] flex items-center justify-between z-20">
         <p className="text-[13px] text-text-muted hidden sm:block">Revisa los datos antes de guardar</p>
         <button
           onClick={handleSave}

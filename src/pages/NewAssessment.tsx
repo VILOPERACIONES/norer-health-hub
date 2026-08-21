@@ -9,6 +9,7 @@ import BarridosEquivalenciasManager, {
   getBarridoVariantes,
   type BarridoCollection,
 } from '@/components/BarridosEquivalenciasManager';
+import { normalizeColacionLabel } from '@/components/BarridoEquivalencias';
 import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
@@ -24,6 +25,8 @@ import {
   hasInvalidOnlineMeasurement,
   onlineMeasurementsFromPerimeters,
 } from '@/lib/assessmentModality';
+import { DEFAULT_RECALL_24, normalizeRecall24, type Recall24Row } from '@/lib/recall24';
+import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
@@ -156,16 +159,49 @@ const NewAssessment = () => {
   });
   const [expedienteModified, setExpedienteModified] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
-  type HabitoRow = { label: string; hora: string; ayer: string; usualmente: string };
-  const DEFAULT_HABITOS: HabitoRow[] = [
-    { label: 'Desayuno',  hora: '', ayer: '', usualmente: '' },
-    { label: 'Colación',  hora: '', ayer: '', usualmente: '' },
-    { label: 'Comida',    hora: '', ayer: '', usualmente: '' },
-    { label: 'Colación',  hora: '', ayer: '', usualmente: '' },
-    { label: 'Cena',      hora: '', ayer: '', usualmente: '' },
-  ];
-  const [habitos, setHabitos] = useState<HabitoRow[]>(DEFAULT_HABITOS);
+  const [habitos, setHabitos] = useState<Recall24Row[]>(DEFAULT_RECALL_24.map((row) => ({ ...row })));
+  // Tiempos de Barrido que ya están en uso por un Plan existente del paciente (por id y, como
+  // respaldo legacy, por nombre) — la sincronización Dietética→Barrido nunca los borra aunque ya
+  // no estén en Dietética, para no romper el panel de equivalentes de planes ya armados.
+  const [planesTiemposEnUso, setPlanesTiemposEnUso] = useState<{ ids: string[]; nombres: string[] } | null>(null);
+  const planesTiemposFetchedRef = React.useRef(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
+  const [showDinamicaDeportiva, setShowDinamicaDeportiva] = useState(false);
+  const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
+  const addDisciplina = () => setDisciplinas(prev => [...prev, { disciplina: '', frecuencia: '', tiempo: '' }]);
+  const removeDisciplina = (idx: number) => setDisciplinas(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
+  const updateDisciplina = (idx: number, field: keyof DisciplinaItem, val: string) => {
+    setDisciplinas(prev => prev.map((d, i) => i === idx ? { ...d, [field]: val } : d));
+    setExpedienteModified(true);
+  };
+  const [showDietetico, setShowDietetico] = useState(false);
+  // Si el nutriólogo agrega/renombra/quita un tiempo directamente en Barrido (no en Dietético),
+  // se refleja de vuelta aquí. Se emparaja por POSICIÓN (índice dentro del barrido), no por nombre:
+  // un renombrado cambia el nombre por definición, así que emparejar por nombre no podría
+  // distinguirlo de "se borró uno y se agregó otro" — perdiendo la hora/notas ya capturadas. Los
+  // tiempos protegidos (huérfanos, en uso por un Plan) viven siempre al final del arreglo del
+  // barrido, más allá de lo que hay en Dietética, así que un índice fuera de rango simplemente no
+  // toca Dietética (no reintroduce un tiempo protegido). Como esto solo se dispara desde las
+  // ediciones manuales de BarridoEquivalencias (nunca desde su propio efecto de auto-sync), no hay
+  // riesgo de loop con la sincronización Dietético→Barrido.
+  const handleTiempoAddedFromBarrido = (nombre: string) => {
+    setHabitos((current) => [...current, { label: normalizeColacionLabel(nombre) || 'Tiempo', hora: '', notas: '' }]);
+    setExpedienteModified(true);
+  };
+  const handleTiempoRenamedFromBarrido = (idx: number, nombre: string) => {
+    setHabitos((current) => {
+      if (idx >= current.length) return current;
+      return current.map((h, i) => (i === idx ? { ...h, label: normalizeColacionLabel(nombre) || h.label } : h));
+    });
+    setExpedienteModified(true);
+  };
+  const handleTiempoRemovedFromBarrido = (idx: number) => {
+    setHabitos((current) => {
+      if (idx >= current.length) return current;
+      return current.filter((_, i) => i !== idx);
+    });
+    setExpedienteModified(true);
+  };
   const [showSuplemantacion, setShowSuplemantacion] = useState(false);
   const [showMedidas, setShowMedidas] = useState(true);
   const [showAgendarCita, setShowAgendarCita] = useState(false);
@@ -341,21 +377,10 @@ const NewAssessment = () => {
       cicloMenstrual: ant.cicloMenstrual || '',
       historialProductos: ant.historialProductos || '',
     });
+    setDisciplinas(decodeDisciplinas(ej?.disciplina, { frecuencia: ej?.frecuencia, tiempo: ej?.tiempo }));
     seedFarmacosDetalle(ant);
     seedHistorialSupDetalle(ant);
-    const h = p.habitos || {};
-    if (Array.isArray(h)) {
-      setHabitos(h.length > 0 ? h : DEFAULT_HABITOS);
-    } else {
-      // Backward compat: convert old object format
-      const rows: HabitoRow[] = [];
-      if (h.desayuno) rows.push({ label: 'Desayuno', ...h.desayuno });
-      if (h.colacion1) rows.push({ label: 'Colación', ...h.colacion1 });
-      if (h.almuerzo)  rows.push({ label: 'Comida',   ...h.almuerzo });
-      if (h.colacion2) rows.push({ label: 'Colación', ...h.colacion2 });
-      if (h.cena)      rows.push({ label: 'Cena',     ...h.cena });
-      setHabitos(rows.length > 0 ? rows : DEFAULT_HABITOS);
-    }
+    setHabitos(normalizeRecall24(p.habitos || p.consumoCalorico));
     setExpedienteModified(false);
   };
 
@@ -372,6 +397,39 @@ const NewAssessment = () => {
     const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
   }, [step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
+
+  // Al entrar al paso de Barrido, averigua qué tiempos ya están en uso por un Plan existente del
+  // paciente, para que la sincronización Dietética→Barrido nunca los borre. Se pide una sola vez
+  // (planes puede traer platillos/ingredientes completos, así que no se refresca en cada render).
+  useEffect(() => {
+    if (step !== 2 || !pacienteId || planesTiemposFetchedRef.current) return;
+    planesTiemposFetchedRef.current = true;
+    api.get(`/api/pacientes/${pacienteId}/planes`)
+      .then(({ data }) => {
+        const planes = data?.data || data || [];
+        const ids = new Set<string>();
+        const nombres = new Set<string>();
+        type PlanTiempoComidaLite = { barridoTiempoId?: string | null; nombre?: string | null };
+        type PlanMenuLite = { tiemposComida?: PlanTiempoComidaLite[] };
+        type PlanLite = { menus?: PlanMenuLite[] };
+        (Array.isArray(planes) ? planes as PlanLite[] : []).forEach((plan) => {
+          (plan?.menus || []).forEach((menu) => {
+            (menu?.tiemposComida || []).forEach((tc) => {
+              if (tc?.barridoTiempoId) {
+                ids.add(String(tc.barridoTiempoId));
+              } else if (tc?.nombre) {
+                nombres.add(String(tc.nombre).trim().toLowerCase());
+              }
+            });
+          });
+        });
+        setPlanesTiemposEnUso({ ids: Array.from(ids), nombres: Array.from(nombres) });
+      })
+      .catch(() => {
+        // Si falla, se sincroniza sin protección (comportamiento previo) — no bloquea la pantalla.
+        setPlanesTiemposEnUso({ ids: [], nombres: [] });
+      });
+  }, [step, pacienteId]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -415,25 +473,32 @@ const NewAssessment = () => {
           porcentajeModerado: String(p.datosEjercicio?.porcentajeModerado ?? 30),
           porcentajeIntenso: String(p.datosEjercicio?.porcentajeIntenso ?? 40),
         });
+        setDisciplinas(decodeDisciplinas(
+          p.datosEjercicio?.disciplina || ej?.disciplina,
+          { frecuencia: p.datosEjercicio?.frecuencia || ej?.frecuencia, tiempo: p.datosEjercicio?.tiempo || ej?.tiempo }
+        ));
         seedFarmacosDetalle(ant2);
         seedHistorialSupDetalle(ant2);
         const h2 = p.habitos || p.consumoCalorico || {};
         if (Array.isArray(h2)) {
-          setHabitos(h2.length > 0 ? h2 : DEFAULT_HABITOS);
+          setHabitos(normalizeRecall24(h2));
         } else {
-          const rows: HabitoRow[] = [];
-          const mk = (label: string, obj: any, horaKey?: string, ayerKey?: string, usKey?: string): HabitoRow => ({
-            label,
-            hora: obj?.hora || (horaKey && h2[horaKey]) || '',
-            ayer: obj?.ayer || (ayerKey && h2[ayerKey]) || '',
-            usualmente: obj?.usualmente || (usKey && h2[usKey]) || '',
-          });
-          rows.push(mk('Desayuno', h2.desayuno, 'horaDesayuno', 'ayerDesayuno', 'usalmenteDesayuno'));
-          rows.push(mk('Colación', h2.colacion1, 'horaColacion1', 'ayerColacion1', 'usalmenteColacion1'));
-          rows.push(mk('Comida',   h2.almuerzo,  'horaAlmuerzo',  'ayerAlmuerzo',  'usalmenteAlmuerzo'));
-          rows.push(mk('Colación', h2.colacion2, 'horaColacion2', 'ayerColacion2', 'usalmenteColacion2'));
-          rows.push(mk('Cena',     h2.cena,      'horaCena',      'ayerCena',      'usalmenteCena'));
-          setHabitos(rows);
+          const mk = (label: string, obj: any, horaKey?: string, ayerKey?: string, usKey?: string): Recall24Row => {
+            const ayer = obj?.ayer || (ayerKey && h2[ayerKey]) || '';
+            const usualmente = obj?.usualmente || (usKey && h2[usKey]) || '';
+            return {
+              label,
+              hora: obj?.hora || (horaKey && h2[horaKey]) || '',
+              notas: obj?.notas || [ayer, usualmente].filter(Boolean).join(' / '),
+            };
+          };
+          setHabitos([
+            mk('Desayuno', h2.desayuno, 'horaDesayuno', 'ayerDesayuno', 'usalmenteDesayuno'),
+            mk('Colación', h2.colacion1, 'horaColacion1', 'ayerColacion1', 'usalmenteColacion1'),
+            mk('Comida',   h2.almuerzo,  'horaAlmuerzo',  'ayerAlmuerzo',  'usalmenteAlmuerzo'),
+            mk('Colación', h2.colacion2, 'horaColacion2', 'ayerColacion2', 'usalmenteColacion2'),
+            mk('Cena',     h2.cena,      'horaCena',      'ayerCena',      'usalmenteCena'),
+          ]);
         }
 
         if (isEdit) {
@@ -825,9 +890,7 @@ const NewAssessment = () => {
               nivelActividad: expediente.nivelActividad,
               gymOrigen: expediente.gymOrigen,
               horaEntrenamiento: expediente.horaEntrenamiento,
-              disciplina: expediente.disciplina,
-              frecuencia: expediente.frecuencia,
-              tiempo: expediente.tiempo,
+              ...encodeDisciplinas(disciplinas),
               porcentajeSedentario: parseInt(expediente.porcentajeSedentario) || 10,
               porcentajeLeve: parseInt(expediente.porcentajeLeve) || 20,
               porcentajeModerado: parseInt(expediente.porcentajeModerado) || 30,
@@ -867,6 +930,16 @@ const NewAssessment = () => {
         const serverData = response.data?.data || response.data;
         valoracionResId = serverData?.id;
         toast({ title: 'Valoración guardada correctamente' });
+      }
+
+      // La tabla de Dietética es única por paciente (no se versiona por consulta):
+      // se guarda de vuelta al expediente para que la siguiente valoración parta de aquí.
+      try {
+        await api.put(`/api/pacientes/${pacienteId}`, {
+          habitos: habitos.map((h) => ({ label: h.label, hora: h.hora, notas: h.notas })),
+        });
+      } catch (e) {
+        console.warn('No se pudo actualizar la dietética del expediente:', e);
       }
 
       // Guardar barrido si existe y tiene tiempos definidos.
@@ -1099,33 +1172,8 @@ const NewAssessment = () => {
                 </button>
                 {showExpediente && (
                   <div className="px-5 pb-5 space-y-6 border-t border-[#2a2a2a]">
-                    {/* Ejercicio */}
-                    <div className="pt-4">
-                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Ejercicio</p>
-                      <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3">
-                        {([
-                          { label: 'Objetivo', field: 'objetivo' },
-                          { label: 'Gym / Lugar', field: 'gymOrigen' },
-                          { label: 'Hora Entrenamiento', field: 'horaEntrenamiento' },
-                          { label: 'Disciplina', field: 'disciplina' },
-                          { label: 'Frecuencia', field: 'frecuencia' },
-                          { label: 'Tiempo / Duración', field: 'tiempo' },
-                        ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
-                          <div key={field} className="space-y-1">
-                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
-                            <input
-                              type="text"
-                              value={expediente[field]}
-                              onChange={(e) => updateExpediente(field, e.target.value)}
-                              className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Consumo Calórico */}
-                    <div>
+                    {/* Consumo Calórico — oculto a pedido: no aporta valor en la consulta */}
+                    {/* <div>
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Distribución Actividad (%)</p>
                       <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-4 gap-3">
                         {([
@@ -1149,10 +1197,10 @@ const NewAssessment = () => {
                           </div>
                         ))}
                       </div>
-                    </div>
+                    </div> */}
 
                     {/* Antecedentes */}
-                    <div>
+                    <div className="pt-4">
                       <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Antecedentes</p>
                       <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
                         {([
@@ -1160,8 +1208,6 @@ const NewAssessment = () => {
                           { label: 'Cirugías / Traumas', field: 'cirugias' },
                           { label: 'Fármacos / Medicamentos', field: 'farmacos' },
                           { label: 'Alergias', field: 'alergias' },
-                          { label: 'Alimentos que gusta', field: 'alimentosGustan' },
-                          { label: 'Alimentos que no gusta', field: 'alimentosNoGustan' },
                           { label: 'Agua al día', field: 'agua' },
                           { label: 'Tránsito Intestinal', field: 'estrenimiento' },
                           { label: 'Alcohol', field: 'consumoAlcohol' },
@@ -1181,7 +1227,6 @@ const NewAssessment = () => {
                         ))}
                       </div>
                     </div>
-
 
                     {/* Historial de Suplementación */}
                     <div>
@@ -1268,6 +1313,207 @@ const NewAssessment = () => {
                         )}
                       </div>
                     </div>
+
+                    {/* Laboratorio */}
+                    <div>
+                      <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-3">Laboratorio</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
+                        <Field label="Glucosa" value={laboratorio.glucosa} onChange={(value) => setLaboratorio(prev => ({ ...prev, glucosa: value }))} suffix="mg/dL" placeholder="Ej. 92" />
+                        <Field label="Triglicéridos" value={laboratorio.trigliceridos} onChange={(value) => setLaboratorio(prev => ({ ...prev, trigliceridos: value }))} suffix="mg/dL" placeholder="Ej. 130" />
+                        <Field label="Colesterol" value={laboratorio.colesterol} onChange={(value) => setLaboratorio(prev => ({ ...prev, colesterol: value }))} suffix="mg/dL" placeholder="Ej. 180" />
+                        <Field label="Creatinina" value={laboratorio.creatinina} onChange={(value) => setLaboratorio(prev => ({ ...prev, creatinina: value }))} suffix="mg/dL" placeholder="Ej. 0.9" />
+                        <Field label="Ácido Úrico" value={laboratorio.acidoUrico} onChange={(value) => setLaboratorio(prev => ({ ...prev, acidoUrico: value }))} suffix="mg/dL" placeholder="Ej. 5.2" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── DINÁMICA DEPORTIVA ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowDinamicaDeportiva(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Dinámica Deportiva</span>
+                    {expedienteModified && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showDinamicaDeportiva ? 'rotate-180' : ''}`} />
+                </button>
+                {showDinamicaDeportiva && (
+                  <div className="px-5 pb-5 pt-4 space-y-4 border-t border-[#2a2a2a]">
+                    <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 gap-3">
+                      {([
+                        { label: 'Objetivo', field: 'objetivo' },
+                        { label: 'Gym / Lugar', field: 'gymOrigen' },
+                        { label: 'Hora Entrenamiento', field: 'horaEntrenamiento' },
+                      ] as { label: string; field: keyof typeof expediente }[]).map(({ label, field }) => (
+                        <div key={field} className="space-y-1">
+                          <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{label}</label>
+                          <input
+                            type="text"
+                            value={expediente[field]}
+                            onChange={(e) => updateExpediente(field, e.target.value)}
+                            className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0">Disciplinas</p>
+                        <button
+                          type="button"
+                          onClick={addDisciplina}
+                          className="flex items-center gap-1.5 text-[11px] font-bold text-[#8a8a8a] hover:text-white bg-[#181818] border border-[#333] hover:border-[#555] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
+                        >
+                          <Plus className="w-3 h-3" /> Agregar disciplina
+                        </button>
+                      </div>
+                      {disciplinas.map((d, idx) => (
+                        <div key={idx} className="grid sm:grid-cols-3 gap-3 items-end p-3 bg-[#181818] border border-[#333] rounded-[8px] relative">
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">{`Disciplina${disciplinas.length > 1 ? ` ${idx + 1}` : ''}`}</label>
+                            <input
+                              type="text"
+                              value={d.disciplina}
+                              onChange={(e) => updateDisciplina(idx, 'disciplina', e.target.value)}
+                              placeholder="Crossfit / Pesas / Correr"
+                              className="w-full bg-[#111111] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Frecuencia</label>
+                            <input
+                              type="text"
+                              value={d.frecuencia}
+                              onChange={(e) => updateDisciplina(idx, 'frecuencia', e.target.value)}
+                              placeholder="Ej: 5 días a la semana"
+                              className="w-full bg-[#111111] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                            />
+                          </div>
+                          <div className="flex gap-2 items-end">
+                            <div className="flex-1 space-y-1">
+                              <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Duración</label>
+                              <input
+                                type="text"
+                                value={d.tiempo}
+                                onChange={(e) => updateDisciplina(idx, 'tiempo', e.target.value)}
+                                placeholder="Ej: 60-90 min"
+                                className="w-full bg-[#111111] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                              />
+                            </div>
+                            {disciplinas.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => removeDisciplina(idx)}
+                                className="p-2 text-[#8a8a8a] hover:text-[#ff6b6b] rounded-[6px] hover:bg-[#111111] transition-colors"
+                                title="Eliminar disciplina"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* ── DIETÉTICO ── */}
+              <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setShowDietetico(s => !s)}
+                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="w-4 h-4 text-brand-primary" />
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Dietético</span>
+                    {habitos.length > 0 && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
+                  </div>
+                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showDietetico ? 'rotate-180' : ''}`} />
+                </button>
+                {showDietetico && (
+                  <div className="px-5 pb-5 space-y-6 border-t border-[#2a2a2a]">
+                    <div className="pt-4">
+                      <div className="flex justify-start mb-3">
+                        <button
+                          type="button"
+                          onClick={() => setHabitos((rows) => [{ label: 'Colación', hora: '', notas: '' }, ...rows])}
+                          className="flex items-center gap-1.5 text-[11px] font-bold text-[#8a8a8a] hover:text-white bg-[#181818] border border-[#333] hover:border-[#555] px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
+                        >
+                          <Plus className="w-3 h-3" /> Agregar tiempo
+                        </button>
+                      </div>
+                      <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+                        <table className="w-full min-w-[560px] text-[12px]">
+                          <thead>
+                            <tr className="border-b border-[#333]">
+                              {['Tiempo', 'Hora', 'Notas'].map((label) => (
+                                <th key={label} className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">{label}</th>
+                              ))}
+                              <th className="w-10" />
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#2a2a2a]">
+                            {habitos.map((row, index) => (
+                              <tr key={index}>
+                                {(['label', 'hora', 'notas'] as const).map((field) => (
+                                  <td key={field} className="py-2 pr-3">
+                                    <input
+                                      type="text"
+                                      value={row[field]}
+                                      onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
+                                      placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Notas (opcional)'}
+                                      className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                                    />
+                                  </td>
+                                ))}
+                                <td className="py-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => setHabitos((rows) => rows.filter((_, itemIndex) => itemIndex !== index))}
+                                    className="p-2 text-[#8a8a8a] hover:text-[#ff6b6b] rounded-[6px] hover:bg-[#181818] transition-colors"
+                                    title="Eliminar tiempo"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Alimentos que gusta</label>
+                        <input
+                          type="text"
+                          value={expediente.alimentosGustan}
+                          onChange={(e) => updateExpediente('alimentosGustan', e.target.value)}
+                          placeholder="Ej. Pollo, Avena, Manzanas"
+                          className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Alimentos que no gusta</label>
+                        <input
+                          type="text"
+                          value={expediente.alimentosNoGustan}
+                          onChange={(e) => updateExpediente('alimentosNoGustan', e.target.value)}
+                          placeholder="Ej. Pescado, Brócoli"
+                          className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
+                        />
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1281,7 +1527,7 @@ const NewAssessment = () => {
                 >
                   <div className="flex items-center gap-2">
                     <Shield className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Esquema de Suplementación</span>
+                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">NORDER SUPS</span>
                     {suplementacionActiva && suplementosDetalle.length > 0 && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showSuplemantacion ? 'rotate-180' : ''}`} />
@@ -1315,7 +1561,7 @@ const NewAssessment = () => {
                       if (registroSuplementos.length === 0) return null;
                       return (
                         <div className="mb-4 p-3 bg-[#141414] border border-dashed border-[#333] rounded-[8px]">
-                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-2">Sumplementos — selecciona para agregar al esquema</p>
+                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest mb-2">Suplementos del historial — selecciona para agregar a NORDER SUPS</p>
                           <div className="flex flex-wrap gap-2">
                             {registroSuplementos.map((s: any, sIdx: number) => {
                               const yaAgregado = suplementosDetalle.some(sd => norm(sd.nombre) === norm(s.nombre));
@@ -1715,17 +1961,6 @@ const NewAssessment = () => {
                       )}
                     </div>
 
-                    <div className="mt-5 pt-4 border-t border-[#2a2a2a]">
-                      <p className="mb-3 text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a]">Laboratorio</p>
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
-                        <Field label="Glucosa" value={laboratorio.glucosa} onChange={(value) => setLaboratorio(prev => ({ ...prev, glucosa: value }))} suffix="mg/dL" placeholder="Ej. 92" />
-                        <Field label="Triglicéridos" value={laboratorio.trigliceridos} onChange={(value) => setLaboratorio(prev => ({ ...prev, trigliceridos: value }))} suffix="mg/dL" placeholder="Ej. 130" />
-                        <Field label="Colesterol" value={laboratorio.colesterol} onChange={(value) => setLaboratorio(prev => ({ ...prev, colesterol: value }))} suffix="mg/dL" placeholder="Ej. 180" />
-                        <Field label="Creatinina" value={laboratorio.creatinina} onChange={(value) => setLaboratorio(prev => ({ ...prev, creatinina: value }))} suffix="mg/dL" placeholder="Ej. 0.9" />
-                        <Field label="Ácido Úrico" value={laboratorio.acidoUrico} onChange={(value) => setLaboratorio(prev => ({ ...prev, acidoUrico: value }))} suffix="mg/dL" placeholder="Ej. 5.2" />
-                      </div>
-                    </div>
-
                     {consultaEnLinea && (
                       <PhotoFollowup pacienteId={pacienteId!} valoracionId={valoracionId} onPendingChange={setPendingFollowupPhotos} />
                     )}
@@ -1802,6 +2037,11 @@ const NewAssessment = () => {
                   <BarridosEquivalenciasManager
                     value={barridoData}
                     onChange={(data) => setBarridoData(data)}
+                    habitos={habitos}
+                    tiemposEnUso={planesTiemposEnUso}
+                    onTiempoAdded={handleTiempoAddedFromBarrido}
+                    onTiempoRenamed={handleTiempoRenamedFromBarrido}
+                    onTiempoRemoved={handleTiempoRemovedFromBarrido}
                   />
                 </div>
               </div>
@@ -1831,7 +2071,7 @@ const NewAssessment = () => {
               <Phase4Delivery
                 pacienteId={pacienteId!}
                 planId={planIdGuardado!}
-                onFinish={() => navigate(`/pacientes/${pacienteId}`)}
+                onFinish={() => navigate('/dashboard')}
               />
             </div>
           )}

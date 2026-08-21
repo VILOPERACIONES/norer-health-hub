@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Plus, X, Check, AlertCircle, RotateCcw, Trash2, GripHorizontal } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmDialog';
+import type { Recall24Row } from '@/lib/recall24';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 export interface BarridoTiempo {
@@ -27,6 +28,20 @@ export interface BarridoData {
 interface BarridoEquivalenciasProps {
   value: BarridoData | null;
   onChange: (data: BarridoData) => void;
+  /** Tabla de Dietética del paciente — cuando se provee, los tiempos de este barrido se mantienen sincronizados con ella (reemplazo completo, por nombre). */
+  habitos?: Recall24Row[];
+  /** Tiempos (por id de barrido, y por nombre como respaldo legacy) ya usados por un Plan del paciente — la sincronización nunca los borra aunque ya no estén en Dietética. */
+  tiemposEnUso?: { ids: string[]; nombres: string[] } | null;
+  /**
+   * Se disparan cuando el usuario agrega, renombra o quita un tiempo directamente aquí (nunca
+   * cuando el propio auto-sync desde Dietética escribe los tiempos), para reflejar el cambio de
+   * vuelta en Dietética. `idx` es la posición del tiempo dentro de este barrido — se usa así (y no
+   * por nombre) porque un renombrado cambia el nombre por definición, y emparejar por nombre no
+   * podría distinguirlo de "se borró uno y se agregó otro" (perdiendo hora/notas capturadas).
+   */
+  onTiempoAdded?: (nombre: string) => void;
+  onTiempoRenamed?: (idx: number, nombre: string) => void;
+  onTiempoRemoved?: (idx: number) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -75,9 +90,59 @@ const DEFAULT_TIEMPOS = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Co
 const newTiempoId = () =>
   globalThis.crypto?.randomUUID?.() || `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-const normalizeColacionLabel = (value: string) => {
+export const normalizeColacionLabel = (value: string) => {
   const label = value.trim();
   return /^colaci[oó]n\s+\d+$/i.test(label) ? 'Colación' : label;
+};
+
+/** Etiqueta cada nombre con su número de ocurrencia (p. ej. dos "Colación" → "Colación#1", "Colación#2"). */
+export const occurrenceKeys = (labels: string[]): string[] => {
+  const counts: Record<string, number> = {};
+  return labels.map((raw) => {
+    const norm = normalizeColacionLabel(raw || '');
+    counts[norm] = (counts[norm] || 0) + 1;
+    return `${norm}__${counts[norm]}`;
+  });
+};
+
+const tiemposEqual = (a: BarridoTiempo[], b: BarridoTiempo[]): boolean =>
+  a.length === b.length && a.every((t, i) => t.id === b[i].id && t.nombre === b[i].nombre);
+
+/** ¿Este tiempo del barrido ya está referenciado por un PlanTiempoComida existente del paciente? */
+const isTiempoProtegido = (
+  t: BarridoTiempo,
+  protegidos: { ids: Set<string>; nombres: Set<string> },
+): boolean => protegidos.ids.has(t.id) || protegidos.nombres.has(normalizeColacionLabel(t.nombre).trim().toLowerCase());
+
+/**
+ * Re-sincroniza los tiempos del barrido con la tabla de Dietética del paciente (reemplazo completo):
+ * agrega los que falten y quita los que ya no estén en Dietética, conservando el id (y por lo tanto
+ * la distribución ya capturada) de los que coinciden por nombre + ocurrencia (para distinguir
+ * "Colación" repetidas). Los tiempos ya usados por un Plan existente del paciente (`protegidos`)
+ * nunca se eliminan, aunque ya no estén en Dietética — solo dejan de "seguir" cambios de nombre.
+ */
+const syncTiemposFromHabitos = (
+  tiempos: BarridoTiempo[],
+  habitos: Recall24Row[],
+  protegidos: { ids: Set<string>; nombres: Set<string> } = { ids: new Set(), nombres: new Set() },
+): BarridoTiempo[] => {
+  const tiempoKeys = occurrenceKeys(tiempos.map((t) => t.nombre));
+  const habitoKeys = occurrenceKeys(habitos.map((h) => h.label));
+  const usedIdx = new Set<number>();
+  const next = habitos.map((h, i) => {
+    const key = habitoKeys[i];
+    const matchIdx = tiempoKeys.findIndex((k, idx) => k === key && !usedIdx.has(idx));
+    if (matchIdx !== -1) {
+      usedIdx.add(matchIdx);
+      return { id: tiempos[matchIdx].id, nombre: h.label || tiempos[matchIdx].nombre };
+    }
+    return { id: newTiempoId(), nombre: h.label || `Tiempo ${i + 1}` };
+  });
+  tiempos.forEach((t, idx) => {
+    if (usedIdx.has(idx)) return;
+    if (isTiempoProtegido(t, protegidos)) next.push(t);
+  });
+  return next;
 };
 
 /** Convierte de forma defensiva el JSON histórico basado en nombres al formato v2 basado en IDs. */
@@ -158,18 +223,63 @@ const cellCls =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) => {
+const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved }: BarridoEquivalenciasProps) => {
   const [state, setState] = useState<BarridoData>(() => buildInitial(value));
   const [newTiempoName, setNewTiempoName] = useState('');
   const [energiaInputStr, setEnergiaInputStr] = useState(value?.kcalTotal ? String(value.kcalTotal) : '');
   const [draggedColIdx, setDraggedColIdx] = useState<number | null>(null);
   const tableRef = useRef<HTMLTableElement>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
   const { confirm, ConfirmDialogComponent } = useConfirm();
 
   // Las valoraciones en edición pueden llegar después del primer render.
   useEffect(() => {
     if (value) setState(normalizeBarridoData(value));
   }, [value]);
+
+  // Ids/nombres de tiempos ya usados por un Plan existente del paciente — la sync nunca los borra.
+  // `tiemposEnUso` llega async (fetch en el padre); mientras no haya resuelto (undefined/null,
+  // distinto de "ya resolvió y no hay ninguno" = {ids: [], nombres: []}), tratamos TODOS los tiempos
+  // actuales como protegidos por seguridad, para no borrar por accidente un tiempo en uso antes de
+  // saber si lo está.
+  const protegidosRef = useRef({ ids: new Set<string>(), nombres: new Set<string>() });
+  const tiemposEnUsoCargado = tiemposEnUso != null;
+  protegidosRef.current = tiemposEnUsoCargado
+    ? {
+      ids: new Set(tiemposEnUso.ids || []),
+      nombres: new Set((tiemposEnUso.nombres || []).map((n) => n.trim().toLowerCase())),
+    }
+    : { ids: new Set(state.tiempos.map((t) => t.id)), nombres: new Set<string>() };
+
+  // Sincroniza los tiempos con la tabla de Dietética del paciente (reemplazo completo por nombre),
+  // conservando id/distribución de los que coinciden y preservando los tiempos en uso por un Plan
+  // existente aunque ya no estén en Dietética. Con debounce para no reasignar ids en cada pulsación
+  // mientras se edita un nombre en Dietética.
+  useEffect(() => {
+    if (!habitos || habitos.length === 0) return;
+    const handle = setTimeout(() => {
+      const current = stateRef.current;
+      const nextTiempos = syncTiemposFromHabitos(current.tiempos, habitos, protegidosRef.current);
+      if (tiemposEqual(current.tiempos, nextTiempos)) return;
+      const keepIds = new Set(nextTiempos.map((t) => t.id));
+      const nextDistribucion: BarridoData['distribucion'] = {};
+      const nextKcalManuales: NonNullable<BarridoData['kcalManuales']> = {};
+      const nextPorcentajes: NonNullable<BarridoData['porcentajesManuales']> = {};
+      Object.keys(current.distribucion).forEach((id) => { if (keepIds.has(id)) nextDistribucion[id] = current.distribucion[id]; });
+      Object.entries(current.kcalManuales || {}).forEach(([id, v]) => { if (keepIds.has(id)) nextKcalManuales[id] = v; });
+      Object.entries(current.porcentajesManuales || {}).forEach(([id, v]) => { if (keepIds.has(id)) nextPorcentajes[id] = v; });
+      commit({
+        ...current,
+        tiempos: nextTiempos,
+        distribucion: nextDistribucion,
+        kcalManuales: nextKcalManuales,
+        porcentajesManuales: nextPorcentajes,
+      });
+    }, 600);
+    return () => clearTimeout(handle);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify((habitos || []).map((h) => h.label))]);
 
   const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>, startRowIdx: number, startColIdx: number) => {
     e.preventDefault();
@@ -332,6 +442,16 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
 
   const { tiempos, porciones, distribucion, kcalManuales = {}, porcentajesManuales = {}, energiaTotalManual } = state;
 
+  // Tiempos que ya no están en la tabla de Dietética pero se conservan aquí por seguir en uso en un Plan — solo para mostrar un aviso visual.
+  const orphanedProtectedIds = useMemo(() => {
+    if (!habitos || habitos.length === 0) return new Set<string>();
+    const tiempoKeys = occurrenceKeys(tiempos.map((t) => t.nombre));
+    const habitoKeys = new Set(occurrenceKeys(habitos.map((h) => h.label)));
+    const result = new Set<string>();
+    tiempos.forEach((t, idx) => { if (!habitoKeys.has(tiempoKeys[idx])) result.add(t.id); });
+    return result;
+  }, [tiempos, habitos]);
+
   // ─── Kcal automática por tiempo (desde distribución) ───────────────────────
   const colKcalAuto = (tiempoId: string) =>
     GRUPOS.reduce(
@@ -463,6 +583,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       tiempos: [...tiempos, { id: newTiempoId(), nombre }],
     });
     setNewTiempoName('');
+    onTiempoAdded?.(nombre);
   };
 
   const clearTable = async () => {
@@ -500,6 +621,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
       kcalManuales: nextManuales,
       porcentajesManuales: nextPorcentajes,
     });
+    onTiempoRemoved?.(idx);
   };
 
   const renameTiempo = (idx: number, name: string) => {
@@ -508,6 +630,7 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
     // El ID de la columna permanece estable, incluso si el título queda vacío
     // temporalmente mientras el usuario escribe uno nuevo.
     commit({ ...state, tiempos: newTiempos });
+    onTiempoRenamed?.(idx, name);
   };
 
   // Evitar scroll que cambie valores
@@ -677,6 +800,12 @@ const BarridoEquivalencias = ({ value, onChange }: BarridoEquivalenciasProps) =>
                       <GripHorizontal className="w-[14px] h-[14px] text-[#666] hover:text-[#999]" />
                     </div>
                     <div className="flex items-center justify-center gap-1 group/thead px-1 relative mt-[14px]">
+                      {orphanedProtectedIds.has(t.id) && (
+                        <span
+                          className="absolute -top-3 left-1/2 -translate-x-1/2 w-1.5 h-1.5 rounded-full bg-amber-400"
+                          title="Ya no está en Dietética, pero se conserva porque un Plan existente lo usa"
+                        />
+                      )}
                       <input
                         type="text"
                         value={t.nombre}

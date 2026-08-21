@@ -4,7 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
-import { buildPdfMeta, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
+import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
 
 interface PDFPreviewModalProps {
   isOpen: boolean;
@@ -13,12 +13,13 @@ interface PDFPreviewModalProps {
   planCustomMeta: any;
   onSaveMeta: (meta: any) => void;
   loading?: boolean;
+  planMenus?: { tipoContenido?: string }[] | null;
 }
 
-export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading }: PDFPreviewModalProps) {
+export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading, planMenus }: PDFPreviewModalProps) {
   const [meta, setMeta] = useState<any>(() => {
     const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
-    return buildPdfMeta(defaultPrefs, planCustomMeta);
+    return buildPdfMeta(defaultPrefs, planCustomMeta, defaultShowDistribucionForMenus(planMenus));
   });
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -81,7 +82,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
 
 
   const handleToggle = (key: string) => {
-    const newMeta = { ...meta, [key]: !meta[key] };
+    const newMeta = togglePdfMetaFlag(meta, key);
     setMeta(newMeta);
     
     // Guardar opciones booleanas en preferencias

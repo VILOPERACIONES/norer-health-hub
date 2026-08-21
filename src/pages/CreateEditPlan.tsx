@@ -30,6 +30,7 @@ import {
 } from '@/lib/mealTimeOrdering';
 import { reorderDishGroups, reorderIngredientWithinDish } from '@/lib/ingredientOrdering';
 import { PacienteResumenSidebar } from '@/components/PacienteResumenSidebar';
+import { Phase4Delivery } from './Phase4Delivery';
 
 const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
@@ -1293,7 +1294,9 @@ export const CreateEditPlanForm = ({
 
                   {/* Parte 2: Requerimientos Esenciales (Macros y Objetivo) */}
                   <div className="lg:col-span-7">
-                    <div className="grid grid-cols-3 gap-6">
+                    {/* Dial de % Prot/Carb/Gras oculto en esta vista — se mantiene el estado
+                        (proteinas/carbohidratos/grasas) para el guardado, solo no se edita aquí. */}
+                    <div className="hidden grid-cols-3 gap-6">
                       {[
                         { label: 'Prot %', key: 'pPct', val: proteinas, set: setProteinas, color: '#ef8c8c', bg: 'rgba(239, 140, 140, 0.1)' },
                         { label: 'Carb %', key: 'cPct', val: carbohidratos, set: setCarbohidratos, color: '#90c2ff', bg: 'rgba(144, 194, 255, 0.1)' },
@@ -2200,7 +2203,7 @@ export const CreateEditPlanForm = ({
           {/* ─── Resumen clínico sidebar ─── */}
           {!isBasePlan && pacienteInfo && (
             <PacienteResumenSidebar
-              className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar"
+              className="hidden xl:block w-[260px] shrink-0 sticky top-[140px] self-start max-h-[calc(100vh-160px)] overflow-y-auto custom-scrollbar"
               pacienteNombre={pacienteNombre}
               pacienteInfo={pacienteInfo}
               alimentosAEvitar={alimentosAEvitar}
@@ -2209,6 +2212,7 @@ export const CreateEditPlanForm = ({
               comentarios={valData?.comentarios}
               esqueHidratacion={valData?.esqueHidratacion}
               notasLibres={valData?.notasLibres}
+              ocultarSeccionesMenu
             />
           )}
         </div>{/* closes flex wrapper */}
@@ -2299,14 +2303,38 @@ export default function CreateEditPlan() {
   const { id, planId } = useParams<{ id: string, planId: string }>();
   const pacienteId = id;
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const valoracionId = searchParams.get('valoracionId') || undefined;
+  const isBasePlan = !pacienteId;
+
+  // Igual que en el paso 3 del wizard de Nueva Consulta: al guardar, el panel de vista
+  // previa/envío aparece debajo en esta misma pantalla en vez de navegar a otra pantalla aparte.
+  const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(planId || null);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
   return (
-    <CreateEditPlanForm
-      pacienteId={pacienteId}
-      planId={planId}
-      valoracionId={valoracionId}
-    />
+    <div className="space-y-6">
+      <CreateEditPlanForm
+        pacienteId={pacienteId}
+        planId={planId}
+        valoracionId={valoracionId}
+        onSaved={isBasePlan ? undefined : (savedPlanId) => {
+          setPlanIdGuardado(savedPlanId);
+          setPreviewRefreshKey((k) => k + 1);
+        }}
+        onCancel={isBasePlan ? undefined : () => navigate(`/pacientes/${pacienteId}`)}
+      />
+      {!isBasePlan && planIdGuardado && (
+        <div className="max-w-none w-full pt-2 border-t border-[#1a1a1a]">
+          <Phase4Delivery
+            key={previewRefreshKey}
+            pacienteId={pacienteId!}
+            planId={planIdGuardado}
+            onFinish={() => navigate('/dashboard')}
+          />
+        </div>
+      )}
+    </div>
   );
 }
