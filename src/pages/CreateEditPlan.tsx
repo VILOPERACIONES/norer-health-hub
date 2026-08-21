@@ -2213,6 +2213,7 @@ export const CreateEditPlanForm = ({
               esqueHidratacion={valData?.esqueHidratacion}
               notasLibres={valData?.notasLibres}
               ocultarSeccionesMenu
+              reemplazarEjercicioPorGustan
             />
           )}
         </div>{/* closes flex wrapper */}
