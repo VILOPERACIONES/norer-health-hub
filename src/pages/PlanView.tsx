@@ -310,7 +310,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                     <div className="bg-[#181818] p-6 rounded-[12px] border border-[#2a2a2a] animate-slide-up">
                         <div className="flex items-center gap-2 mb-5 text-brand-primary">
                             <Activity className="w-[18px] h-[18px]" />
-                            <h3 className="text-[16px] font-bold text-white m-0 tracking-wide uppercase">Esquema de Suplementación</h3>
+                            <h3 className="text-[16px] font-bold text-white m-0 tracking-wide uppercase">NORDER SUPS</h3>
                         </div>
                         <div className="overflow-hidden rounded-[8px] border border-[#2a2a2a] bg-[#111]">
                             <table className="w-full border-collapse text-left">

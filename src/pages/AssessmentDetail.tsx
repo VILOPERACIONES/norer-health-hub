@@ -652,7 +652,7 @@ const AssessmentDetail = () => {
             <div className="p-2 rounded-[8px] bg-brand-primary/10 text-brand-primary">
               <Activity className="w-4 h-4" />
             </div>
-            <h3 className="text-[15px] font-bold text-text-primary m-0 uppercase tracking-wide">Esquema de Suplementación</h3>
+            <h3 className="text-[15px] font-bold text-text-primary m-0 uppercase tracking-wide">NORDER SUPS</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-left min-w-[500px]">

@@ -724,25 +724,23 @@ const PatientProfile = () => {
                           <tr className="border-b border-border-subtle">
                             <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4 w-28">Tiempo</th>
                             <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Hora</th>
-                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-4">Ayer</th>
-                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2">Usualmente</th>
+                            <th className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2">Notas</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border-subtle/30">
                           {recall24Rows.map((row, index) => {
-                            if (!row.hora && !row.ayer && !row.usualmente) return null;
+                            if (!row.hora && !row.notas) return null;
                             return (
                               <tr key={`${row.label}-${index}`}>
                                 <td className="py-2 pr-4 text-[11px] font-bold text-text-muted uppercase tracking-wider">{row.label}</td>
                                 <td className="py-2 pr-4 text-[13px] text-text-secondary">{row.hora || '—'}</td>
-                                <td className="py-2 pr-4 text-[13px] text-text-secondary">{row.ayer || '—'}</td>
-                                <td className="py-2 text-[13px] text-text-secondary">{row.usualmente || '—'}</td>
+                                <td className="py-2 text-[13px] text-text-secondary">{row.notas || '—'}</td>
                               </tr>
                             );
                           })}
                           {!hasRecall24Data(recall24Rows) && (
                             <tr>
-                              <td colSpan={4} className="py-5 text-center text-[12px] text-text-muted">Sin información registrada.</td>
+                              <td colSpan={3} className="py-5 text-center text-[12px] text-text-muted">Sin información registrada.</td>
                             </tr>
                           )}
                         </tbody>

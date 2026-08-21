@@ -140,11 +140,11 @@ export function PacienteResumenSidebar({
           <SidebarSeccion titulo="Recordatorio 24 Horas">
             <ul className="space-y-1.5">
               {normalizeRecall24(pacienteInfo?.habitos).map((row, index) => (
-                (row.hora || row.ayer || row.usualmente) && (
+                (row.hora || row.notas) && (
                   <li key={`${row.label}-${index}`} className="text-[12px] text-[#e0e0e0]">
                     <span className="font-semibold text-white">{row.label}</span>
                     {row.hora && <span className="text-[#8a8a8a]"> — {row.hora}</span>}
-                    {row.usualmente && <p className="text-[#8a8a8a] mt-0.5">{row.usualmente}</p>}
+                    {row.notas && <p className="text-[#8a8a8a] mt-0.5">{row.notas}</p>}
                   </li>
                 )
               ))}
