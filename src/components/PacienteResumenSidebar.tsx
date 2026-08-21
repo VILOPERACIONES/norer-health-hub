@@ -28,6 +28,11 @@ export interface PacienteResumenSidebarProps {
    * aportan y sobrecargan el sidebar. Default: false (se muestran todas).
    */
   ocultarSeccionesMenu?: boolean;
+  /**
+   * Reemplaza la sección "Ejercicio" por "Alimentos que le gustan / Consume" en esa
+   * misma posición. Usado en Personalizar Menú y en Detalle de Consulta. Default: false.
+   */
+  reemplazarEjercicioPorGustan?: boolean;
 }
 
 export function PacienteResumenSidebar({
@@ -42,6 +47,7 @@ export function PacienteResumenSidebar({
   className = '',
   mostrarTiemposComida = false,
   ocultarSeccionesMenu = false,
+  reemplazarEjercicioPorGustan = false,
 }: PacienteResumenSidebarProps) {
   return (
     <aside className={`space-y-3 ${className}`}>
@@ -75,15 +81,15 @@ export function PacienteResumenSidebar({
           </SidebarSeccion>
         )}
 
-        {/* En la vista de Personalizar Menú, Ejercicio se reemplaza por Alimentos que le gustan */}
-        {ocultarSeccionesMenu && pacienteInfo?.antecedentes?.alimentosGustan && (
+        {/* En esta vista, Ejercicio se reemplaza por Alimentos que le gustan */}
+        {reemplazarEjercicioPorGustan && pacienteInfo?.antecedentes?.alimentosGustan && (
           <SidebarSeccion titulo="Le gustan / Consume">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
           </SidebarSeccion>
         )}
 
         {/* Ejercicio */}
-        {!ocultarSeccionesMenu && (pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
+        {!reemplazarEjercicioPorGustan && (pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
           const raw = pacienteInfo.ejercicio?.disciplina;
           let disciplinas: { disciplina?: string; frecuencia?: string; tiempo?: string }[] = [];
           if (raw) {
@@ -200,8 +206,8 @@ export function PacienteResumenSidebar({
           <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
         )}
 
-        {/* Alimentos que sí le gustan (ya se muestra arriba, en lugar de Ejercicio, en Personalizar Menú) */}
-        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.alimentosGustan && (
+        {/* Alimentos que sí le gustan (si reemplazarEjercicioPorGustan, ya se muestra arriba en su lugar) */}
+        {!reemplazarEjercicioPorGustan && pacienteInfo?.antecedentes?.alimentosGustan && (
           <SidebarSeccion titulo="Le gustan / Consume">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
           </SidebarSeccion>

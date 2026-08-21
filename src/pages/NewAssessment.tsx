@@ -145,9 +145,9 @@ const NewAssessment = () => {
 
   const [dragSupIdx, setDragSupIdx] = useState<number | null>(null);
   const [notasLibres, setNotasLibres] = useState('');
-  const [notasLibresOpen, setNotasLibresOpen] = useState(false);
+  const [notasLibresOpen, setNotasLibresOpen] = useState(true);
   const [esqueHidratacion, setEsqueHidratacion] = useState('');
-  const [esqueHidratacionOpen, setEsqueHidratacionOpen] = useState(false);
+  const [esqueHidratacionOpen, setEsqueHidratacionOpen] = useState(true);
   const [adjuntos, setAdjuntos] = useState<{ id: string; nombre: string; tipo: string; dataUrl: string }[]>([]);
 
   const [expediente, setExpediente] = useState({
@@ -166,7 +166,7 @@ const NewAssessment = () => {
   const [planesTiemposEnUso, setPlanesTiemposEnUso] = useState<{ ids: string[]; nombres: string[] } | null>(null);
   const planesTiemposFetchedRef = React.useRef(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
-  const [showDinamicaDeportiva, setShowDinamicaDeportiva] = useState(false);
+  const [showDinamicaDeportiva, setShowDinamicaDeportiva] = useState(true);
   const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
   const addDisciplina = () => setDisciplinas(prev => [...prev, { disciplina: '', frecuencia: '', tiempo: '' }]);
   const removeDisciplina = (idx: number) => setDisciplinas(prev => prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev);
@@ -174,7 +174,7 @@ const NewAssessment = () => {
     setDisciplinas(prev => prev.map((d, i) => i === idx ? { ...d, [field]: val } : d));
     setExpedienteModified(true);
   };
-  const [showDietetico, setShowDietetico] = useState(false);
+  const [showDietetico, setShowDietetico] = useState(true);
   // Si el nutriólogo agrega/renombra/quita un tiempo directamente en Barrido (no en Dietético),
   // se refleja de vuelta aquí. Se emparaja por POSICIÓN (índice dentro del barrido), no por nombre:
   // un renombrado cambia el nombre por definición, así que emparejar por nombre no podría
@@ -202,9 +202,9 @@ const NewAssessment = () => {
     });
     setExpedienteModified(true);
   };
-  const [showSuplemantacion, setShowSuplemantacion] = useState(false);
+  const [showSuplemantacion, setShowSuplemantacion] = useState(true);
   const [showMedidas, setShowMedidas] = useState(true);
-  const [showAgendarCita, setShowAgendarCita] = useState(false);
+  const [showAgendarCita, setShowAgendarCita] = useState(true);
 
   const handleAdjuntoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
@@ -1006,7 +1006,7 @@ const NewAssessment = () => {
         setValoracionIdGuardada(valoracionResId);
         setStep(redirectAPlan === 'equivalencias' ? 2 : 3);
       } else {
-        navigate(isEdit ? `/pacientes/${pacienteId}/valoraciones/${valoracionId}` : `/pacientes/${pacienteId}`);
+        navigate('/dashboard');
       }
     } catch (err: any) {
       toast({ title: 'Error al guardar', description: err.response?.data?.message || `No se pudo ${isEdit ? 'actualizar' : 'guardar'} la valoración.`, variant: 'destructive' });
@@ -1937,7 +1937,11 @@ const NewAssessment = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-5">
                       <Field label="Fecha" value={fecha} onChange={setFecha} type="date" />
                       <Field label="Hora" value={hora} onChange={setHora} type="time" />
-                      <Field label="Peso" value={peso} onChange={(value) => { setPeso(value); setMeasurementStatuses(prev => ({ ...prev, peso: value ? 'REGISTRADA' : 'NO_CAPTURADA' })); }} suffix="kg" placeholder="Ej. 68.5" status={measurementStatuses.peso} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, peso: status })); if (status === 'NO_APLICA') setPeso(''); }} />
+                      {!consultaEnLinea && compositionMethod === 'ANTROPOMETRIA' ? (
+                        <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" status={measurementStatuses.masaMagra} onStatusChange={(status) => setMeasurementStatuses(prev => ({ ...prev, masaMagra: status }))} />
+                      ) : (
+                        <Field label="Peso" value={peso} onChange={(value) => { setPeso(value); setMeasurementStatuses(prev => ({ ...prev, peso: value ? 'REGISTRADA' : 'NO_CAPTURADA' })); }} suffix="kg" placeholder="Ej. 68.5" status={measurementStatuses.peso} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, peso: status })); if (status === 'NO_APLICA') setPeso(''); }} />
+                      )}
                       {consultaEnLinea ? (
                         <>
                           <Field label="Brazo relajado" value={onlineMeasurements.brazoRelajado} onChange={(value) => { setOnlineMeasurements(prev => ({ ...prev, brazoRelajado: value })); setIsGrasaModified(true); }} suffix="cm" placeholder="Ej. 29.5" />
@@ -1947,7 +1951,7 @@ const NewAssessment = () => {
                         </>
                       ) : compositionMethod === 'ANTROPOMETRIA' ? (
                         <>
-                          <Field label="Masa Muscular" value={masaMagra !== null ? masaMagra.toFixed(2) : ''} disabled suffix="kg" placeholder="Auto" status={measurementStatuses.masaMagra} onStatusChange={(status) => setMeasurementStatuses(prev => ({ ...prev, masaMagra: status }))} />
+                          <Field label="Peso" value={peso} onChange={(value) => { setPeso(value); setMeasurementStatuses(prev => ({ ...prev, peso: value ? 'REGISTRADA' : 'NO_CAPTURADA' })); }} suffix="kg" placeholder="Ej. 68.5" status={measurementStatuses.peso} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, peso: status })); if (status === 'NO_APLICA') setPeso(''); }} />
                           <Field label="% Grasa Corp." value={pctGrasa} onChange={handlePctGrasaChange} placeholder="Ej. 24.3" status={measurementStatuses.pctGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, pctGrasa: status })); if (status === 'NO_APLICA') { setPctGrasa(''); setKgGrasa(''); } }} />
                           <Field label="Kg Grasa" value={kgGrasa} onChange={handleKgGrasaChange} suffix="kg" placeholder="Ej. 15.2" status={measurementStatuses.kgGrasa} onStatusChange={(status) => { setMeasurementStatuses(prev => ({ ...prev, kgGrasa: status })); if (status === 'NO_APLICA') setKgGrasa(''); }} />
                         </>

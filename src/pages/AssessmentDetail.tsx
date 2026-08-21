@@ -879,6 +879,7 @@ const AssessmentDetail = () => {
         esqueHidratacion={val.esqueHidratacion}
         notasLibres={val.notasLibres}
         mostrarTiemposComida
+        reemplazarEjercicioPorGustan
       />
     )}
     </div>
