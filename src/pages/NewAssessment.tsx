@@ -9,6 +9,7 @@ import BarridosEquivalenciasManager, {
   getBarridoVariantes,
   type BarridoCollection,
 } from '@/components/BarridosEquivalenciasManager';
+import { normalizeColacionLabel } from '@/components/BarridoEquivalencias';
 import { CreateEditPlanForm } from './CreateEditPlan';
 import { PlanEnvioForm } from './PlanView';
 import { Phase4Delivery } from './Phase4Delivery';
@@ -174,6 +175,33 @@ const NewAssessment = () => {
     setExpedienteModified(true);
   };
   const [showDietetico, setShowDietetico] = useState(false);
+  // Si el nutriólogo agrega/renombra/quita un tiempo directamente en Barrido (no en Dietético),
+  // se refleja de vuelta aquí. Se emparaja por POSICIÓN (índice dentro del barrido), no por nombre:
+  // un renombrado cambia el nombre por definición, así que emparejar por nombre no podría
+  // distinguirlo de "se borró uno y se agregó otro" — perdiendo la hora/notas ya capturadas. Los
+  // tiempos protegidos (huérfanos, en uso por un Plan) viven siempre al final del arreglo del
+  // barrido, más allá de lo que hay en Dietética, así que un índice fuera de rango simplemente no
+  // toca Dietética (no reintroduce un tiempo protegido). Como esto solo se dispara desde las
+  // ediciones manuales de BarridoEquivalencias (nunca desde su propio efecto de auto-sync), no hay
+  // riesgo de loop con la sincronización Dietético→Barrido.
+  const handleTiempoAddedFromBarrido = (nombre: string) => {
+    setHabitos((current) => [...current, { label: normalizeColacionLabel(nombre) || 'Tiempo', hora: '', notas: '' }]);
+    setExpedienteModified(true);
+  };
+  const handleTiempoRenamedFromBarrido = (idx: number, nombre: string) => {
+    setHabitos((current) => {
+      if (idx >= current.length) return current;
+      return current.map((h, i) => (i === idx ? { ...h, label: normalizeColacionLabel(nombre) || h.label } : h));
+    });
+    setExpedienteModified(true);
+  };
+  const handleTiempoRemovedFromBarrido = (idx: number) => {
+    setHabitos((current) => {
+      if (idx >= current.length) return current;
+      return current.filter((_, i) => i !== idx);
+    });
+    setExpedienteModified(true);
+  };
   const [showSuplemantacion, setShowSuplemantacion] = useState(false);
   const [showMedidas, setShowMedidas] = useState(true);
   const [showAgendarCita, setShowAgendarCita] = useState(false);
@@ -2011,6 +2039,9 @@ const NewAssessment = () => {
                     onChange={(data) => setBarridoData(data)}
                     habitos={habitos}
                     tiemposEnUso={planesTiemposEnUso}
+                    onTiempoAdded={handleTiempoAddedFromBarrido}
+                    onTiempoRenamed={handleTiempoRenamedFromBarrido}
+                    onTiempoRemoved={handleTiempoRemovedFromBarrido}
                   />
                 </div>
               </div>

@@ -22,9 +22,15 @@ export function parsePdfPreferences(saved: string | null): PdfMeta {
   }
 }
 
-export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta = {}): PdfMeta {
-  // "Solo equivalencias" es una decisión de cada plan, no una preferencia global.
-  const { soloEquivalencias: _ignoredGlobalValue, ...safeGlobalPreferences } = globalPreferences;
+/**
+ * @param defaultShowDistribucionPorciones Default para "Distribución de porciones" cuando el plan
+ * aún no tiene un valor explícito guardado — normalmente calculado a partir de si el plan es de
+ * platillos (false) o de solo equivalencias (true). Si se omite, cae al default general (true).
+ */
+export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta = {}, defaultShowDistribucionPorciones?: boolean): PdfMeta {
+  // "Solo equivalencias" y "Distribución de porciones" son decisiones de cada plan, no preferencias
+  // globales (la segunda depende del tipo de contenido del plan — platillos vs. equivalencias).
+  const { soloEquivalencias: _ignoredGlobalValue, showDistribucionPorciones: _ignoredGlobalDist, ...safeGlobalPreferences } = globalPreferences;
 
   return {
     ...DEFAULT_PDF_META,
@@ -34,7 +40,17 @@ export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta 
       typeof planMeta.soloEquivalencias === 'boolean'
         ? planMeta.soloEquivalencias
         : false,
+    showDistribucionPorciones:
+      typeof planMeta.showDistribucionPorciones === 'boolean'
+        ? planMeta.showDistribucionPorciones
+        : (defaultShowDistribucionPorciones ?? DEFAULT_PDF_META.showDistribucionPorciones),
   };
+}
+
+/** true solo cuando NINGÚN menú del plan usa platillos (todos son de solo equivalencias). */
+export function defaultShowDistribucionForMenus(menus?: { tipoContenido?: string }[] | null): boolean {
+  if (!menus || menus.length === 0) return DEFAULT_PDF_META.showDistribucionPorciones;
+  return menus.every((m) => m.tipoContenido === 'equivalencias');
 }
 
 export function getGlobalPdfPreferences(meta: PdfMeta): PdfMeta {

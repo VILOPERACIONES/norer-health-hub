@@ -30,6 +30,7 @@ import {
 } from '@/lib/mealTimeOrdering';
 import { reorderDishGroups, reorderIngredientWithinDish } from '@/lib/ingredientOrdering';
 import { PacienteResumenSidebar } from '@/components/PacienteResumenSidebar';
+import { Phase4Delivery } from './Phase4Delivery';
 
 const defaultTiempos = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Colación', 'Cena'];
 
@@ -2299,14 +2300,38 @@ export default function CreateEditPlan() {
   const { id, planId } = useParams<{ id: string, planId: string }>();
   const pacienteId = id;
   const location = useLocation();
+  const navigate = useNavigate();
   const searchParams = new URLSearchParams(location.search);
   const valoracionId = searchParams.get('valoracionId') || undefined;
+  const isBasePlan = !pacienteId;
+
+  // Igual que en el paso 3 del wizard de Nueva Consulta: al guardar, el panel de vista
+  // previa/envío aparece debajo en esta misma pantalla en vez de navegar a otra pantalla aparte.
+  const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(planId || null);
+  const [previewRefreshKey, setPreviewRefreshKey] = useState(0);
 
   return (
-    <CreateEditPlanForm
-      pacienteId={pacienteId}
-      planId={planId}
-      valoracionId={valoracionId}
-    />
+    <div className="space-y-6">
+      <CreateEditPlanForm
+        pacienteId={pacienteId}
+        planId={planId}
+        valoracionId={valoracionId}
+        onSaved={isBasePlan ? undefined : (savedPlanId) => {
+          setPlanIdGuardado(savedPlanId);
+          setPreviewRefreshKey((k) => k + 1);
+        }}
+        onCancel={isBasePlan ? undefined : () => navigate(`/pacientes/${pacienteId}`)}
+      />
+      {!isBasePlan && planIdGuardado && (
+        <div className="max-w-none w-full pt-2 border-t border-[#1a1a1a]">
+          <Phase4Delivery
+            key={previewRefreshKey}
+            pacienteId={pacienteId!}
+            planId={planIdGuardado}
+            onFinish={() => navigate(`/pacientes/${pacienteId}`)}
+          />
+        </div>
+      )}
+    </div>
   );
 }

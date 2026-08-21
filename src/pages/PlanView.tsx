@@ -473,6 +473,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                     planCustomMeta={plan.pdfCustomMeta || {}}
                     onSaveMeta={handleSaveMeta}
                     loading={savingMeta}
+                    planMenus={plan.menus}
                 />
                 <PlanDeliveryDialog
                     open={showDeliveryDialog}

@@ -32,6 +32,16 @@ interface BarridoEquivalenciasProps {
   habitos?: Recall24Row[];
   /** Tiempos (por id de barrido, y por nombre como respaldo legacy) ya usados por un Plan del paciente — la sincronización nunca los borra aunque ya no estén en Dietética. */
   tiemposEnUso?: { ids: string[]; nombres: string[] } | null;
+  /**
+   * Se disparan cuando el usuario agrega, renombra o quita un tiempo directamente aquí (nunca
+   * cuando el propio auto-sync desde Dietética escribe los tiempos), para reflejar el cambio de
+   * vuelta en Dietética. `idx` es la posición del tiempo dentro de este barrido — se usa así (y no
+   * por nombre) porque un renombrado cambia el nombre por definición, y emparejar por nombre no
+   * podría distinguirlo de "se borró uno y se agregó otro" (perdiendo hora/notas capturadas).
+   */
+  onTiempoAdded?: (nombre: string) => void;
+  onTiempoRenamed?: (idx: number, nombre: string) => void;
+  onTiempoRemoved?: (idx: number) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -80,13 +90,13 @@ const DEFAULT_TIEMPOS = ['Pre-entreno', 'Desayuno', 'Colación', 'Almuerzo', 'Co
 const newTiempoId = () =>
   globalThis.crypto?.randomUUID?.() || `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
-const normalizeColacionLabel = (value: string) => {
+export const normalizeColacionLabel = (value: string) => {
   const label = value.trim();
   return /^colaci[oó]n\s+\d+$/i.test(label) ? 'Colación' : label;
 };
 
 /** Etiqueta cada nombre con su número de ocurrencia (p. ej. dos "Colación" → "Colación#1", "Colación#2"). */
-const occurrenceKeys = (labels: string[]): string[] => {
+export const occurrenceKeys = (labels: string[]): string[] => {
   const counts: Record<string, number> = {};
   return labels.map((raw) => {
     const norm = normalizeColacionLabel(raw || '');
@@ -213,7 +223,7 @@ const cellCls =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso }: BarridoEquivalenciasProps) => {
+const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved }: BarridoEquivalenciasProps) => {
   const [state, setState] = useState<BarridoData>(() => buildInitial(value));
   const [newTiempoName, setNewTiempoName] = useState('');
   const [energiaInputStr, setEnergiaInputStr] = useState(value?.kcalTotal ? String(value.kcalTotal) : '');
@@ -573,6 +583,7 @@ const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso }: Barrid
       tiempos: [...tiempos, { id: newTiempoId(), nombre }],
     });
     setNewTiempoName('');
+    onTiempoAdded?.(nombre);
   };
 
   const clearTable = async () => {
@@ -610,6 +621,7 @@ const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso }: Barrid
       kcalManuales: nextManuales,
       porcentajesManuales: nextPorcentajes,
     });
+    onTiempoRemoved?.(idx);
   };
 
   const renameTiempo = (idx: number, name: string) => {
@@ -618,6 +630,7 @@ const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso }: Barrid
     // El ID de la columna permanece estable, incluso si el título queda vacío
     // temporalmente mientras el usuario escribe uno nuevo.
     commit({ ...state, tiempos: newTiempos });
+    onTiempoRenamed?.(idx, name);
   };
 
   // Evitar scroll que cambie valores
