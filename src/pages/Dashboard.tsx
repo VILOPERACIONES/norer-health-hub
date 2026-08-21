@@ -215,7 +215,7 @@ const Dashboard = () => {
       value: planesPendientes,
       icon: MessageSquare,
       badge: {
-        text: planesPendientes > 0 ? `${planesSinAsignar + planesEnProceso + planesListos} por completar` : '¡Todo al día! ✨',
+        text: planesPendientes > 0 ? `${planesSinAsignar + planesEnProceso + planesListos} por completar` : '¡Todo al día!',
         color: planesPendientes > 0 ? 'text-amber-400' : 'text-emerald-400',
       },
       sub: planesPendientes > 0
@@ -373,9 +373,6 @@ const Dashboard = () => {
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
               Últimos Pacientes
             </h2>
-            <p className="text-[11px] font-medium text-[#8a8a8a] m-0 mt-0.5">
-              Consultas de hoy · última modificación primero
-            </p>
           </div>
 
           <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar w-full">
