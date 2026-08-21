@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
-import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
+import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
 import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
 import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
@@ -94,7 +94,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   }, [meta, loadingInitial]);
 
   const handleToggle = (key: string) => {
-    const newMeta = { ...meta, [key]: !meta[key] };
+    const newMeta = togglePdfMetaFlag(meta, key);
     setMeta(newMeta);
     
     // Guardar opciones booleanas en preferencias

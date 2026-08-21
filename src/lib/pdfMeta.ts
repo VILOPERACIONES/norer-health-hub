@@ -53,6 +53,19 @@ export function defaultShowDistribucionForMenus(menus?: { tipoContenido?: string
   return menus.every((m) => m.tipoContenido === 'equivalencias');
 }
 
+/**
+ * Aplica un toggle del panel de configuración de PDF. Activar "Solo equivalencias"
+ * a mano fuerza también "Distribución de porciones" a ON — un plan de solo
+ * equivalencias siempre la necesita. El resto de toggles cambian normal.
+ */
+export function togglePdfMetaFlag(meta: PdfMeta, key: string): PdfMeta {
+  const newMeta: PdfMeta = { ...meta, [key]: !meta[key] };
+  if (key === 'soloEquivalencias' && newMeta.soloEquivalencias === true) {
+    newMeta.showDistribucionPorciones = true;
+  }
+  return newMeta;
+}
+
 export function getGlobalPdfPreferences(meta: PdfMeta): PdfMeta {
   return {
     showPageHistorial: meta.showPageHistorial !== false,

@@ -192,6 +192,9 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
             setPlan((prev) => prev ? { ...prev, estadoEnvio: 'enviado' } as Plan : prev);
             // Invalidar cache para que Dashboard y Pendientes reflejen el envío
             invalidateAfterPlanChange(queryClient, pacienteId);
+            // Al terminar de enviar, salir de este plan (no debe quedar en el
+            // expediente del paciente) hacia el destino configurado por el caller.
+            if (onFinish) onFinish();
         } catch (err: any) {
             toast({
                 title: 'Error al enviar',
@@ -491,5 +494,6 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
 
 export default function PlanView() {
     const { id: pacienteId, planId } = useParams();
-    return <PlanEnvioForm pacienteId={pacienteId} planId={planId} />;
+    const navigate = useNavigate();
+    return <PlanEnvioForm pacienteId={pacienteId} planId={planId} onFinish={() => navigate('/dashboard')} />;
 }

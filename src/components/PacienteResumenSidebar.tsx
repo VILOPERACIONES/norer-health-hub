@@ -22,6 +22,12 @@ export interface PacienteResumenSidebarProps {
   className?: string;
   /** Muestra la sección "Número de comidas". Default: false */
   mostrarTiemposComida?: boolean;
+  /**
+   * Oculta las secciones Tránsito Intestinal, Signos y Síntomas, Ciclo Menstrual,
+   * Patología y Agua al día — solo para la vista de Personalizar Menú, donde no
+   * aportan y sobrecargan el sidebar. Default: false (se muestran todas).
+   */
+  ocultarSeccionesMenu?: boolean;
 }
 
 export function PacienteResumenSidebar({
@@ -35,6 +41,7 @@ export function PacienteResumenSidebar({
   notasLibres,
   className = '',
   mostrarTiemposComida = false,
+  ocultarSeccionesMenu = false,
 }: PacienteResumenSidebarProps) {
   return (
     <aside className={`space-y-3 ${className}`}>
@@ -68,8 +75,15 @@ export function PacienteResumenSidebar({
           </SidebarSeccion>
         )}
 
+        {/* En la vista de Personalizar Menú, Ejercicio se reemplaza por Alimentos que le gustan */}
+        {ocultarSeccionesMenu && pacienteInfo?.antecedentes?.alimentosGustan && (
+          <SidebarSeccion titulo="Le gustan / Consume">
+            <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
+          </SidebarSeccion>
+        )}
+
         {/* Ejercicio */}
-        {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
+        {!ocultarSeccionesMenu && (pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
           const raw = pacienteInfo.ejercicio?.disciplina;
           let disciplinas: { disciplina?: string; frecuencia?: string; tiempo?: string }[] = [];
           if (raw) {
@@ -160,7 +174,7 @@ export function PacienteResumenSidebar({
         )}
 
         {/* Patología */}
-        {pacienteInfo?.antecedentes?.patologia && (
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.patologia && (
           <SidebarSeccion titulo="Patología"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.patologia}</p></SidebarSeccion>
         )}
 
@@ -182,26 +196,26 @@ export function PacienteResumenSidebar({
         )}
 
         {/* Ciclo menstrual */}
-        {pacienteInfo?.antecedentes?.cicloMenstrual && (
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.cicloMenstrual && (
           <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
         )}
 
-        {/* Alimentos que sí le gustan */}
-        {pacienteInfo?.antecedentes?.alimentosGustan && (
+        {/* Alimentos que sí le gustan (ya se muestra arriba, en lugar de Ejercicio, en Personalizar Menú) */}
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.alimentosGustan && (
           <SidebarSeccion titulo="Le gustan / Consume">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
           </SidebarSeccion>
         )}
 
         {/* Tránsito intestinal */}
-        {pacienteInfo?.antecedentes?.estrenimiento && (
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.estrenimiento && (
           <SidebarSeccion titulo="Tránsito Intestinal">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.estrenimiento}</p>
           </SidebarSeccion>
         )}
 
         {/* Agua (reporte del paciente en entrevista) */}
-        {pacienteInfo?.antecedentes?.agua && (
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.agua && (
           <SidebarSeccion titulo="Agua al día (reporte paciente)">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.agua}</p>
           </SidebarSeccion>
@@ -215,7 +229,7 @@ export function PacienteResumenSidebar({
         )}
 
         {/* Signos y síntomas */}
-        {pacienteInfo?.antecedentes?.signosYSintomas && (
+        {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.signosYSintomas && (
           <SidebarSeccion titulo="Signos y Síntomas">
             <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.signosYSintomas}</p>
           </SidebarSeccion>

@@ -1294,7 +1294,9 @@ export const CreateEditPlanForm = ({
 
                   {/* Parte 2: Requerimientos Esenciales (Macros y Objetivo) */}
                   <div className="lg:col-span-7">
-                    <div className="grid grid-cols-3 gap-6">
+                    {/* Dial de % Prot/Carb/Gras oculto en esta vista — se mantiene el estado
+                        (proteinas/carbohidratos/grasas) para el guardado, solo no se edita aquí. */}
+                    <div className="hidden grid-cols-3 gap-6">
                       {[
                         { label: 'Prot %', key: 'pPct', val: proteinas, set: setProteinas, color: '#ef8c8c', bg: 'rgba(239, 140, 140, 0.1)' },
                         { label: 'Carb %', key: 'cPct', val: carbohidratos, set: setCarbohidratos, color: '#90c2ff', bg: 'rgba(144, 194, 255, 0.1)' },
@@ -2201,7 +2203,7 @@ export const CreateEditPlanForm = ({
           {/* ─── Resumen clínico sidebar ─── */}
           {!isBasePlan && pacienteInfo && (
             <PacienteResumenSidebar
-              className="hidden xl:block w-[260px] shrink-0 sticky top-[68px] self-start max-h-[calc(100vh-88px)] overflow-y-auto custom-scrollbar"
+              className="hidden xl:block w-[260px] shrink-0 sticky top-[140px] self-start max-h-[calc(100vh-160px)] overflow-y-auto custom-scrollbar"
               pacienteNombre={pacienteNombre}
               pacienteInfo={pacienteInfo}
               alimentosAEvitar={alimentosAEvitar}
@@ -2210,6 +2212,7 @@ export const CreateEditPlanForm = ({
               comentarios={valData?.comentarios}
               esqueHidratacion={valData?.esqueHidratacion}
               notasLibres={valData?.notasLibres}
+              ocultarSeccionesMenu
             />
           )}
         </div>{/* closes flex wrapper */}
@@ -2328,7 +2331,7 @@ export default function CreateEditPlan() {
             key={previewRefreshKey}
             pacienteId={pacienteId!}
             planId={planIdGuardado}
-            onFinish={() => navigate(`/pacientes/${pacienteId}`)}
+            onFinish={() => navigate('/dashboard')}
           />
         </div>
       )}

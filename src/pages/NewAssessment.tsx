@@ -2071,7 +2071,7 @@ const NewAssessment = () => {
               <Phase4Delivery
                 pacienteId={pacienteId!}
                 planId={planIdGuardado!}
-                onFinish={() => navigate(`/pacientes/${pacienteId}`)}
+                onFinish={() => navigate('/dashboard')}
               />
             </div>
           )}

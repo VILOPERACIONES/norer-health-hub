@@ -4,7 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import api from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
-import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences } from '@/lib/pdfMeta';
+import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
 
 interface PDFPreviewModalProps {
   isOpen: boolean;
@@ -82,7 +82,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
 
 
   const handleToggle = (key: string) => {
-    const newMeta = { ...meta, [key]: !meta[key] };
+    const newMeta = togglePdfMetaFlag(meta, key);
     setMeta(newMeta);
     
     // Guardar opciones booleanas en preferencias

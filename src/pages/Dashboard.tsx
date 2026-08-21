@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/queryKeys';
 import { usePatients } from '@/hooks/usePatients';
-import { 
+import {
   Users, UserPlus, ClipboardList, Activity, Plus,
   MessageSquare, BookOpen, Trophy, MoreHorizontal,
   Clock, Check, Square, ChevronDown, ChevronsLeft,
@@ -18,7 +18,7 @@ import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
 const Dashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
   const navigate = useNavigate();
   const { user } = useAuthStore();
   const { data: pacientesData = [], isLoading: loadingPacientes } = usePatients();
@@ -114,12 +114,20 @@ const Dashboard = () => {
     return pendItems.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
   }, [pacientesData]);
 
-  // La tabla "Últimos Pacientes" muestra la consulta más reciente de cada
-  // paciente, independientemente de si su menú ya fue enviado. Los pendientes
-  // se mantienen aparte para el KPI de Menús pendientes.
+  // Fecha real (parte de fecha, sin hora) del día de hoy en la zona local
+  const isFechaHoy = (fechaStr: string) => {
+    if (!fechaStr) return false;
+    const datePart = fechaStr.includes('T') ? fechaStr.split('T')[0] : fechaStr;
+    const todayPart = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD local
+    return datePart === todayPart;
+  };
+
+  // La tabla "Últimos Pacientes" muestra solo las consultas del DÍA DE HOY
+  // (fecha real de la valoración), no un histórico mezclado de otros días.
+  // Dentro del día, se ordena por última modificación (plan tocado más reciente).
   const pacientesRecientes = useMemo(() => pacientesData.flatMap((pac: any) => {
     const val = Array.isArray(pac.valoraciones) ? pac.valoraciones[0] : null;
-    if (!val) return [];
+    if (!val || !isFechaHoy(val.fecha)) return [];
     const planAsociado = val.plan || (Array.isArray(pac.planes)
       ? pac.planes.find((plan: any) => plan.valoracionId === val.id)
       : null);
@@ -129,17 +137,22 @@ const Dashboard = () => {
       planId: planAsociado?.id || val.planId || null,
       estadoEnvio: planAsociado?.estadoEnvio || val.estadoEnvio || null,
     };
+    // Última modificación real: si hay plan, cuenta lo último que se tocó
+    // el plan (creación, edición, cambio de estado); si no hay plan aún,
+    // cuenta la valoración misma.
+    const modifiedAt = planAsociado?.updatedAt || val.updatedAt || valoracion.fecha;
     return [{
       pacienteId: pac.id,
       nombre: `${pac.nombre} ${pac.apellido || ''}`.trim(),
       fecha: valoracion.fecha,
+      modifiedAt,
       val: valoracion,
       statusInfo: getBadgeForValuation(valoracion),
       proximaSesion: valoracion.tieneCita
         ? (valoracion.proximaCita || true)
         : (planAsociado?.proximaSesion || null),
     }];
-  }).sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()), [pacientesData]);
+  }).sort((a: any, b: any) => new Date(b.modifiedAt).getTime() - new Date(a.modifiedAt).getTime()), [pacientesData]);
 
   const loading = loadingPacientes && !metricas;
 
@@ -147,8 +160,8 @@ const Dashboard = () => {
 
   // Conteos para KPI "Menús pendientes" — derivados de ultimosPendientes (misma fuente que la tabla)
   const planesSinAsignar = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Pendiente de menú').length;
-  const planesEnProceso  = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú en Proceso').length;
-  const planesListos     = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú Listo').length;
+  const planesEnProceso = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú en Proceso').length;
+  const planesListos = ultimosPendientes.filter((i: any) => i.statusInfo?.text === 'Menú Listo').length;
   const planesPendientes = ultimosPendientes.length;
 
   // Alias corto para el resumen
@@ -233,15 +246,15 @@ const Dashboard = () => {
   );
 
   return (
-    <div 
-      className="flex flex-col gap-6 animate-fade-in h-full overflow-y-auto overflow-x-hidden lg:overflow-hidden pb-12 lg:pb-0" 
+    <div
+      className="flex flex-col gap-6 animate-fade-in h-full overflow-y-auto overflow-x-hidden lg:overflow-hidden pb-12 lg:pb-0"
       style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
     >
       {/* HEADER SECTION */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-bold text-[#f0f0f0] m-4 tracking-tight">
-            Bienvenido de vuelta, {userName}! 
+            Bienvenido de vuelta, {userName}!
           </h1>
           <p className="text-[14px] font-normal text-[#8a8a8a] mt-1">
             ¡NEW ORDER begins here!
@@ -292,7 +305,7 @@ const Dashboard = () => {
 
       {/* SECCIÓN PRINCIPAL: Tablas */}
       <div className="flex flex-col lg:grid lg:grid-cols-12 gap-6 flex-1 lg:min-h-0 lg:overflow-hidden shrink-0">
-        
+
         {/* TOP CLIENTES */}
         <div className="lg:col-span-4 bg-[#111111] border border-[#2a2a2a] rounded-[12px] shadow-none flex flex-col min-h-[300px] lg:min-h-0 lg:overflow-hidden">
           <div className="px-5 py-4 flex justify-between items-center border-b border-[#2a2a2a] shrink-0">
@@ -319,9 +332,9 @@ const Dashboard = () => {
                   // Colores de rank para los 3 primeros
                   const rankColor =
                     idx === 0 ? 'text-[#f59e0b]' :
-                    idx === 1 ? 'text-[#9ca3af]' :
-                    idx === 2 ? 'text-[#92400e]' :
-                    'text-[#444]';
+                      idx === 1 ? 'text-[#9ca3af]' :
+                        idx === 2 ? 'text-[#92400e]' :
+                          'text-[#444]';
 
 
                   return (
@@ -332,7 +345,7 @@ const Dashboard = () => {
                     >
                       {/* Rank */}
                       <span className={`text-[13px] font-bold w-5 shrink-0 ${rankColor}`}>
-                        {idx < 3 ? ['①','②','③'][idx] : `${idx + 1}`}
+                        {idx < 3 ? ['①', '②', '③'][idx] : `${idx + 1}`}
                       </span>
 
                       {/* Nombre + badge */}
@@ -360,6 +373,9 @@ const Dashboard = () => {
             <h2 className="text-[14px] font-medium text-[#f0f0f0] m-0">
               Últimos Pacientes
             </h2>
+            <p className="text-[11px] font-medium text-[#8a8a8a] m-0 mt-0.5">
+              Consultas de hoy · última modificación primero
+            </p>
           </div>
 
           <div className="flex-1 overflow-x-auto overflow-y-auto custom-scrollbar w-full">
@@ -372,15 +388,16 @@ const Dashboard = () => {
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Nombre de Paciente</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Estatus</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Fecha de Consulta</th>
+                  <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a]">Última modificación</th>
                   <th className="px-3 py-3 text-[12px] font-medium text-[#8a8a8a] text-center">Próxima sesión</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#2a2a2a]">
                 {pacientesRecientes.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-16">
+                    <td colSpan={6} className="py-16">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <p className="text-[13px] text-[#8a8a8a] text-center">Aún no hay consultas registradas.</p>
+                        <p className="text-[13px] text-[#8a8a8a] text-center">Aún no hay consultas registradas hoy.</p>
                       </div>
                     </td>
                   </tr>
@@ -388,7 +405,10 @@ const Dashboard = () => {
                   pacientesRecientes.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((item, i) => {
                     const dateStr = item.fecha
                       ? new Date(item.fecha.includes('T') ? item.fecha.split('T')[0] + 'T12:00:00' : item.fecha)
-                          .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                        .toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                      : '—';
+                    const modifiedStr = item.modifiedAt
+                      ? new Date(item.modifiedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                       : '—';
                     const hasNextSession = !!item.proximaSesion;
                     return (
@@ -411,6 +431,9 @@ const Dashboard = () => {
                         <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
                           {dateStr}
                         </td>
+                        <td className="px-3 py-[14px] text-[13px] font-normal text-[#8a8a8a]">
+                          {modifiedStr}
+                        </td>
                         <td className="px-3 py-[14px] text-center">
                           {hasNextSession ? (
                             <span title={item.proximaSesion} className="inline-flex items-center justify-center">
@@ -431,61 +454,63 @@ const Dashboard = () => {
           </div>
 
           <div className="px-5 py-3 border-t border-[#2a2a2a] flex flex-col md:flex-row gap-4 items-center justify-between bg-[#111111]">
-             <div className="text-[12px] font-medium text-[#8a8a8a]">
-                Mostrando {pacientesRecientes.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, pacientesRecientes.length)} Resultados de {pacientesRecientes.length}
-             </div>
-             
-             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
-                <div className="flex items-center gap-3">
-                   <span className="text-[12px] font-medium text-[#8a8a8a]">Filas por página</span>
-                   <select 
-                      className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] outline-none text-[12px] font-medium text-[#f0f0f0] cursor-pointer transition-colors"
-                      value={itemsPerPage}
-                      onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
-                        setCurrentPage(1);
-                      }}
-                   >
-                     <option value={5}>5</option>
-                     <option value={10}>10</option>
-                     <option value={20}>20</option>
-                   </select>
-                </div>
-                
-                <div className="flex items-center gap-1">
-                   <button 
-                      onClick={() => setCurrentPage(1)}
-                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
-                      disabled={currentPage === 1}
-                   >
-                      <ChevronsLeft className="w-4 h-4" />
-                   </button>
-                   <button 
-                      onClick={() => setCurrentPage(max => Math.max(1, max - 1))}
-                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50" 
-                      disabled={currentPage === 1}
-                   >
-                      <ChevronLeft className="w-4 h-4" />
-                   </button>
-                   <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
-                      {currentPage} / {Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage))}
-                   </span>
-                   <button 
-                      onClick={() => setCurrentPage(min => Math.min(Math.ceil(pacientesRecientes.length / itemsPerPage), min + 1))}
-                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
-                   >
-                      <ChevronRight className="w-4 h-4" />
-                   </button>
-                   <button 
-                      onClick={() => setCurrentPage(Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage)))}
-                      className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors" 
-                      disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
-                   >
-                      <ChevronsRight className="w-4 h-4" />
-                   </button>
-                </div>
-             </div>
+            <div className="text-[12px] font-medium text-[#8a8a8a]">
+              Mostrando {pacientesRecientes.length > 0 ? (currentPage - 1) * itemsPerPage + 1 : '0'} a {Math.min(currentPage * itemsPerPage, pacientesRecientes.length)} Resultados de {pacientesRecientes.length}
+            </div>
+
+            <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] font-medium text-[#8a8a8a]">Filas por página</span>
+                <select
+                  className="flex items-center justify-between px-3 py-1.5 bg-[#181818] border border-[#2a2a2a] rounded-[6px] gap-2 hover:border-[#444] outline-none text-[12px] font-medium text-[#f0f0f0] cursor-pointer transition-colors"
+                  value={itemsPerPage}
+                  onChange={(e) => {
+                    setItemsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setCurrentPage(1)}
+                  className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+                  disabled={currentPage === 1}
+                >
+                  <ChevronsLeft className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(max => Math.max(1, max - 1))}
+                  className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="text-[12px] font-medium text-[#f0f0f0] mx-2 select-none">
+                  {currentPage} / {Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage))}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(min => Math.min(Math.ceil(pacientesRecientes.length / itemsPerPage), min + 1))}
+                  className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors"
+                  disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, Math.ceil(pacientesRecientes.length / itemsPerPage)))}
+                  className="p-1 px-[5px] bg-transparent border border-transparent rounded-[6px] text-[#8a8a8a] hover:bg-[#1a1a1a] transition-colors"
+                  disabled={currentPage >= Math.ceil(pacientesRecientes.length / itemsPerPage)}
+                >
+                  <ChevronsRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
