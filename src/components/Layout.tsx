@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import Logo from './Logo';
 import { useAuthStore } from '@/store/auth';
 import { useThemeStore } from '@/store/theme';
+import { usePendingCount } from '@/hooks/usePendingCount';
 
 const navItems = [
   { to: '/dashboard', icon: BarChart3, label: 'RESUMEN' },
@@ -19,6 +20,7 @@ const Layout = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user, logout } = useAuthStore();
   const { theme, setTheme } = useThemeStore();
+  const pendingCount = usePendingCount();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -70,6 +72,7 @@ const Layout = () => {
           {filteredNavItems.map((item) => (
             <NavLink
               key={item.to}
+              style={{ position: 'relative' }}
               to={item.to}
               onClick={() => setMobileOpen(false)}
               title={isCollapsed ? item.label : ''}
@@ -83,6 +86,15 @@ const Layout = () => {
             >
               <item.icon className="h-[18px] w-[18px] shrink-0" />
               {!isCollapsed && item.label}
+              {item.to === '/pendientes' && pendingCount > 0 && (
+                <span className={`inline-flex items-center justify-center font-bold bg-rose-500 text-white rounded-full shadow-sm shadow-rose-500/30 ${
+                  isCollapsed
+                    ? 'absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] text-[10px] px-1'
+                    : 'ml-auto min-w-[20px] h-[20px] text-[11px] px-1.5'
+                }`}>
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              )}
             </NavLink>
           ))}
 

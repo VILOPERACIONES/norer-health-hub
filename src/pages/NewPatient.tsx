@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterPacienteChange } from '@/lib/invalidation';
 import { encodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
+import DietTable from '@/components/DietTable';
 
 const Input = ({ label, value, onChange, placeholder, type = 'text', readOnly = false }: any) => (
   <div className="space-y-2 group">
@@ -315,47 +316,9 @@ const NewPatient = () => {
                 <Plus className="w-3 h-3" /> Agregar tiempo
               </button>
             </div>
-            <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
-              <table className="w-full min-w-[560px] text-[12px]">
-                <thead>
-                  <tr className="border-b border-border-subtle">
-                    {['Tiempo', 'Hora', 'Notas'].map((label) => (
-                      <th key={label} className="text-left text-[10px] font-medium text-text-muted uppercase tracking-widest pb-2 pr-3">{label}</th>
-                    ))}
-                    <th className="w-10" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border-subtle/50">
-                  {habitos.map((row, index) => (
-                    <tr key={index}>
-                      {(['label', 'hora', 'notas'] as const).map((field) => (
-                        <td key={field} className="py-2 pr-3">
-                          <input
-                            type="text"
-                            value={row[field]}
-                            onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
-                            placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Notas (opcional)'}
-                            className="w-full bg-bg-elevated rounded-[6px] px-3 py-2 text-[13px] text-text-primary outline-none border border-border-subtle focus:border-[#555] transition-colors"
-                          />
-                        </td>
-                      ))}
-                      <td className="py-2">
-                        <button
-                          type="button"
-                          onClick={() => setHabitos((rows) => rows.filter((_, itemIndex) => itemIndex !== index))}
-                          className="p-2 text-text-muted hover:text-accent-red rounded-[6px] hover:bg-bg-elevated transition-colors"
-                          title="Eliminar tiempo"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+              <DietTable habitos={habitos} setHabitos={setHabitos} variant="default" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Preferencias (Gusta)" value={form.alimentosGusta} onChange={(v: string) => update('alimentosGusta', v)} placeholder="Ej. Pollo, Avena, Manzanas" />
+              <Input label="Alergias" value={form.alergico} onChange={(v: string) => update('alergico', v)} placeholder="Ej. Nueces, Mariscos, Lactosa" />
               <Input label="Aversiones (No Gusta)" value={form.alimentosNoGusta} onChange={(v: string) => update('alimentosNoGusta', v)} placeholder="Ej. Pescado, Brócoli" />
             </div>
           </div>
