@@ -91,7 +91,8 @@ const newTiempoId = () =>
   globalThis.crypto?.randomUUID?.() || `tiempo-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
 export const normalizeColacionLabel = (value: string) => {
-  const label = value.trim();
+  const label = (value || '').trim();
+  if (label.toLowerCase() === 'comida') return 'Almuerzo';
   return /^colaci[oó]n\s+\d+$/i.test(label) ? 'Colación' : label;
 };
 
