@@ -7,7 +7,7 @@ export type Recall24Row = {
 export const DEFAULT_RECALL_24: Recall24Row[] = [
   { label: 'Desayuno', hora: '', notas: '' },
   { label: 'Colación', hora: '', notas: '' },
-  { label: 'Comida', hora: '', notas: '' },
+  { label: 'Almuerzo', hora: '', notas: '' },
   { label: 'Colación', hora: '', notas: '' },
   { label: 'Cena', hora: '', notas: '' },
 ];
@@ -33,7 +33,7 @@ export function normalizeRecall24(value: unknown): Recall24Row[] {
     return [
       { label: 'Desayuno', ...legacy.desayuno },
       { label: 'Colación', ...legacy.colacion1 },
-      { label: 'Comida', ...legacy.almuerzo },
+      { label: 'Almuerzo', ...legacy.almuerzo },
       { label: 'Colación', ...legacy.colacion2 },
       { label: 'Cena', ...legacy.cena },
     ].map((row) => ({

@@ -26,8 +26,10 @@ export function parsePdfPreferences(saved: string | null): PdfMeta {
  * @param defaultShowDistribucionPorciones Default para "Distribución de porciones" cuando el plan
  * aún no tiene un valor explícito guardado — normalmente calculado a partir de si el plan es de
  * platillos (false) o de solo equivalencias (true). Si se omite, cae al default general (true).
+ * @param defaultSoloEquivalencias Default para "Solo equivalencias" — calculado igual que
+ * distribución de porciones. Si se omite, cae al default general (false).
  */
-export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta = {}, defaultShowDistribucionPorciones?: boolean): PdfMeta {
+export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta = {}, defaultShowDistribucionPorciones?: boolean, defaultSoloEquivalencias?: boolean): PdfMeta {
   // "Solo equivalencias" y "Distribución de porciones" son decisiones de cada plan, no preferencias
   // globales (la segunda depende del tipo de contenido del plan — platillos vs. equivalencias).
   const { soloEquivalencias: _ignoredGlobalValue, showDistribucionPorciones: _ignoredGlobalDist, ...safeGlobalPreferences } = globalPreferences;
@@ -39,7 +41,7 @@ export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta 
     soloEquivalencias:
       typeof planMeta.soloEquivalencias === 'boolean'
         ? planMeta.soloEquivalencias
-        : false,
+        : (defaultSoloEquivalencias ?? DEFAULT_PDF_META.soloEquivalencias),
     showDistribucionPorciones:
       typeof planMeta.showDistribucionPorciones === 'boolean'
         ? planMeta.showDistribucionPorciones
@@ -56,12 +58,17 @@ export function defaultShowDistribucionForMenus(menus?: { tipoContenido?: string
 /**
  * Aplica un toggle del panel de configuración de PDF. Activar "Solo equivalencias"
  * a mano fuerza también "Distribución de porciones" a ON — un plan de solo
- * equivalencias siempre la necesita. El resto de toggles cambian normal.
+ * equivalencias siempre la necesita. Desactivar "Solo equivalencias" apaga
+ * "Distribución de porciones". El resto de toggles cambian normal.
  */
 export function togglePdfMetaFlag(meta: PdfMeta, key: string): PdfMeta {
   const newMeta: PdfMeta = { ...meta, [key]: !meta[key] };
-  if (key === 'soloEquivalencias' && newMeta.soloEquivalencias === true) {
-    newMeta.showDistribucionPorciones = true;
+  if (key === 'soloEquivalencias') {
+    if (newMeta.soloEquivalencias === true) {
+      newMeta.showDistribucionPorciones = true;
+    } else {
+      newMeta.showDistribucionPorciones = false;
+    }
   }
   return newMeta;
 }

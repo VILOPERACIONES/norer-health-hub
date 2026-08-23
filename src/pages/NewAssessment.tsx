@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets, MapPin, Wifi } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterValoracionChange } from '@/lib/invalidation';
 import api from '@/lib/api';
@@ -27,6 +27,7 @@ import {
 } from '@/lib/assessmentModality';
 import { DEFAULT_RECALL_24, normalizeRecall24, type Recall24Row } from '@/lib/recall24';
 import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
+import DietTable from '@/components/DietTable';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
@@ -120,7 +121,7 @@ const NewAssessment = () => {
   const [barridoData, setBarridoData] = useState<BarridoCollection | null>(null);
   const [isGrasaModified, setIsGrasaModified] = useState(false);
   const [proximaSesion, setProximaSesion] = useState('');
-  const [showScheduling, setShowScheduling] = useState(false);
+  const [showScheduling, setShowScheduling] = useState(true);
 
   const [valoracionIdGuardada, setValoracionIdGuardada] = useState<string | null>(null);
   const [calcomData, setCalcomData] = useState<AppointmentSummaryData | null>(null);
@@ -495,7 +496,7 @@ const NewAssessment = () => {
           setHabitos([
             mk('Desayuno', h2.desayuno, 'horaDesayuno', 'ayerDesayuno', 'usalmenteDesayuno'),
             mk('Colación', h2.colacion1, 'horaColacion1', 'ayerColacion1', 'usalmenteColacion1'),
-            mk('Comida',   h2.almuerzo,  'horaAlmuerzo',  'ayerAlmuerzo',  'usalmenteAlmuerzo'),
+            mk('Almuerzo', h2.almuerzo,  'horaAlmuerzo',  'ayerAlmuerzo',  'usalmenteAlmuerzo'),
             mk('Colación', h2.colacion2, 'horaColacion2', 'ayerColacion2', 'usalmenteColacion2'),
             mk('Cena',     h2.cena,      'horaCena',      'ayerCena',      'usalmenteCena'),
           ]);
@@ -1118,7 +1119,7 @@ const NewAssessment = () => {
                     <p className="mb-1 text-[10px] font-bold uppercase tracking-widest text-[#8a8a8a]">Modalidad de consulta</p>
                     <p className="m-0 text-[11px] text-[#666]">Selecciona cómo se está realizando esta consulta.</p>
                   </div>
-                  <div className="grid w-full grid-cols-2 gap-2 sm:w-[280px]">
+                  <div className="grid w-full grid-cols-2 gap-2 sm:w-[300px]">
                     <button
                       type="button"
                       onClick={() => {
@@ -1131,8 +1132,9 @@ const NewAssessment = () => {
                           masaMagra: masaMagra !== null ? 'REGISTRADA' : 'NO_CAPTURADA',
                         }));
                       }}
-                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${!consultaEnLinea ? 'border-white bg-white text-black hover:bg-white hover:text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                      className={`flex items-center justify-center gap-2 rounded-[8px] border px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-200 ${!consultaEnLinea ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.1)]' : 'border-[#333] text-[#666] hover:text-[#999] hover:border-[#444]'}`}
                     >
+                      <MapPin className="w-3.5 h-3.5" />
                       Presencial
                     </button>
                     <button
@@ -1142,15 +1144,23 @@ const NewAssessment = () => {
                         setIsGrasaModified(true);
                         setMeasurementStatuses(prev => ({ ...prev, estatura: 'NO_APLICA', pctGrasa: 'NO_APLICA', kgGrasa: 'NO_APLICA', masaMagra: 'NO_APLICA' }));
                       }}
-                      className={`rounded-[7px] border px-3 py-2 text-[11px] font-bold uppercase tracking-wider transition-colors ${consultaEnLinea ? 'border-white bg-white text-black hover:bg-white hover:text-black' : 'border-[#333] text-[#777] hover:text-white'}`}
+                      className={`flex items-center justify-center gap-2 rounded-[8px] border px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider transition-all duration-200 ${consultaEnLinea ? 'border-sky-500/50 bg-sky-500/15 text-sky-400 shadow-[0_0_12px_rgba(14,165,233,0.1)]' : 'border-[#333] text-[#666] hover:text-[#999] hover:border-[#444]'}`}
                     >
+                      <Wifi className="w-3.5 h-3.5" />
                       En línea
                     </button>
                   </div>
                 </div>
                 {consultaEnLinea && (
-                  <p className="mb-0 mt-3 border-t border-[#292929] pt-3 text-[11px] leading-relaxed text-[#8faede]">
+                  <p className="mb-0 mt-3 border-t border-[#292929] pt-3 text-[11px] leading-relaxed text-sky-400/80">
+                    <Wifi className="w-3 h-3 inline-block mr-1.5 -mt-0.5" />
                     Captura el peso y los cuatro perímetros proporcionados por el paciente. Los perímetros quedan únicamente en el expediente interno.
+                  </p>
+                )}
+                {!consultaEnLinea && (
+                  <p className="mb-0 mt-3 border-t border-[#292929] pt-3 text-[11px] leading-relaxed text-emerald-400/80">
+                    <MapPin className="w-3 h-3 inline-block mr-1.5 -mt-0.5" />
+                    Consulta presencial — medidas completas del paciente en consultorio.
                   </p>
                 )}
               </div>
@@ -1207,7 +1217,6 @@ const NewAssessment = () => {
                           { label: 'Patología / Enfermedades', field: 'patologia' },
                           { label: 'Cirugías / Traumas', field: 'cirugias' },
                           { label: 'Fármacos / Medicamentos', field: 'farmacos' },
-                          { label: 'Alergias', field: 'alergias' },
                           { label: 'Agua al día', field: 'agua' },
                           { label: 'Tránsito Intestinal', field: 'estrenimiento' },
                           { label: 'Alcohol', field: 'consumoAlcohol' },
@@ -1451,55 +1460,17 @@ const NewAssessment = () => {
                           <Plus className="w-3 h-3" /> Agregar tiempo
                         </button>
                       </div>
-                      <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
-                        <table className="w-full min-w-[560px] text-[12px]">
-                          <thead>
-                            <tr className="border-b border-[#333]">
-                              {['Tiempo', 'Hora', 'Notas'].map((label) => (
-                                <th key={label} className="text-left text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest pb-2 pr-3">{label}</th>
-                              ))}
-                              <th className="w-10" />
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-[#2a2a2a]">
-                            {habitos.map((row, index) => (
-                              <tr key={index}>
-                                {(['label', 'hora', 'notas'] as const).map((field) => (
-                                  <td key={field} className="py-2 pr-3">
-                                    <input
-                                      type="text"
-                                      value={row[field]}
-                                      onChange={(event) => setHabitos((rows) => rows.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: event.target.value } : item))}
-                                      placeholder={field === 'label' ? 'Tiempo de comida' : field === 'hora' ? '7:00 am' : 'Notas (opcional)'}
-                                      className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
-                                    />
-                                  </td>
-                                ))}
-                                <td className="py-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => setHabitos((rows) => rows.filter((_, itemIndex) => itemIndex !== index))}
-                                    className="p-2 text-[#8a8a8a] hover:text-[#ff6b6b] rounded-[6px] hover:bg-[#181818] transition-colors"
-                                    title="Eliminar tiempo"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
+                      <DietTable habitos={habitos} setHabitos={setHabitos} variant="dark" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-1">
-                        <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Alimentos que gusta</label>
+                        <label className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">Alergias</label>
                         <input
                           type="text"
-                          value={expediente.alimentosGustan}
-                          onChange={(e) => updateExpediente('alimentosGustan', e.target.value)}
-                          placeholder="Ej. Pollo, Avena, Manzanas"
+                          value={expediente.alergias}
+                          onChange={(e) => updateExpediente('alergias', e.target.value)}
+                          placeholder="Ej. Nueces, Mariscos, Lactosa"
                           className="w-full bg-[#181818] rounded-[6px] px-3 py-2 text-[13px] font-medium text-white outline-none border border-[#333] focus:border-[#555] transition-colors"
                         />
                       </div>
@@ -1982,39 +1953,22 @@ const NewAssessment = () => {
                   <div className="flex items-center gap-2">
                     <CalendarIcon className="w-4 h-4 text-brand-primary" />
                     <span className="text-[13px] font-bold text-white tracking-widest uppercase">Agendar Próxima Cita</span>
-                    {showScheduling && proximaSesion && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
+                    {proximaSesion && <span className="w-2 h-2 rounded-full bg-green-500 shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showAgendarCita ? 'rotate-180' : ''}`} />
                 </button>
                 {showAgendarCita && (
                   <div className="px-5 pb-5 border-t border-[#2a2a2a] pt-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <p className="text-[12px] text-[#8a8a8a] m-0">Opcional — agenda la siguiente consulta directamente desde aquí.</p>
-                      <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                        <input
-                          type="checkbox"
-                          className="sr-only peer"
-                          checked={showScheduling}
-                          onChange={(e) => {
-                            setShowScheduling(e.target.checked);
-                            if (!e.target.checked) { setCalcomData(null); setProximaSesion(''); }
-                          }}
-                        />
-                        <div className="w-11 h-6 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-primary"></div>
-                        <span className="ml-3 text-[12px] font-bold text-white uppercase tracking-wider">{showScheduling ? 'Habilitado' : 'Deshabilitado'}</span>
-                      </label>
+                    <p className="text-[12px] text-[#8a8a8a] m-0 mb-4">Agenda la siguiente consulta directamente desde aquí.</p>
+                    <div className="animate-fade-in">
+                      <CalcomScheduling
+                        pacienteData={paciente ? { nombre: paciente.nombre, apellido: paciente.apellido, email: paciente.email, telefono: paciente.telefono } : undefined}
+                        onSelection={(data) => {
+                          setCalcomData(data);
+                          setProximaSesion(data?.fecha || '');
+                        }}
+                      />
                     </div>
-                    {showScheduling && (
-                      <div className="animate-fade-in">
-                        <CalcomScheduling
-                          pacienteData={paciente ? { nombre: paciente.nombre, apellido: paciente.apellido, email: paciente.email, telefono: paciente.telefono } : undefined}
-                          onSelection={(data) => {
-                            setCalcomData(data);
-                            setProximaSesion(data?.fecha || '');
-                          }}
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
               </div>

@@ -50,7 +50,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
         const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
         const defaultDistribucion = defaultShowDistribucionForMenus(planRes.data?.menus);
         setMeta({
-          ...buildPdfMeta(defaultPrefs, planRes.data?.pdfCustomMeta || {}, defaultDistribucion),
+          ...buildPdfMeta(defaultPrefs, planRes.data?.pdfCustomMeta || {}, defaultDistribucion, defaultDistribucion),
           notaAmarilla: planRes.data?.pdfCustomMeta?.notaAmarilla || '',
           precioEspecial: planRes.data?.pdfCustomMeta?.precioEspecial || '',
         });

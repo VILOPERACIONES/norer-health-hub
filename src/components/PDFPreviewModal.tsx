@@ -19,7 +19,7 @@ interface PDFPreviewModalProps {
 export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading, planMenus }: PDFPreviewModalProps) {
   const [meta, setMeta] = useState<any>(() => {
     const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
-    return buildPdfMeta(defaultPrefs, planCustomMeta, defaultShowDistribucionForMenus(planMenus));
+    return buildPdfMeta(defaultPrefs, planCustomMeta, defaultShowDistribucionForMenus(planMenus), defaultShowDistribucionForMenus(planMenus));
   });
   
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
