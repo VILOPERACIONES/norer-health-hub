@@ -189,7 +189,7 @@ const DietTable = ({ habitos, setHabitos, variant = 'default' }: DietTableProps)
   );
 
   return (
-    <div className="overflow-x-auto max-h-[280px] overflow-y-auto">
+    <div className="overflow-x-auto">
       <DndContext
         id={dndId}
         sensors={sensors}
