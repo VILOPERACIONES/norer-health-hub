@@ -1464,13 +1464,13 @@ const NewAssessment = () => {
                                   key={s.id || sIdx}
                                   type="button"
                                   onClick={() => {
-                                    setSuplementosDetalle(prev => [...prev, {
+                                    setSuplementosDetalle(prev => [{
                                       id: Date.now().toString() + Math.random(),
                                       nombre: s.nombre,
                                       indicaciones: s.indicaciones || '',
                                       activo: true,
                                       fechaInicio: new Date().toISOString(),
-                                    }]);
+                                    }, ...prev]);
                                     setSuplementacionActiva(true);
                                   }}
                                   className="flex items-center gap-1.5 text-[12px] font-semibold text-white bg-[#1a1a1a] hover:bg-[#222] border border-[#333] hover:border-brand-primary px-3 py-1.5 rounded-[8px] transition-colors"
@@ -1493,6 +1493,16 @@ const NewAssessment = () => {
                           <div className="hidden md:block">Tiempo</div>
                           <div className="hidden md:block text-center">Estado</div>
                           <div></div>
+                        </div>
+                        <div className="grid grid-cols-[20px_1fr_36px] xs:grid-cols-[20px_1fr_1fr_36px] md:grid-cols-[20px_1.5fr_2fr_120px_80px_40px] gap-2 md:gap-4 items-center px-3">
+                          <div></div>
+                          <button
+                            type="button"
+                            onClick={() => setSuplementosDetalle(prev => [{ id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }, ...prev])}
+                            className="flex w-fit items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider"
+                          >
+                            <Plus className="w-4 h-4" /> Agregar Suplemento
+                          </button>
                         </div>
                         <div className="space-y-2 max-h-[250px] overflow-y-auto custom-scrollbar pr-1">
                           {suplementosDetalle.map((sup, idx) => (
@@ -1546,11 +1556,6 @@ const NewAssessment = () => {
                               <p className="text-[12px] text-[#8a8a8a] m-0">No hay suplementos agregados.</p>
                             </div>
                           )}
-                        </div>
-                        <div className="flex justify-end pt-2">
-                          <button type="button" onClick={() => setSuplementosDetalle([...suplementosDetalle, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true, fechaInicio: new Date().toISOString() }])} className="flex items-center gap-2 text-[12px] font-bold text-[#0a0a0a] bg-[#f0f0f0] hover:bg-white px-4 py-2 rounded-[8px] transition-colors uppercase tracking-wider">
-                            <Plus className="w-4 h-4" /> Agregar Suplemento
-                          </button>
                         </div>
                       </div>
                     )}
