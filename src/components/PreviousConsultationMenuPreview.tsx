@@ -1,0 +1,140 @@
+import { useEffect, useState } from 'react';
+import { ExternalLink, FileText, X } from 'lucide-react';
+import api from '@/lib/api';
+import { NutritionLoader } from '@/components/ui/NutritionLoader';
+
+interface PreviousConsultationMenuPreviewProps {
+  isOpen: boolean;
+  planId?: string | null;
+  consultationDate?: string | null;
+  onClose: () => void;
+}
+
+const MENU_ONLY_PDF_META = {
+  showPageHistorial: false,
+  showPageMenus: true,
+  showPageIntercambio: false,
+  showPageExtras: false,
+  showContacto: false,
+  showAlimentosEvitar: false,
+  showDistribucionPorciones: false,
+  soloEquivalencias: false,
+};
+
+const formatConsultationDate = (value?: string | null) => {
+  if (!value) return 'consulta anterior';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'consulta anterior';
+  return new Intl.DateTimeFormat('es-MX', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+};
+
+export function PreviousConsultationMenuPreview({
+  isOpen,
+  planId,
+  consultationDate,
+  onClose,
+}: PreviousConsultationMenuPreviewProps) {
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || !planId) return;
+
+    let active = true;
+    let objectUrl: string | null = null;
+
+    const loadMenus = async () => {
+      setLoading(true);
+      setError(null);
+      setPdfUrl(null);
+
+      try {
+        const response = await api.post(
+          `/api/planes/${planId}/pdf/preview`,
+          MENU_ONLY_PDF_META,
+          { responseType: 'blob' },
+        );
+        objectUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+        if (active) setPdfUrl(objectUrl);
+      } catch {
+        if (active) setError('No fue posible cargar los menús de la consulta anterior.');
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void loadMenus();
+
+    return () => {
+      active = false;
+      if (objectUrl) window.URL.revokeObjectURL(objectUrl);
+    };
+  }, [isOpen, planId]);
+
+  if (!isOpen) return null;
+
+  return (
+    <section className="mb-4 overflow-hidden rounded-[14px] border border-[#90c2ff]/30 bg-[#0d0d0d] shadow-[0_16px_45px_rgba(0,0,0,0.35)]">
+      <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] bg-[#151515] px-4 py-3">
+        <div className="flex min-w-0 items-start gap-2.5">
+          <div className="mt-0.5 rounded-[7px] bg-[#90c2ff]/10 p-1.5 text-[#90c2ff]">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0">
+            <h4 className="m-0 text-[13px] font-bold uppercase tracking-wider text-white">
+              Menús de la consulta anterior
+            </h4>
+            <p className="mb-0 mt-1 text-[11px] text-[#8a8a8a]">
+              Referencia enviada el {formatConsultationDate(consultationDate)}. Puedes seguir editando debajo.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={onClose}
+          className="shrink-0 rounded-full border border-[#333] bg-[#202020] p-2 text-[#999] transition-colors hover:border-[#555] hover:text-white"
+          aria-label="Cerrar menús de la consulta anterior"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      <div className="relative h-[58vh] min-h-[430px] max-h-[720px] bg-[#202020]">
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center bg-[#111]">
+            <NutritionLoader />
+          </div>
+        )}
+        {error && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-6 text-center">
+            <FileText className="h-8 w-8 text-[#555]" />
+            <p className="m-0 text-[12px] text-[#aaa]">{error}</p>
+          </div>
+        )}
+        {pdfUrl && !loading && (
+          <>
+            <iframe
+              src={`${pdfUrl}#toolbar=0&navpanes=0&view=FitH`}
+              title="Menús de la consulta anterior"
+              className="h-full w-full border-0 bg-white"
+            />
+            <a
+              href={pdfUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-[7px] border border-white/20 bg-black/75 px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-white backdrop-blur transition-colors hover:bg-black"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Abrir grande
+            </a>
+          </>
+        )}
+      </div>
+    </section>
+  );
+}

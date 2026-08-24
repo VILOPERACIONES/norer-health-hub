@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets, MapPin, Wifi } from 'lucide-react';
+import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, FileText, Activity, GripVertical, Check, Droplets, MapPin, Wifi, Search } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterValoracionChange } from '@/lib/invalidation';
 import api from '@/lib/api';
@@ -29,6 +29,8 @@ import { DEFAULT_RECALL_24, normalizeRecall24, resolveAssessmentDietetica, seria
 import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 import DietTable from '@/components/DietTable';
 import { SupplementHistoryEditor } from '@/components/SupplementHistoryEditor';
+import { PreviousConsultationMenuPreview } from '@/components/PreviousConsultationMenuPreview';
+import { findPreviousConsultationPlan } from '@/lib/previousConsultationPlan';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
@@ -171,6 +173,16 @@ const NewAssessment = () => {
     setExpedienteModified(true);
   };
   const [showDietetico, setShowDietetico] = useState(true);
+  const [showPreviousMenus, setShowPreviousMenus] = useState(false);
+
+  const previousConsultationPlan = useMemo(
+    () => findPreviousConsultationPlan(paciente?.valoraciones, isEdit ? valoracionId : undefined),
+    [isEdit, paciente?.valoraciones, valoracionId],
+  );
+
+  useEffect(() => {
+    if (!previousConsultationPlan) setShowPreviousMenus(false);
+  }, [previousConsultationPlan]);
   // Si el nutriólogo agrega/renombra/quita un tiempo directamente en Barrido (no en Dietético),
   // se refleja de vuelta aquí. Se emparaja por POSICIÓN (índice dentro del barrido), no por nombre:
   // un renombrado cambia el nombre por definición, así que emparejar por nombre no podría
@@ -1319,20 +1331,39 @@ const NewAssessment = () => {
 
               {/* ── DIETÉTICO ── */}
               <div className="bg-[#111111] border border-[#2a2a2a] rounded-[16px] shrink-0 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => setShowDietetico(s => !s)}
-                  className="w-full flex items-center justify-between px-5 py-4 hover:bg-[#181818] transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="w-4 h-4 text-brand-primary" />
-                    <span className="text-[13px] font-bold text-white tracking-widest uppercase">Dietético</span>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showDietetico ? 'rotate-180' : ''}`} />
-                </button>
+                <div className="flex items-center px-5 py-2 hover:bg-[#181818] transition-colors">
+                  <button
+                    type="button"
+                    onClick={() => setShowDietetico(s => !s)}
+                    className="flex min-w-0 flex-1 items-center justify-between py-2"
+                  >
+                    <div className="flex items-center gap-2">
+                      <BookOpen className="w-4 h-4 text-brand-primary" />
+                      <span className="text-[13px] font-bold text-white tracking-widest uppercase">Dietético</span>
+                    </div>
+                    <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showDietetico ? 'rotate-180' : ''}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowPreviousMenus(open => !open)}
+                    disabled={!previousConsultationPlan}
+                    className="ml-3 flex shrink-0 items-center gap-1.5 rounded-[7px] border border-[#333] bg-[#1b1b1b] px-2.5 py-2 text-[10px] font-bold uppercase tracking-wider text-[#90c2ff] transition-colors hover:border-[#90c2ff]/50 hover:bg-[#90c2ff]/10 disabled:cursor-not-allowed disabled:opacity-35"
+                    title={previousConsultationPlan ? 'Comparar con los menús enviados en la consulta anterior' : 'No hay un plan anterior disponible'}
+                    aria-label="Ver menús de la consulta anterior"
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Menú anterior</span>
+                  </button>
+                </div>
                 {showDietetico && (
                   <div className="px-5 pb-5 space-y-6 border-t border-[#2a2a2a]">
                     <div className="pt-4">
+                      <PreviousConsultationMenuPreview
+                        isOpen={showPreviousMenus}
+                        planId={previousConsultationPlan?.planId}
+                        consultationDate={previousConsultationPlan?.fecha}
+                        onClose={() => setShowPreviousMenus(false)}
+                      />
                       <div className="flex justify-start mb-3">
                         <button
                           type="button"
@@ -1860,17 +1891,37 @@ const NewAssessment = () => {
           {/* FASE 2: BARRIDO */}
           {step === 2 && (
             <div className="flex flex-col flex-1 min-h-0 animate-slide-up gap-4">
-              <div className="shrink-0 mb-1">
-                <p className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-[0.15em] mb-1">Paso 2 de {totalSteps}</p>
-                <h3 className="text-[22px] font-bold text-white m-0 tracking-tight">
-                  Equivalencias
-                </h3>
-                <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
-                  {barridoData && barridoData.kcalTotal > 0
-                    ? `Total temporal: ${Math.round(barridoData.kcalTotal).toLocaleString()} kcal`
-                    : 'Asigna el cuadro sintético o los macros del paciente.'}
-                </p>
+              <div className="flex shrink-0 items-start justify-between gap-3 mb-1">
+                <div>
+                  <p className="text-[10px] font-semibold text-[#8a8a8a] uppercase tracking-[0.15em] mb-1">Paso 2 de {totalSteps}</p>
+                  <h3 className="text-[22px] font-bold text-white m-0 tracking-tight">
+                    Equivalencias
+                  </h3>
+                  <p className="text-[12px] text-[#8a8a8a] m-0 mt-1">
+                    {barridoData && barridoData.kcalTotal > 0
+                      ? `Total temporal: ${Math.round(barridoData.kcalTotal).toLocaleString()} kcal`
+                      : 'Asigna el cuadro sintético o los macros del paciente.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPreviousMenus(open => !open)}
+                  disabled={!previousConsultationPlan}
+                  className="mt-1 flex shrink-0 items-center gap-1.5 rounded-[7px] border border-[#333] bg-[#1b1b1b] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#90c2ff] transition-colors hover:border-[#90c2ff]/50 hover:bg-[#90c2ff]/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  title={previousConsultationPlan ? 'Comparar con los menús enviados en la consulta anterior' : 'No hay un plan anterior disponible'}
+                  aria-label="Ver menús de la consulta anterior"
+                >
+                  <Search className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Menú anterior</span>
+                </button>
               </div>
+
+              <PreviousConsultationMenuPreview
+                isOpen={showPreviousMenus}
+                planId={previousConsultationPlan?.planId}
+                consultationDate={previousConsultationPlan?.fecha}
+                onClose={() => setShowPreviousMenus(false)}
+              />
 
               <div className="bg-[#111111] px-5 py-4 rounded-[16px] border border-[#2a2a2a] shadow-none flex-1 min-h-0 overflow-y-auto custom-scrollbar">
                 <div className="-mx-4 md:mx-0">
