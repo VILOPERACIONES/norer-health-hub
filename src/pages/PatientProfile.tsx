@@ -355,8 +355,9 @@ const PatientProfile = () => {
   }>({ isOpen: false, title: '', baseDataKey: '', baseName: '' });
 
   useEffect(() => {
-    if (location.hash === '#historial' && !loading) {
-      // Intentar scroll con reintentos por si el DOM aún no está listo
+    if (loading) return;
+
+    if (location.hash === '#historial') {
       let attempts = 0;
       const tryScroll = () => {
         const el = document.getElementById('historial');
@@ -367,9 +368,15 @@ const PatientProfile = () => {
           setTimeout(tryScroll, 100);
         }
       };
-      setTimeout(tryScroll, 300);
+      const timer = setTimeout(tryScroll, 150);
+      return () => clearTimeout(timer);
+    } else {
+      // Si entra desde el módulo de Pacientes (sin hash), mostrar siempre desde el inicio
+      const mainEl = document.querySelector('main');
+      if (mainEl) mainEl.scrollTo({ top: 0, behavior: 'instant' });
+      window.scrollTo({ top: 0, behavior: 'instant' });
     }
-  }, [location.hash, loading]);
+  }, [location.pathname, location.hash, loading]);
 
   const { confirm, ConfirmDialogComponent } = useConfirm();
 

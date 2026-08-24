@@ -132,16 +132,8 @@ const Pending = () => {
                   const { paciente: p, valoracion: val } = item;
                   const statusInfo = getBadgeForValuation(val);
                   
-                  // Navegación inteligente según el estado del plan
-                  const planId = (val as any).planId || (val as any).plan?.id;
                   const handleClick = () => {
-                    if (planId) {
-                      // Plan asignado → ir directo a la vista del plan para enviarlo
-                      navigate(`/pacientes/${p.id}/planes/${planId}`);
-                    } else {
-                      // Sin plan → ir al detalle de la valoración para crear uno
-                      navigate(`/pacientes/${p.id}/valoraciones/${val.id}`);
-                    }
+                    navigate(`/pacientes/${p.id}#historial`);
                   };
 
                   return (
