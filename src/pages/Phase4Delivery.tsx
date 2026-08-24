@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
-import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
+import { buildPdfMeta, buildPdfMetaFromPlanResponse, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
 import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
 import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
@@ -48,11 +48,11 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
           pacienteId ? api.get(`/api/pacientes/${pacienteId}`).catch(() => null) : Promise.resolve(null),
         ]);
         const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
-        const defaultDistribucion = defaultShowDistribucionForMenus(planRes.data?.menus);
+        const planData = planRes.data?.data || planRes.data || {};
         setMeta({
-          ...buildPdfMeta(defaultPrefs, planRes.data?.pdfCustomMeta || {}, defaultDistribucion, defaultDistribucion),
-          notaAmarilla: planRes.data?.pdfCustomMeta?.notaAmarilla || '',
-          precioEspecial: planRes.data?.pdfCustomMeta?.precioEspecial || '',
+          ...buildPdfMetaFromPlanResponse(defaultPrefs, planRes.data),
+          notaAmarilla: planData.pdfCustomMeta?.notaAmarilla || '',
+          precioEspecial: planData.pdfCustomMeta?.precioEspecial || '',
         });
         if (pacRes) {
           const p = pacRes.data?.data || pacRes.data;

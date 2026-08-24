@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from './pdfMeta';
+import { buildPdfMeta, buildPdfMetaFromPlanResponse, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from './pdfMeta';
 
 describe('configuración del PDF', () => {
   it('muestra el menú completo por defecto aunque exista una preferencia global antigua', () => {
@@ -51,6 +51,44 @@ describe('configuración del PDF', () => {
       { tipoContenido: 'equivalencias' },
       { tipoContenido: 'platillos' },
     ])).toBe(false);
+  });
+
+  it('lee los menús dentro del envelope real de la API en la fase de entrega', () => {
+    const meta = buildPdfMetaFromPlanResponse({}, {
+      success: true,
+      data: {
+        menus: [
+          { tipoContenido: 'platillos' },
+          { tipoContenido: 'platillos' },
+        ],
+        pdfCustomMeta: {
+          soloEquivalencias: true,
+          showDistribucionPorciones: true,
+        },
+      },
+    });
+
+    expect(meta.soloEquivalencias).toBe(false);
+    expect(meta.showDistribucionPorciones).toBe(false);
+  });
+
+  it('activa ambas opciones desde el envelope cuando todos los menús son equivalencias', () => {
+    const meta = buildPdfMetaFromPlanResponse({}, {
+      success: true,
+      data: {
+        menus: [
+          { tipoContenido: 'equivalencias' },
+          { tipoContenido: 'equivalencias' },
+        ],
+        pdfCustomMeta: {
+          soloEquivalencias: false,
+          showDistribucionPorciones: false,
+        },
+      },
+    });
+
+    expect(meta.soloEquivalencias).toBe(true);
+    expect(meta.showDistribucionPorciones).toBe(true);
   });
 
   it('elimina la marca legacy al cambiar un toggle', () => {

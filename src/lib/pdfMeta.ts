@@ -56,6 +56,26 @@ export function defaultShowDistribucionForMenus(menus?: { tipoContenido?: string
 }
 
 /**
+ * Construye la configuración del PDF desde la respuesta real de GET /api/planes/:id.
+ * La API usa el envelope `{ success, data }`, aunque se conserva compatibilidad con
+ * respuestas directas para no romper ambientes o mocks antiguos.
+ */
+export function buildPdfMetaFromPlanResponse(globalPreferences: PdfMeta, responseData: PdfMeta): PdfMeta {
+  const planData = responseData?.data && typeof responseData.data === 'object'
+    ? responseData.data as PdfMeta
+    : responseData;
+  const menus = Array.isArray(planData?.menus)
+    ? planData.menus as { tipoContenido?: string }[]
+    : undefined;
+  const menuDefault = defaultShowDistribucionForMenus(menus);
+  const planMeta = planData?.pdfCustomMeta && typeof planData.pdfCustomMeta === 'object'
+    ? planData.pdfCustomMeta as PdfMeta
+    : {};
+
+  return buildPdfMeta(globalPreferences, planMeta, menuDefault, menuDefault);
+}
+
+/**
  * Aplica un toggle del panel de configuración de PDF. Activar "Solo equivalencias"
  * a mano fuerza también "Distribución de porciones" a ON — un plan de solo
  * equivalencias siempre la necesita. Desactivar "Solo equivalencias" apaga
