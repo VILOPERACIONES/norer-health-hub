@@ -444,7 +444,7 @@ const EditPatient = () => {
             <div className="flex justify-start">
               <button
                 type="button"
-                onClick={() => setHabitos((rows) => [...rows, { label: '', hora: '', notas: '' }])}
+                onClick={() => setHabitos((rows) => [{ label: '', hora: '', notas: '' }, ...rows])}
                 className="flex items-center gap-1.5 text-[11px] font-bold text-text-secondary hover:text-text-primary bg-bg-elevated border border-border-subtle hover:border-border-default px-3 py-1.5 rounded-[6px] uppercase tracking-wider transition-colors shrink-0"
               >
                 <Plus className="w-3 h-3" /> Agregar tiempo
