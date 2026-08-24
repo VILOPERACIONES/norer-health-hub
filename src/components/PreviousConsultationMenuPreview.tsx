@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, FileText, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { ExternalLink, FileText, Minus, X } from 'lucide-react';
 import api from '@/lib/api';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
 
@@ -42,6 +43,11 @@ export function PreviousConsultationMenuPreview({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [minimized, setMinimized] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) setMinimized(false);
+  }, [isOpen]);
 
   useEffect(() => {
     if (!isOpen || !planId) return;
@@ -77,10 +83,13 @@ export function PreviousConsultationMenuPreview({
     };
   }, [isOpen, planId]);
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
-    <section className="mb-4 overflow-hidden rounded-[14px] border border-[#90c2ff]/30 bg-[#0d0d0d] shadow-[0_16px_45px_rgba(0,0,0,0.35)]">
+  return createPortal(
+    <section
+      className={`fixed right-3 top-[76px] z-[900] flex w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[14px] border border-[#90c2ff]/40 bg-[#0d0d0d] shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:right-5 sm:top-[88px] sm:w-[48vw] sm:min-w-[420px] sm:max-w-[760px] ${minimized ? 'h-auto resize-none' : 'h-[58vh] min-h-[430px] max-h-[720px] resize'}`}
+      aria-label="Vista flotante de los menús de la consulta anterior"
+    >
       <div className="flex items-start justify-between gap-4 border-b border-[#2a2a2a] bg-[#151515] px-4 py-3">
         <div className="flex min-w-0 items-start gap-2.5">
           <div className="mt-0.5 rounded-[7px] bg-[#90c2ff]/10 p-1.5 text-[#90c2ff]">
@@ -95,17 +104,29 @@ export function PreviousConsultationMenuPreview({
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="shrink-0 rounded-full border border-[#333] bg-[#202020] p-2 text-[#999] transition-colors hover:border-[#555] hover:text-white"
-          aria-label="Cerrar menús de la consulta anterior"
-        >
-          <X className="h-4 w-4" />
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setMinimized((value) => !value)}
+            className="rounded-full border border-[#333] bg-[#202020] p-2 text-[#999] transition-colors hover:border-[#555] hover:text-white"
+            aria-label={minimized ? 'Restaurar menús de la consulta anterior' : 'Minimizar menús de la consulta anterior'}
+            title={minimized ? 'Restaurar' : 'Minimizar'}
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-[#333] bg-[#202020] p-2 text-[#999] transition-colors hover:border-[#555] hover:text-white"
+            aria-label="Cerrar menús de la consulta anterior"
+            title="Cerrar"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
       </div>
 
-      <div className="relative h-[58vh] min-h-[430px] max-h-[720px] bg-[#202020]">
+      {!minimized && <div className="relative min-h-0 flex-1 bg-[#202020]">
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center bg-[#111]">
             <NutritionLoader />
@@ -134,7 +155,8 @@ export function PreviousConsultationMenuPreview({
             </a>
           </>
         )}
-      </div>
-    </section>
+      </div>}
+    </section>,
+    document.body,
   );
 }
