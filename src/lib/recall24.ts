@@ -1,15 +1,16 @@
 export type Recall24Row = {
+  id?: string;
   label: string;
   hora: string;
   notas: string;
 };
 
 export const DEFAULT_RECALL_24: Recall24Row[] = [
-  { label: 'Desayuno', hora: '', notas: '' },
-  { label: 'Colación', hora: '', notas: '' },
-  { label: 'Almuerzo', hora: '', notas: '' },
-  { label: 'Colación', hora: '', notas: '' },
-  { label: 'Cena', hora: '', notas: '' },
+  { id: 'diet-def-1', label: 'Desayuno', hora: '', notas: '' },
+  { id: 'diet-def-2', label: 'Colación', hora: '', notas: '' },
+  { id: 'diet-def-3', label: 'Almuerzo', hora: '', notas: '' },
+  { id: 'diet-def-4', label: 'Colación', hora: '', notas: '' },
+  { id: 'diet-def-5', label: 'Cena', hora: '', notas: '' },
 ];
 
 // Combina los campos legacy "ayer"/"usualmente" en una sola nota para no perder datos ya capturados.
@@ -30,6 +31,7 @@ function normalizeMealLabel(label: unknown, fallback?: string): string {
 export function normalizeRecall24(value: unknown): Recall24Row[] {
   if (Array.isArray(value)) {
     return value.map((row, index) => ({
+      id: row?.id || `diet-row-${index + 1}-${Math.random().toString(36).slice(2, 7)}`,
       label: normalizeMealLabel(row?.label, row?.label === undefined ? DEFAULT_RECALL_24[index]?.label || `Tiempo ${index + 1}` : ''),
       hora: String(row?.hora || ''),
       notas: legacyNotas(row),
@@ -39,12 +41,13 @@ export function normalizeRecall24(value: unknown): Recall24Row[] {
   if (value && typeof value === 'object') {
     const legacy = value as Record<string, any>;
     return [
-      { label: 'Desayuno', ...legacy.desayuno },
-      { label: 'Colación', ...legacy.colacion1 },
-      { label: 'Almuerzo', ...legacy.almuerzo },
-      { label: 'Colación', ...legacy.colacion2 },
-      { label: 'Cena', ...legacy.cena },
+      { id: 'diet-legacy-1', label: 'Desayuno', ...legacy.desayuno },
+      { id: 'diet-legacy-2', label: 'Colación', ...legacy.colacion1 },
+      { id: 'diet-legacy-3', label: 'Almuerzo', ...legacy.almuerzo },
+      { id: 'diet-legacy-4', label: 'Colación', ...legacy.colacion2 },
+      { id: 'diet-legacy-5', label: 'Cena', ...legacy.cena },
     ].map((row) => ({
+      id: row.id,
       label: normalizeMealLabel(row.label, 'Tiempo'),
       hora: String(row.hora || ''),
       notas: legacyNotas(row),

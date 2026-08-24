@@ -125,24 +125,24 @@ const SortableRow = ({ id, index, row, onFieldChange, onRemove, variant }: Sorta
 
 /* ── Main Component ───────────────────────────────────────────────────────── */
 
-const rowIdMap = new WeakMap<Recall24Row, string>();
-let rowIdCounter = 0;
-
-function getRowId(row: Recall24Row): string {
-  let id = rowIdMap.get(row);
-  if (!id) {
-    id = `diet-item-${++rowIdCounter}`;
-    rowIdMap.set(row, id);
-  }
-  return id;
-}
-
 const DietTable = ({ habitos, setHabitos, variant = 'default' }: DietTableProps) => {
   const dndId = useId();
   const dark = variant === 'dark';
 
-  // Stable IDs mapped to each object reference
-  const rowIds = React.useMemo(() => habitos.map(getRowId), [habitos]);
+  // Ensure every row has a persistent id in state
+  React.useEffect(() => {
+    if (habitos.some((h) => !h.id)) {
+      setHabitos((prev) =>
+        prev.map((h, i) => (h.id ? h : { ...h, id: `diet-${i + 1}-${Math.random().toString(36).slice(2, 8)}` }))
+      );
+    }
+  }, [habitos, setHabitos]);
+
+  // Stable IDs directly from item.id
+  const rowIds = React.useMemo(
+    () => habitos.map((h, i) => h.id || `diet-tmp-${i}`),
+    [habitos]
+  );
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -159,9 +159,8 @@ const DietTable = ({ habitos, setHabitos, variant = 'default' }: DietTableProps)
       if (!over || active.id === over.id) return;
 
       setHabitos((prev) => {
-        const currentIds = prev.map(getRowId);
-        const oldIndex = currentIds.indexOf(active.id as string);
-        const newIndex = currentIds.indexOf(over.id as string);
+        const oldIndex = prev.findIndex((h, i) => (h.id || `diet-tmp-${i}`) === active.id);
+        const newIndex = prev.findIndex((h, i) => (h.id || `diet-tmp-${i}`) === over.id);
 
         if (oldIndex !== -1 && newIndex !== -1) {
           return arrayMove(prev, oldIndex, newIndex);
