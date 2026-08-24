@@ -26,6 +26,15 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
   const [loadingPdf, setLoadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
 
+  // El modal permanece montado aun cuando está cerrado. Recalcular aquí evita que conserve
+  // opciones de otro tipo de menú al volver a abrir "Configurar PDF".
+  useEffect(() => {
+    if (isOpen) return;
+    const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
+    const menuDefault = defaultShowDistribucionForMenus(planMenus);
+    setMeta(buildPdfMeta(defaultPrefs, planCustomMeta, menuDefault, menuDefault));
+  }, [isOpen, planId, planCustomMeta, planMenus]);
+
   const fetchPdf = async (metaOptions?: any) => {
     if (!planId) return;
     setLoadingPdf(true);

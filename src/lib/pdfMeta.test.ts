@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPdfMeta, getGlobalPdfPreferences, parsePdfPreferences } from './pdfMeta';
+import { buildPdfMeta, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from './pdfMeta';
 
 describe('configuración del PDF', () => {
   it('muestra el menú completo por defecto aunque exista una preferencia global antigua', () => {
@@ -8,33 +8,60 @@ describe('configuración del PDF', () => {
     expect(meta.soloEquivalencias).toBe(false);
   });
 
-  it('respeta solo equivalencias cuando fue guardado explícitamente en el plan', () => {
-    const meta = buildPdfMeta({}, { soloEquivalencias: true, _manualPdfKeys: ['soloEquivalencias'] });
+  it('fuerza ambas opciones a false cuando el plan contiene platillos', () => {
+    const meta = buildPdfMeta(
+      {},
+      {
+        soloEquivalencias: true,
+        showDistribucionPorciones: true,
+        _manualPdfKeys: ['soloEquivalencias', 'showDistribucionPorciones'],
+      },
+      false,
+      false,
+    );
 
-    expect(meta.soloEquivalencias).toBe(true);
+    expect(meta.soloEquivalencias).toBe(false);
+    expect(meta.showDistribucionPorciones).toBe(false);
+    expect(meta).not.toHaveProperty('_manualPdfKeys');
   });
 
-  it('ignora un valor guardado que no fue tocado a mano y usa el default calculado del tipo de menú', () => {
-    // Simula el caso reportado: el plan tiene platillos (default false), el usuario descarga el PDF
-    // una vez (lo que persiste soloEquivalencias:false sin que haya sido un toggle manual), luego
-    // cambia el menú a "solo equivalencias" y recarga — debe reflejar el nuevo default (true), no el
-    // valor viejo guardado.
-    const meta = buildPdfMeta({}, { soloEquivalencias: false }, true, true);
+  it('fuerza ambas opciones a true cuando todos los menús son de solo equivalencias', () => {
+    const meta = buildPdfMeta(
+      {},
+      {
+        soloEquivalencias: false,
+        showDistribucionPorciones: false,
+        _manualPdfKeys: ['soloEquivalencias', 'showDistribucionPorciones'],
+      },
+      true,
+      true,
+    );
 
     expect(meta.soloEquivalencias).toBe(true);
     expect(meta.showDistribucionPorciones).toBe(true);
+    expect(meta).not.toHaveProperty('_manualPdfKeys');
   });
 
-  it('togglePdfMetaFlag marca la clave como tocada a mano para que quede pegada', async () => {
-    const { togglePdfMetaFlag } = await import('./pdfMeta');
-    const toggled = togglePdfMetaFlag({}, 'soloEquivalencias');
+  it('solo activa ambas opciones cuando todos los menús usan equivalencias', () => {
+    expect(defaultShowDistribucionForMenus([
+      { tipoContenido: 'equivalencias' },
+      { tipoContenido: 'equivalencias' },
+    ])).toBe(true);
+    expect(defaultShowDistribucionForMenus([
+      { tipoContenido: 'equivalencias' },
+      { tipoContenido: 'platillos' },
+    ])).toBe(false);
+  });
 
-    expect(toggled._manualPdfKeys).toContain('soloEquivalencias');
-    expect(toggled._manualPdfKeys).toContain('showDistribucionPorciones');
+  it('elimina la marca legacy al cambiar un toggle', () => {
+    const toggled = togglePdfMetaFlag(
+      { soloEquivalencias: false, _manualPdfKeys: ['soloEquivalencias'] },
+      'soloEquivalencias',
+    );
 
-    // Con la clave marcada, un default distinto ya no la pisa.
-    const meta = buildPdfMeta({}, toggled, false, false);
-    expect(meta.soloEquivalencias).toBe(true);
+    expect(toggled.soloEquivalencias).toBe(true);
+    expect(toggled.showDistribucionPorciones).toBe(true);
+    expect(toggled).not.toHaveProperty('_manualPdfKeys');
   });
 
   it('no guarda solo equivalencias como preferencia global', () => {
