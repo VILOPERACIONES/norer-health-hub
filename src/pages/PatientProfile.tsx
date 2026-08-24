@@ -690,7 +690,6 @@ const PatientProfile = () => {
                     </div>
                     {[
                       { label: 'Historial Suplementos', value: paciente.antecedentes?.historialProductos },
-                      { label: 'Preferencias (Gusta)', value: paciente.antecedentes?.alimentosGustan },
                       { label: 'Aversiones (No gusta)', value: paciente.antecedentes?.alimentosNoGustan },
                       { label: 'Signos y Síntomas', value: paciente.antecedentes?.signosYSintomas },
                     ].map(({ label, value }) => (

@@ -81,15 +81,8 @@ export function PacienteResumenSidebar({
           </SidebarSeccion>
         )}
 
-        {/* En esta vista, Ejercicio se reemplaza por Alimentos que le gustan */}
-        {reemplazarEjercicioPorGustan && pacienteInfo?.antecedentes?.alimentosGustan && (
-          <SidebarSeccion titulo="Le gustan / Consume">
-            <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
-          </SidebarSeccion>
-        )}
-
         {/* Ejercicio */}
-        {!reemplazarEjercicioPorGustan && (pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
+        {(pacienteInfo?.ejercicio?.objetivo || pacienteInfo?.ejercicio?.disciplina) && (() => {
           const raw = pacienteInfo.ejercicio?.disciplina;
           let disciplinas: { disciplina?: string; frecuencia?: string; tiempo?: string }[] = [];
           if (raw) {
@@ -204,13 +197,6 @@ export function PacienteResumenSidebar({
         {/* Ciclo menstrual */}
         {!ocultarSeccionesMenu && pacienteInfo?.antecedentes?.cicloMenstrual && (
           <SidebarSeccion titulo="Ciclo Menstrual"><p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.cicloMenstrual}</p></SidebarSeccion>
-        )}
-
-        {/* Alimentos que sí le gustan (si reemplazarEjercicioPorGustan, ya se muestra arriba en su lugar) */}
-        {!reemplazarEjercicioPorGustan && pacienteInfo?.antecedentes?.alimentosGustan && (
-          <SidebarSeccion titulo="Le gustan / Consume">
-            <p className="text-[12px] text-[#e0e0e0]">{pacienteInfo.antecedentes.alimentosGustan}</p>
-          </SidebarSeccion>
         )}
 
         {/* Tránsito intestinal */}
