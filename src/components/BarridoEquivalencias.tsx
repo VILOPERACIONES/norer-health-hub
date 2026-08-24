@@ -122,7 +122,7 @@ const isTiempoProtegido = (
  * "Colación" repetidas). Los tiempos ya usados por un Plan existente del paciente (`protegidos`)
  * nunca se eliminan, aunque ya no estén en Dietética — solo dejan de "seguir" cambios de nombre.
  */
-const syncTiemposFromHabitos = (
+export const syncTiemposFromHabitos = (
   tiempos: BarridoTiempo[],
   habitos: Recall24Row[],
   protegidos: { ids: Set<string>; nombres: Set<string> } = { ids: new Set(), nombres: new Set() },
@@ -239,19 +239,16 @@ const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempo
     if (value) setState(normalizeBarridoData(value));
   }, [value]);
 
-  // Ids/nombres de tiempos ya usados por un Plan existente del paciente — la sync nunca los borra.
-  // `tiemposEnUso` llega async (fetch en el padre); mientras no haya resuelto (undefined/null,
-  // distinto de "ya resolvió y no hay ninguno" = {ids: [], nombres: []}), tratamos TODOS los tiempos
-  // actuales como protegidos por seguridad, para no borrar por accidente un tiempo en uso antes de
-  // saber si lo está.
+  // Solo se conservan tiempos históricos cuando el padre los declara expresamente protegidos.
+  // En una valoración nueva no se envía esta lista: Dietética reemplaza por completo los tiempos
+  // del barrido actual y los planes/valoraciones anteriores conservan sus propios snapshots.
   const protegidosRef = useRef({ ids: new Set<string>(), nombres: new Set<string>() });
-  const tiemposEnUsoCargado = tiemposEnUso != null;
-  protegidosRef.current = tiemposEnUsoCargado
+  protegidosRef.current = tiemposEnUso != null
     ? {
       ids: new Set(tiemposEnUso.ids || []),
       nombres: new Set((tiemposEnUso.nombres || []).map((n) => n.trim().toLowerCase())),
     }
-    : { ids: new Set(state.tiempos.map((t) => t.id)), nombres: new Set<string>() };
+    : { ids: new Set<string>(), nombres: new Set<string>() };
 
   // Sincroniza los tiempos con la tabla de Dietética del paciente (reemplazo completo por nombre),
   // conservando id/distribución de los que coinciden y preservando los tiempos en uso por un Plan

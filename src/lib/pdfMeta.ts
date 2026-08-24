@@ -5,7 +5,7 @@ export const DEFAULT_PDF_META = {
   showPageExtras: true,
   showContacto: false,
   showAlimentosEvitar: true,
-  showDistribucionPorciones: true,
+  showDistribucionPorciones: false,
   soloEquivalencias: false,
 };
 
@@ -51,7 +51,9 @@ export function buildPdfMeta(globalPreferences: PdfMeta = {}, planMeta: PdfMeta 
 
 /** true solo cuando NINGÚN menú del plan usa platillos (todos son de solo equivalencias). */
 export function defaultShowDistribucionForMenus(menus?: { tipoContenido?: string }[] | null): boolean {
-  if (!menus || menus.length === 0) return DEFAULT_PDF_META.showDistribucionPorciones;
+  // Sin menús confirmados, el estado seguro es apagado. Solo se activan cuando
+  // hay evidencia de que todos los menús actuales usan equivalencias.
+  if (!menus || menus.length === 0) return false;
   return menus.every((m) => m.tipoContenido === 'equivalencias');
 }
 

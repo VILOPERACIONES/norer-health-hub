@@ -53,6 +53,8 @@ describe('PDFPreviewModal', () => {
     await waitFor(() => {
       expectToggleState(/solo equivalencias/i, false);
       expectToggleState(/distribución de porciones/i, false);
+      expect(screen.getByRole('button', { name: /solo equivalencias/i })).toBeDisabled();
+      expect(screen.getByRole('button', { name: /distribución de porciones/i })).toBeDisabled();
     });
 
     rerender(
@@ -77,6 +79,8 @@ describe('PDFPreviewModal', () => {
     await waitFor(() => {
       expectToggleState(/solo equivalencias/i, true);
       expectToggleState(/distribución de porciones/i, true);
+      expect(screen.getByRole('button', { name: /solo equivalencias/i })).not.toBeDisabled();
+      expect(screen.getByRole('button', { name: /distribución de porciones/i })).not.toBeDisabled();
     });
   });
 });

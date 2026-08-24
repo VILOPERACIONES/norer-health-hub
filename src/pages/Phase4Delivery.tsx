@@ -4,7 +4,7 @@ import { format } from 'date-fns';
 import api from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import { NutritionLoader } from '@/components/ui/NutritionLoader';
-import { buildPdfMeta, buildPdfMetaFromPlanResponse, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
+import { buildPdfMeta, buildPdfMetaFromPlanResponse, defaultShowDistribucionForMenus, getGlobalPdfPreferences, parsePdfPreferences, togglePdfMetaFlag } from '@/lib/pdfMeta';
 import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
 import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
 
@@ -34,6 +34,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   const [pacienteNombre, setPacienteNombre] = useState('Paciente');
   const [pacienteContacto, setPacienteContacto] = useState({ email: '', phone: '' });
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
+  const [equivalencePdfOptionsEnabled, setEquivalencePdfOptionsEnabled] = useState(false);
 
   useEffect(() => {
     const loadMeta = async () => {
@@ -49,6 +50,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
         ]);
         const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
         const planData = planRes.data?.data || planRes.data || {};
+        setEquivalencePdfOptionsEnabled(defaultShowDistribucionForMenus(planData.menus));
         setMeta({
           ...buildPdfMetaFromPlanResponse(defaultPrefs, planRes.data),
           notaAmarilla: planData.pdfCustomMeta?.notaAmarilla || '',
@@ -63,6 +65,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
         }
       } catch (e) {
         console.error("Error loading plan meta", e);
+        setEquivalencePdfOptionsEnabled(false);
       } finally {
         setLoadingInitial(false);
       }
@@ -94,6 +97,7 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   }, [meta, loadingInitial]);
 
   const handleToggle = (key: string) => {
+    if (!equivalencePdfOptionsEnabled && (key === 'soloEquivalencias' || key === 'showDistribucionPorciones')) return;
     const newMeta = togglePdfMetaFlag(meta, key);
     setMeta(newMeta);
     
@@ -203,8 +207,8 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
               <ToggleItem label="Correo y Teléfono del paciente" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
               <ToggleItem label="Alimentos a evitar" active={meta.showAlimentosEvitar !== false} onChange={() => handleToggle('showAlimentosEvitar')} isSubItem />
               <ToggleItem label="2. Menús de Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
-              <ToggleItem label="Solo equivalencias (Sin platillos)" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
-              <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />
+              <ToggleItem label="Solo equivalencias (Sin platillos)" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem disabled={!equivalencePdfOptionsEnabled} />
+              <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem disabled={!equivalencePdfOptionsEnabled} />
               <ToggleItem label="3. Lista de Intercambio (SMAE)" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />
               <ToggleItem label="4. Extras y Recomendaciones" active={meta.showPageExtras !== false} onChange={() => handleToggle('showPageExtras')} />
             </div>
@@ -263,16 +267,17 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
   );
 }
 
-function ToggleItem({ label, active, onChange, isSubItem = false }: { label: string, active: boolean, onChange: () => void, isSubItem?: boolean }) {
+function ToggleItem({ label, active, onChange, isSubItem = false, disabled = false }: { label: string, active: boolean, onChange: () => void, isSubItem?: boolean, disabled?: boolean }) {
   return (
     <div className={`relative ${isSubItem ? 'mt-1 mb-3' : ''}`}>
       {isSubItem && <div className="absolute left-[20px] top-[-10px] w-px h-[24px] bg-[#333]" />}
       <button 
         onClick={onChange}
+        disabled={disabled}
         className={`w-full flex items-center justify-between p-3.5 rounded-[12px] border transition-all duration-200 group ${
           isSubItem ? 'ml-[20px] w-[calc(100%-20px)] bg-[#111] border-transparent hover:bg-[#1a1a1a]' : 
           active ? 'bg-[#1a1a1a] border-[#333] shadow-sm' : 'bg-[#0f0f0f] border-[#222] hover:bg-[#161616] hover:border-[#333]'
-        }`}
+        } ${disabled ? 'cursor-not-allowed opacity-60' : ''}`}
       >
         <span className={`text-[13px] font-medium transition-colors flex items-center ${isSubItem ? 'text-[12px]' : ''} ${active ? 'text-[#e0e0e0]' : 'text-[#666] line-through'}`}>
           {isSubItem && <div className="w-3 h-px bg-[#333] mr-2" />}

@@ -25,9 +25,10 @@ import {
   hasInvalidOnlineMeasurement,
   onlineMeasurementsFromPerimeters,
 } from '@/lib/assessmentModality';
-import { DEFAULT_RECALL_24, normalizeRecall24, type Recall24Row } from '@/lib/recall24';
+import { DEFAULT_RECALL_24, normalizeRecall24, resolveAssessmentDietetica, serializeRecall24, type Recall24Row } from '@/lib/recall24';
 import { encodeDisciplinas, decodeDisciplinas, type DisciplinaItem } from '@/lib/disciplinas';
 import DietTable from '@/components/DietTable';
+import { SupplementHistoryEditor } from '@/components/SupplementHistoryEditor';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
@@ -133,7 +134,6 @@ const NewAssessment = () => {
   const [farmacosDetalle, setFarmacosDetalle] = useState<{ id: string; nombre: string; tiempoTomando: string; activo: boolean }[]>([]);
   const [dragFarmIdx, setDragFarmIdx] = useState<number | null>(null);
   const [historialSupDetalle, setHistorialSupDetalle] = useState<{ id: string; nombre: string; indicaciones: string; activo: boolean }[]>([]);
-  const [dragHistSupIdx, setDragHistSupIdx] = useState<number | null>(null);
   const [registroSupAdded, setRegistroSupAdded] = useState<Set<string>>(new Set());
   const [planIdGuardado, setPlanIdGuardado] = useState<string | null>(null);
   // B8: en modo edición, plan ya vinculado a esta valoración — el paso 3 lo edita en vez de duplicar
@@ -161,11 +161,6 @@ const NewAssessment = () => {
   const [expedienteModified, setExpedienteModified] = useState(false);
   const [showExpediente, setShowExpediente] = useState(false);
   const [habitos, setHabitos] = useState<Recall24Row[]>(DEFAULT_RECALL_24.map((row) => ({ ...row })));
-  // Tiempos de Barrido que ya están en uso por un Plan existente del paciente (por id y, como
-  // respaldo legacy, por nombre) — la sincronización Dietética→Barrido nunca los borra aunque ya
-  // no estén en Dietética, para no romper el panel de equivalentes de planes ya armados.
-  const [planesTiemposEnUso, setPlanesTiemposEnUso] = useState<{ ids: string[]; nombres: string[] } | null>(null);
-  const planesTiemposFetchedRef = React.useRef(false);
   const [showNotasConsulta, setShowNotasConsulta] = useState(true);
   const [showDinamicaDeportiva, setShowDinamicaDeportiva] = useState(true);
   const [disciplinas, setDisciplinas] = useState<DisciplinaItem[]>([{ disciplina: '', frecuencia: '', tiempo: '' }]);
@@ -311,6 +306,7 @@ const NewAssessment = () => {
     if (d.suplementosDetalle) setSuplementosDetalle(d.suplementosDetalle);
     if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
     if (d.suplementos) setSuplementos(d.suplementos);
+    if (Array.isArray(d.habitos)) setHabitos(normalizeRecall24(d.habitos));
     if (d.notasLibres) setNotasLibres(d.notasLibres);
     if (d.adjuntos) setAdjuntos(d.adjuntos);
     setIsGrasaModified(true);
@@ -381,7 +377,7 @@ const NewAssessment = () => {
     setDisciplinas(decodeDisciplinas(ej?.disciplina, { frecuencia: ej?.frecuencia, tiempo: ej?.tiempo }));
     seedFarmacosDetalle(ant);
     seedHistorialSupDetalle(ant);
-    setHabitos(normalizeRecall24(p.habitos || p.consumoCalorico));
+    setHabitos(resolveAssessmentDietetica(lastVal, p.habitos || p.consumoCalorico));
     setExpedienteModified(false);
   };
 
@@ -395,42 +391,9 @@ const NewAssessment = () => {
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
     // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
-    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
+    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, habitos: serializeRecall24(habitos), fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
-  }, [step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario, competencia, barridoData, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
-
-  // Al entrar al paso de Barrido, averigua qué tiempos ya están en uso por un Plan existente del
-  // paciente, para que la sincronización Dietética→Barrido nunca los borre. Se pide una sola vez
-  // (planes puede traer platillos/ingredientes completos, así que no se refresca en cada render).
-  useEffect(() => {
-    if (step !== 2 || !pacienteId || planesTiemposFetchedRef.current) return;
-    planesTiemposFetchedRef.current = true;
-    api.get(`/api/pacientes/${pacienteId}/planes`)
-      .then(({ data }) => {
-        const planes = data?.data || data || [];
-        const ids = new Set<string>();
-        const nombres = new Set<string>();
-        type PlanTiempoComidaLite = { barridoTiempoId?: string | null; nombre?: string | null };
-        type PlanMenuLite = { tiemposComida?: PlanTiempoComidaLite[] };
-        type PlanLite = { menus?: PlanMenuLite[] };
-        (Array.isArray(planes) ? planes as PlanLite[] : []).forEach((plan) => {
-          (plan?.menus || []).forEach((menu) => {
-            (menu?.tiemposComida || []).forEach((tc) => {
-              if (tc?.barridoTiempoId) {
-                ids.add(String(tc.barridoTiempoId));
-              } else if (tc?.nombre) {
-                nombres.add(String(tc.nombre).trim().toLowerCase());
-              }
-            });
-          });
-        });
-        setPlanesTiemposEnUso({ ids: Array.from(ids), nombres: Array.from(nombres) });
-      })
-      .catch(() => {
-        // Si falla, se sincroniza sin protección (comportamiento previo) — no bloquea la pantalla.
-        setPlanesTiemposEnUso({ ids: [], nombres: [] });
-      });
-  }, [step, pacienteId]);
+  }, [step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario, competencia, barridoData, habitos, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
   useEffect(() => {
     const fetchPatientAndData = async () => {
@@ -507,6 +470,9 @@ const NewAssessment = () => {
             const val = valRes ? (valRes.data?.data || valRes.data) : null;
 
             if (val) {
+              if (Array.isArray(val.dietetica)) {
+                setHabitos(normalizeRecall24(val.dietetica));
+              }
               setFecha(val.fecha ? val.fecha.split('T')[0] : '');
               setHora(val.hora || '');
               setNumeroValoracion(val.numeroValoracion || 1);
@@ -595,6 +561,7 @@ const NewAssessment = () => {
           if (vals.length > 0) {
             lastVal = [...vals].sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())[0];
           }
+          setHabitos(resolveAssessmentDietetica(lastVal, p.habitos || p.consumoCalorico));
 
           // Peso (siempre limpio en nueva valoración)
           setPeso('');
@@ -797,6 +764,9 @@ const NewAssessment = () => {
       esqueHidratacion: esqueHidratacion || null,
       adjuntosJson: adjuntos.length > 0 ? adjuntos : null,
       suplementosDetalle: suplementosParaGuardar,
+      // Fotografía de Dietética de esta consulta. El barrido de esta valoración se
+      // sincroniza únicamente contra estas filas, sin mezclar consultas anteriores.
+      dietetica: serializeRecall24(habitos),
       // proximaSesion NO se manda aquí — ese campo vive en Plan, no en Valoracion.
       // Se guarda en estado React y se pasa como prop a CreateEditPlanForm.
     };
@@ -931,16 +901,6 @@ const NewAssessment = () => {
         const serverData = response.data?.data || response.data;
         valoracionResId = serverData?.id;
         toast({ title: 'Valoración guardada correctamente' });
-      }
-
-      // La tabla de Dietética es única por paciente (no se versiona por consulta):
-      // se guarda de vuelta al expediente para que la siguiente valoración parta de aquí.
-      try {
-        await api.put(`/api/pacientes/${pacienteId}`, {
-          habitos: habitos.map((h) => ({ label: h.label, hora: h.hora, notas: h.notas })),
-        });
-      } catch (e) {
-        console.warn('No se pudo actualizar la dietética del expediente:', e);
       }
 
       // Guardar barrido si existe y tiene tiempos definidos.
@@ -1237,91 +1197,14 @@ const NewAssessment = () => {
                       </div>
                     </div>
 
-                    {/* Historial de Suplementación */}
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <p className="text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest m-0">Historial de Suplementación</p>
-                          <p className="text-[10px] text-[#555] m-0 mt-0.5">Se captura en el expediente y se usa como base para la consulta</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => { setHistorialSupDetalle(prev => [...prev, { id: Date.now().toString(), nombre: '', indicaciones: '', activo: true }]); setExpedienteModified(true); }}
-                          className="flex items-center gap-1.5 text-[11px] font-bold text-white bg-[#1a1a1a] hover:bg-[#222] border border-[#333] px-3 py-1.5 rounded-[6px] transition-colors uppercase tracking-wider shrink-0"
-                        >
-                          <Plus className="w-3 h-3" /> Agregar
-                        </button>
-                      </div>
-                      {historialSupDetalle.length > 0 && (
-                        <div className="grid grid-cols-[1fr_1fr_70px_36px] gap-2 items-center px-3 py-2 border-b border-[#2a2a2a] text-[10px] font-bold text-[#8a8a8a] uppercase tracking-widest">
-                          <div>Suplemento</div>
-                          <div>Indicaciones / Dosis</div>
-                          <div className="text-center">Activo</div>
-                          <div></div>
-                        </div>
-                      )}
-                      <div className="space-y-2 mt-2">
-                        {historialSupDetalle.map((sup, idx) => (
-                          <div
-                            key={sup.id}
-                            draggable
-                            onDragStart={() => setDragHistSupIdx(idx)}
-                            onDragOver={(e) => { e.preventDefault(); }}
-                            onDrop={() => {
-                              if (dragHistSupIdx === null || dragHistSupIdx === idx) return;
-                              setHistorialSupDetalle(prev => {
-                                const arr = [...prev];
-                                const [moved] = arr.splice(dragHistSupIdx, 1);
-                                arr.splice(idx, 0, moved);
-                                return arr;
-                              });
-                              setDragHistSupIdx(null);
-                              setExpedienteModified(true);
-                            }}
-                            onDragEnd={() => setDragHistSupIdx(null)}
-                            className={`grid grid-cols-[1fr_1fr_70px_36px] gap-2 items-center bg-[#181818] p-2 rounded-[8px] border transition-colors ${dragHistSupIdx === idx ? 'opacity-40 border-brand-primary' : 'border-[#2a2a2a] hover:border-[#444]'}`}
-                          >
-                            <input
-                              type="text"
-                              value={sup.nombre}
-                              onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, nombre: e.target.value } : s)); setExpedienteModified(true); }}
-                              placeholder="Ej. Creatina"
-                              className="w-full bg-transparent text-[13px] font-semibold text-white outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
-                            />
-                            <input
-                              type="text"
-                              value={sup.indicaciones}
-                              onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, indicaciones: e.target.value } : s)); setExpedienteModified(true); }}
-                              placeholder="Ej. 1 scoop post-entreno"
-                              className="w-full bg-transparent text-[13px] text-[#c0c0c0] outline-none placeholder-[#555] p-1 border-b border-transparent focus:border-[#444] transition-colors"
-                            />
-                            <div className="flex items-center justify-center">
-                              <label className="relative inline-flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  className="sr-only peer"
-                                  checked={sup.activo}
-                                  onChange={(e) => { setHistorialSupDetalle(prev => prev.map((s, i) => i === idx ? { ...s, activo: e.target.checked } : s)); setExpedienteModified(true); }}
-                                />
-                                <div className="w-8 h-4 bg-[#333] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-500"></div>
-                              </label>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => { setHistorialSupDetalle(prev => prev.filter((_, i) => i !== idx)); setExpedienteModified(true); }}
-                              className="p-2 text-[#555] hover:text-[#ff6b6b] hover:bg-[#ff6b6b]/10 rounded-[6px] transition-colors flex justify-center items-center ml-auto"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        ))}
-                        {historialSupDetalle.length === 0 && (
-                          <div className="py-6 text-center border border-dashed border-[#333] rounded-[8px] bg-[#141414]">
-                            <p className="text-[12px] text-[#8a8a8a] m-0">Sin historial de suplementos registrado.</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
+                    {/* Mismo editor de Anamnesis y Suplementación usado en Nuevo Expediente. */}
+                    <SupplementHistoryEditor
+                      value={historialSupDetalle}
+                      onChange={(next) => {
+                        setHistorialSupDetalle(next);
+                        setExpedienteModified(true);
+                      }}
+                    />
 
                     {/* Laboratorio */}
                     <div>
@@ -1444,7 +1327,6 @@ const NewAssessment = () => {
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-4 h-4 text-brand-primary" />
                     <span className="text-[13px] font-bold text-white tracking-widest uppercase">Dietético</span>
-                    {habitos.length > 0 && <span className="w-2 h-2 rounded-full bg-brand-primary shrink-0" />}
                   </div>
                   <ChevronDown className={`w-4 h-4 text-[#8a8a8a] transition-transform duration-200 ${showDietetico ? 'rotate-180' : ''}`} />
                 </button>
@@ -1996,7 +1878,6 @@ const NewAssessment = () => {
                     value={barridoData}
                     onChange={(data) => setBarridoData(data)}
                     habitos={habitos}
-                    tiemposEnUso={planesTiemposEnUso}
                     onTiempoAdded={handleTiempoAddedFromBarrido}
                     onTiempoRenamed={handleTiempoRenamedFromBarrido}
                     onTiempoRemoved={handleTiempoRemovedFromBarrido}

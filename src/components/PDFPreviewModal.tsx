@@ -17,6 +17,7 @@ interface PDFPreviewModalProps {
 }
 
 export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSaveMeta, loading, planMenus }: PDFPreviewModalProps) {
+  const equivalencePdfOptionsEnabled = defaultShowDistribucionForMenus(planMenus);
   const [meta, setMeta] = useState<any>(() => {
     const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
     return buildPdfMeta(defaultPrefs, planCustomMeta, defaultShowDistribucionForMenus(planMenus), defaultShowDistribucionForMenus(planMenus));
@@ -91,6 +92,7 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
 
 
   const handleToggle = (key: string) => {
+    if (!equivalencePdfOptionsEnabled && (key === 'soloEquivalencias' || key === 'showDistribucionPorciones')) return;
     const newMeta = togglePdfMetaFlag(meta, key);
     setMeta(newMeta);
     
@@ -146,8 +148,8 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
                     <ToggleItem label="Correo y Teléfono" active={meta.showContacto === true} onChange={() => handleToggle('showContacto')} isSubItem />
                     <ToggleItem label="Alimentos a evitar" active={meta.showAlimentosEvitar !== false} onChange={() => handleToggle('showAlimentosEvitar')} isSubItem />
                     <ToggleItem label="2. Menús Ejemplo" active={meta.showPageMenus !== false} onChange={() => handleToggle('showPageMenus')} />
-                    <ToggleItem label="Solo equivalencias" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem />
-                    <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem />
+                    <ToggleItem label="Solo equivalencias" active={meta.soloEquivalencias === true} onChange={() => handleToggle('soloEquivalencias')} isSubItem disabled={!equivalencePdfOptionsEnabled} />
+                    <ToggleItem label="Distribución de porciones" active={meta.showDistribucionPorciones !== false} onChange={() => handleToggle('showDistribucionPorciones')} isSubItem disabled={!equivalencePdfOptionsEnabled} />
                     <ToggleItem label="3. Lista SMAE" active={meta.showPageIntercambio !== false} onChange={() => handleToggle('showPageIntercambio')} />
                     <ToggleItem label="4. Extras" active={meta.showPageExtras !== false} onChange={() => handleToggle('showPageExtras')} />
                   </div>
@@ -205,14 +207,16 @@ export function PDFPreviewModal({ isOpen, onClose, planId, planCustomMeta, onSav
   );
 }
 
-function ToggleItem({ label, active, onChange, isSubItem = false }: { label: string, active: boolean, onChange: () => void, isSubItem?: boolean }) {
+function ToggleItem({ label, active, onChange, isSubItem = false, disabled = false }: { label: string, active: boolean, onChange: () => void, isSubItem?: boolean, disabled?: boolean }) {
   return (
     <button 
       onClick={onChange}
+      disabled={disabled}
       className={cn(
         "w-full flex items-center justify-between p-3 rounded-[10px] border transition-all duration-200",
         isSubItem ? "ml-4 w-[calc(100%-1rem)] text-[12px]" : "text-[13px]",
-        active ? "bg-[#1a1a1a] border-[#333] text-[#e0e0e0]" : "bg-[#111] border-[#222] text-[#666]"
+        active ? "bg-[#1a1a1a] border-[#333] text-[#e0e0e0]" : "bg-[#111] border-[#222] text-[#666]",
+        disabled && "cursor-not-allowed opacity-60"
       )}
     >
       <span className={cn("font-medium", !active && "line-through")}>{label}</span>

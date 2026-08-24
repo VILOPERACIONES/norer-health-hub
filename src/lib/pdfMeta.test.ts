@@ -51,6 +51,8 @@ describe('configuración del PDF', () => {
       { tipoContenido: 'equivalencias' },
       { tipoContenido: 'platillos' },
     ])).toBe(false);
+    expect(defaultShowDistribucionForMenus([])).toBe(false);
+    expect(defaultShowDistribucionForMenus(undefined)).toBe(false);
   });
 
   it('lee los menús dentro del envelope real de la API en la fase de entrega', () => {

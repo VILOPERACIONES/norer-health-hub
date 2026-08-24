@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeBarridoData } from './BarridoEquivalencias';
+import { normalizeBarridoData, syncTiemposFromHabitos } from './BarridoEquivalencias';
 
 describe('normalizeBarridoData', () => {
   it('convierte colaciones históricas a etiquetas iguales con IDs y datos independientes', () => {
@@ -36,5 +36,25 @@ describe('normalizeBarridoData', () => {
     });
 
     expect(result.tiempos.map(t => t.id)).toEqual(['colacion-am', 'colacion-pm']);
+  });
+});
+
+describe('syncTiemposFromHabitos', () => {
+  it('reemplaza tiempos de consultas anteriores y conserva los coincidentes de la consulta actual', () => {
+    const result = syncTiemposFromHabitos(
+      [
+        { id: 'desayuno-previo', nombre: 'Desayuno' },
+        { id: 'colacion-vieja', nombre: 'Colación' },
+        { id: 'cena-previa', nombre: 'Cena' },
+      ],
+      [
+        { label: 'Desayuno', hora: '08:00', notas: '' },
+        { label: 'Post-entreno', hora: '11:00', notas: '' },
+      ],
+    );
+
+    expect(result.map(({ nombre }) => nombre)).toEqual(['Desayuno', 'Post-entreno']);
+    expect(result[0].id).toBe('desayuno-previo');
+    expect(result.some(({ id }) => id === 'colacion-vieja' || id === 'cena-previa')).toBe(false);
   });
 });

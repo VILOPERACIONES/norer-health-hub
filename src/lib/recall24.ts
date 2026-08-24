@@ -60,3 +60,22 @@ export function normalizeRecall24(value: unknown): Recall24Row[] {
 export function hasRecall24Data(rows: Recall24Row[]): boolean {
   return rows.some((row) => Boolean(row.hora || row.notas));
 }
+
+export function serializeRecall24(rows: Recall24Row[]): Omit<Recall24Row, 'id'>[] {
+  return rows.map(({ label, hora, notas }) => ({ label, hora, notas }));
+}
+
+/**
+ * Una nueva valoración parte exclusivamente de la Dietética de la última valoración.
+ * Para pacientes históricos cuya última valoración todavía no tenga fotografía propia,
+ * se usa la Dietética del expediente como compatibilidad inicial.
+ */
+export function resolveAssessmentDietetica(
+  latestAssessment: { dietetica?: unknown } | null | undefined,
+  patientDietetica: unknown,
+): Recall24Row[] {
+  if (Array.isArray(latestAssessment?.dietetica)) {
+    return normalizeRecall24(latestAssessment.dietetica);
+  }
+  return normalizeRecall24(patientDietetica);
+}
