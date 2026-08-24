@@ -737,6 +737,7 @@ const AssessmentDetail = () => {
             <BarridosEquivalenciasManager
               value={barridoData}
               onChange={(data) => setBarridoData(data)}
+              habitos={pacienteInfo?.habitos}
             />
             {/* Botón "Guardar barrido" separado — POST upsert */}
             <div className="flex items-center justify-between pt-4 mt-2 border-t border-border-subtle">
