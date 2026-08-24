@@ -358,18 +358,29 @@ const PatientProfile = () => {
     if (loading) return;
 
     if (location.hash === '#historial') {
-      let attempts = 0;
-      const tryScroll = () => {
+      const scrollToHistorial = (smooth = true) => {
         const el = document.getElementById('historial');
-        if (el) {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } else if (attempts < 10) {
-          attempts++;
-          setTimeout(tryScroll, 100);
+        const mainEl = document.querySelector('main');
+        if (el && mainEl) {
+          const elRect = el.getBoundingClientRect();
+          const mainRect = mainEl.getBoundingClientRect();
+          const targetTop = mainEl.scrollTop + (elRect.top - mainRect.top) - 16;
+          mainEl.scrollTo({ top: Math.max(0, targetTop), behavior: smooth ? 'smooth' : 'instant' });
+          return true;
         }
+        return false;
       };
-      const timer = setTimeout(tryScroll, 150);
-      return () => clearTimeout(timer);
+
+      // Múltiples pasadas para garantizar precisión exacta en cualquier monitor (incluso tras renderizado dinámico de gráficas)
+      const t1 = setTimeout(() => scrollToHistorial(true), 100);
+      const t2 = setTimeout(() => scrollToHistorial(true), 350);
+      const t3 = setTimeout(() => scrollToHistorial(false), 700);
+
+      return () => {
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     } else {
       // Si entra desde el módulo de Pacientes (sin hash), mostrar siempre desde el inicio
       const mainEl = document.querySelector('main');
