@@ -46,12 +46,14 @@ export function PreviousConsultationMenuPreview({
   const [error, setError] = useState<string | null>(null);
   const [minimized, setMinimized] = useState(false);
   const [position, setPosition] = useState<{ x: number; y: number } | null>(null);
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const panelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) {
       setMinimized(false);
       setPosition(null);
+      setSize(null);
     }
   }, [isOpen]);
 
@@ -70,6 +72,41 @@ export function PreviousConsultationMenuPreview({
       setPosition({
         x: Math.min(Math.max(8, moveEvent.clientX - offsetX), maxX),
         y: Math.min(Math.max(68, moveEvent.clientY - offsetY), maxY),
+      });
+    };
+
+    const handleEnd = () => {
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', handleEnd);
+      window.removeEventListener('pointercancel', handleEnd);
+    };
+
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', handleEnd);
+    window.addEventListener('pointercancel', handleEnd);
+  };
+
+  const handleResizeStart = (event: ReactPointerEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const panel = panelRef.current;
+    if (!panel) return;
+
+    const rect = panel.getBoundingClientRect();
+    const startX = event.clientX;
+    const startY = event.clientY;
+    setPosition({ x: rect.left, y: rect.top });
+    setSize({ width: rect.width, height: rect.height });
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const minWidth = Math.min(360, window.innerWidth - rect.left - 8);
+      const minHeight = Math.min(280, window.innerHeight - rect.top - 8);
+      const maxWidth = Math.max(minWidth, window.innerWidth - rect.left - 8);
+      const maxHeight = Math.max(minHeight, window.innerHeight - rect.top - 8);
+
+      setSize({
+        width: Math.min(maxWidth, Math.max(minWidth, rect.width + moveEvent.clientX - startX)),
+        height: Math.min(maxHeight, Math.max(minHeight, rect.height + moveEvent.clientY - startY)),
       });
     };
 
@@ -123,9 +160,12 @@ export function PreviousConsultationMenuPreview({
   return createPortal(
     <section
       ref={panelRef}
-      className={`fixed right-3 top-[76px] z-[900] flex w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[14px] border border-[#90c2ff]/40 bg-[#0d0d0d] shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:right-5 sm:top-[88px] sm:w-[48vw] sm:min-w-[420px] sm:max-w-[760px] ${minimized ? 'h-auto resize-none' : 'h-[58vh] min-h-[430px] max-h-[720px] resize'}`}
+      className={`fixed right-3 top-[76px] z-[900] flex w-[calc(100vw-24px)] flex-col overflow-hidden rounded-[14px] border border-[#90c2ff]/40 bg-[#0d0d0d] shadow-[0_24px_80px_rgba(0,0,0,0.75)] sm:right-5 sm:top-[88px] sm:w-[48vw] ${minimized ? 'h-auto' : 'h-[58vh]'}`}
       aria-label="Vista flotante de los menús de la consulta anterior"
-      style={position ? { left: position.x, top: position.y, right: 'auto' } : undefined}
+      style={{
+        ...(position ? { left: position.x, top: position.y, right: 'auto' } : {}),
+        ...(size ? { width: size.width, ...(!minimized ? { height: size.height } : {}) } : {}),
+      }}
     >
       <div
         className="flex touch-none cursor-move select-none items-start justify-between gap-4 border-b border-[#2a2a2a] bg-[#151515] px-4 py-3"
@@ -141,7 +181,7 @@ export function PreviousConsultationMenuPreview({
               Menús de la consulta anterior
             </h4>
             <p className="mb-0 mt-1 text-[11px] text-[#8a8a8a]">
-              Referencia enviada el {formatConsultationDate(consultationDate)}. Arrastra esta barra para moverla.
+              Referencia enviada el {formatConsultationDate(consultationDate)}. Mueve desde esta barra y cambia el tamaño desde la esquina inferior derecha.
             </p>
           </div>
         </div>
@@ -198,6 +238,19 @@ export function PreviousConsultationMenuPreview({
           </>
         )}
       </div>}
+
+      {!minimized && (
+        <div
+          role="separator"
+          aria-label="Cambiar tamaño de la vista previa"
+          title="Arrastra para cambiar el tamaño"
+          onPointerDown={handleResizeStart}
+          className="absolute bottom-0 right-0 z-20 h-8 w-8 touch-none cursor-nwse-resize rounded-tl-[10px] bg-[#90c2ff]/15 transition-colors hover:bg-[#90c2ff]/30"
+        >
+          <span className="absolute bottom-1.5 right-1.5 h-3.5 w-3.5 border-b-2 border-r-2 border-[#90c2ff]" />
+          <span className="absolute bottom-2.5 right-2.5 h-2.5 w-2.5 border-b border-r border-[#90c2ff]/70" />
+        </div>
+      )}
     </section>,
     document.body,
   );
