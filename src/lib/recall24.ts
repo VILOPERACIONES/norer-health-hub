@@ -19,18 +19,18 @@ function legacyNotas(row: Record<string, any> | undefined): string {
   return [row.ayer, row.usualmente].filter(Boolean).join(' / ');
 }
 
-// Normaliza etiquetas antiguas (ej. 'Comida' -> 'Almuerzo')
-function normalizeMealLabel(label: unknown, fallback: string): string {
-  const raw = String(label || '').trim();
-  if (!raw) return fallback;
-  if (raw.toLowerCase() === 'comida') return 'Almuerzo';
+// Normaliza etiquetas antiguas (ej. 'Comida' -> 'Almuerzo'), respetando etiquetas vacías
+function normalizeMealLabel(label: unknown, fallback?: string): string {
+  if (label === undefined || label === null) return fallback ?? '';
+  const raw = String(label);
+  if (raw.trim().toLowerCase() === 'comida') return 'Almuerzo';
   return raw;
 }
 
 export function normalizeRecall24(value: unknown): Recall24Row[] {
   if (Array.isArray(value)) {
     return value.map((row, index) => ({
-      label: normalizeMealLabel(row?.label, DEFAULT_RECALL_24[index]?.label || `Tiempo ${index + 1}`),
+      label: normalizeMealLabel(row?.label, row?.label === undefined ? DEFAULT_RECALL_24[index]?.label || `Tiempo ${index + 1}` : ''),
       hora: String(row?.hora || ''),
       notas: legacyNotas(row),
     }));
