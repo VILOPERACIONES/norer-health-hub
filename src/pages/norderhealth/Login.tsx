@@ -50,23 +50,18 @@ export default function NorderHealthLogin() {
   };
 
   return (
-    <div className="min-h-[100dvh] bg-[#0d0d0d] flex flex-col">
+    <div className="min-h-[100dvh] bg-[#0a0a0a] flex flex-col" data-disable-local-spellcheck="true">
 
       {/* Top gradient */}
-      <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#0a1f12] to-transparent pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-64 bg-gradient-to-b from-[#141414] to-transparent pointer-events-none" />
 
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative">
 
         {/* Logo + brand */}
         <div className="flex flex-col items-center mb-10">
-          <div className="w-16 h-16 rounded-[22px] bg-gradient-to-br from-[#22c55e] to-[#16a34a] flex items-center justify-center mb-5 shadow-lg shadow-[#22c55e]/20">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z"/>
-              <path d="M12 6v6l4 2"/>
-            </svg>
-          </div>
-          <h1 className="text-[26px] font-bold text-white tracking-tight">Norder Health</h1>
-          <p className="text-[14px] text-[#555] mt-1">Tu nutriólogo digital</p>
+          <img src="/logo-nrdr.svg" alt="NORDER" className="h-[30px] w-auto object-contain mb-4" />
+          <p className="text-[10px] font-black tracking-[0.4em] text-white/40 uppercase">Health</p>
+          <p className="text-[14px] text-[#555] mt-3">Tu nutriólogo digital</p>
         </div>
 
         {/* Card */}
@@ -115,7 +110,7 @@ export default function NorderHealthLogin() {
               <button
                 type="submit"
                 disabled={loading}
-                className="mt-1 bg-[#22c55e] text-white font-semibold rounded-[12px] py-3.5 text-[14px] hover:bg-[#16a34a] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="mt-1 bg-white text-black font-bold uppercase tracking-wide rounded-[12px] py-3.5 text-[14px] hover:bg-white/90 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (
                   <span className="flex items-center justify-center gap-2">
