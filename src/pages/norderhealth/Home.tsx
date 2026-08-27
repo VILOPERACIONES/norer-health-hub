@@ -2,16 +2,19 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Sunrise, Coffee, Utensils, Apple, Moon, UtensilsCrossed,
-  Flame, MessageCircle, LogOut, ChevronRight,
-  Scale, Dumbbell, TrendingUp, TrendingDown, Minus,
-  Lock, Droplets, Crown, ClipboardList, Activity, Percent,
-  RefreshCw, Zap, Star, ChevronDown,
+  Flame, MessageCircle, ChevronRight,
+  Dumbbell, TrendingUp, TrendingDown, Minus, Scale,
+  Lock, Crown, ClipboardList, Activity, Percent,
+  RefreshCw, Zap, CalendarClock,
 } from 'lucide-react';
 import portalApi from '@/lib/portalApi';
-import { requestStripeCheckout, type CheckoutTier } from '@/lib/stripeCheckout';
 import { usePortalAuthStore } from '@/store/portalAuth';
 import { PortalPhotoHistory } from '@/components/PortalPhotoHistory';
+import { useUpgradeModal } from '@/hooks/norderhealth/useUpgradeModal';
+import { UpgradeButton } from '@/components/norderhealth/UpgradeButton';
+import { OnboardingTour, type OnboardingStep } from '@/components/norderhealth/OnboardingTour';
+import { SectionLabel, mealIcon, pickCurrentTiempo } from '@/lib/norderhealth/planDisplay';
+import { usePortalMe } from '@/hooks/norderhealth/usePortalMe';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type LucideIcon = React.ComponentType<{ className?: string; size?: number; strokeWidth?: number }>;
@@ -24,29 +27,9 @@ function greeting() {
   return 'Buenas noches';
 }
 
-function mealIcon(name: string): LucideIcon {
-  const u = name.toUpperCase();
-  if (u.includes('DESAYUNO')) return Sunrise;
-  if (u.includes('CENA')) return Moon;
-  if (u.includes('COMIDA') || u.includes('ALMUERZO')) return Utensils;
-  if (u.includes('COLACIÓN 1') || u.includes('MATUTINA') || u.includes('COLACION 1')) return Coffee;
-  if (u.includes('COLACIÓN') || u.includes('COLACION')) return Apple;
-  return UtensilsCrossed;
-}
-
 function fmt(n: number | null, dec = 1): string {
   if (n == null) return '—';
   return Number(n).toFixed(dec);
-}
-
-// ─── Sección label ────────────────────────────────────────────────────────────
-function SectionLabel({ children, right }: { children: React.ReactNode; right?: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between mb-3">
-      <p className="text-[10px] text-[#3a3a3a] uppercase tracking-[0.15em] font-bold">{children}</p>
-      {right && <span className="text-[10px] text-[#2a2a2a]">{right}</span>}
-    </div>
-  );
 }
 
 // ─── Delta inline ─────────────────────────────────────────────────────────────
@@ -70,15 +53,6 @@ function Skeleton({ className }: { className?: string }) {
   return <div className={`bg-[#161616] animate-pulse rounded-[12px] ${className ?? ''}`} />;
 }
 
-// ─── MacroBar ─────────────────────────────────────────────────────────────────
-function MacroBar({ pct, color }: { pct: number; color: string }) {
-  return (
-    <div className="h-[3px] rounded-full bg-white/5 overflow-hidden mt-1.5">
-      <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.min(Number(pct) || 0, 100)}%`, backgroundColor: color }} />
-    </div>
-  );
-}
-
 // ─── Cards de stats ───────────────────────────────────────────────────────────
 type BodyMode = 'grasa' | 'magra';
 const BODY_MODES: { key: BodyMode; label: string; unit: string; posGood: boolean; Icon: LucideIcon }[] = [
@@ -88,6 +62,7 @@ const BODY_MODES: { key: BodyMode; label: string; unit: string; posGood: boolean
 
 function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
   const [modeIdx, setModeIdx] = useState(0);
+  const openUpgradeModal = useUpgradeModal((s) => s.open);
   const mode = BODY_MODES[modeIdx];
   const Icon = mode.Icon;
   const value = mode.key === 'grasa' ? (progreso?.pctGrasa ?? null) : (progreso?.masaMagra ?? null);
@@ -98,7 +73,7 @@ function StatCard({ progreso, locked }: { progreso: any; locked?: boolean }) {
   return (
     <div
       className="relative flex-1 bg-[#111] border border-[#1c1c1c] rounded-[16px] p-4 overflow-hidden cursor-pointer select-none active:scale-[0.97] transition-transform"
-      onClick={() => !locked && setModeIdx(i => (i + 1) % BODY_MODES.length)}
+      onClick={() => (locked ? openUpgradeModal('premium') : setModeIdx(i => (i + 1) % BODY_MODES.length))}
     >
       <div style={locked ? { filter: 'blur(6px)', userSelect: 'none', pointerEvents: 'none' } : undefined}>
         <div className="flex items-center justify-between mb-3">
@@ -143,124 +118,19 @@ function PesoCard({ value, delta, noAplica }: { value: number | null; delta: num
   );
 }
 
-// ─── Tiempo card (grid 2 cols) ─────────────────────────────────────────────────
-function TiempoCard({ t }: { t: any }) {
-  const Icon = mealIcon(t.nombre);
-  const ings: any[] = t.ingredientes || [];
-  return (
-    <div className="bg-[#111] border border-[#1c1c1c] rounded-[14px] p-3.5">
-      <div className="flex items-center gap-2 mb-2.5">
-        <div className="w-7 h-7 rounded-[8px] bg-[#1a1a1a] flex items-center justify-center flex-shrink-0">
-          <Icon size={13} className="text-[#22c55e]" strokeWidth={2} />
-        </div>
-        <p className="text-[12px] font-bold text-white capitalize leading-none truncate">
-          {t.nombre.charAt(0) + t.nombre.slice(1).toLowerCase()}
-        </p>
-      </div>
-      {ings.length > 0 && (
-        <ul className="space-y-1.5">
-          {ings.map((ing: any, j: number) => (
-            <li key={j} className="flex items-start gap-1.5">
-              <span className="w-1 h-1 rounded-full bg-[#22c55e]/20 flex-shrink-0 mt-1.5" />
-              <span className="text-[10.5px] text-[#555] leading-snug">
-                {ing.descripcion}
-                {ing.cantidad != null && <span className="text-[#3a3a3a]"> · {ing.cantidad}{ing.unidad ? ` ${ing.unidad}` : ''}</span>}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {t.bebida && (
-        <div className="mt-2 flex items-center gap-1.5">
-          <Droplets size={10} className="text-[#333]" strokeWidth={2} />
-          <span className="text-[10px] text-[#333]">{t.bebida}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Upgrade button ────────────────────────────────────────────────────────────
-function UpgradeButton({ nivel, label, color = 'green' }: { nivel: CheckoutTier; label: string; color?: 'green' | 'blue' | 'ghost' }) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [activePlan, setActivePlan] = useState<{ message: string; url: string } | null>(null);
-
-  const handleUpgrade = async () => {
-    setLoading(true);
-    setError(null);
-    setActivePlan(null);
-    try {
-      const session = await requestStripeCheckout(nivel);
-      if (session.flow === 'already_active') {
-        setActivePlan({
-          message: session.message || 'Tu suscripción ya está activa. No se generó otro cobro.',
-          url: session.url,
-        });
-        setLoading(false);
-        return;
-      }
-      window.location.assign(session.url);
-    } catch (err: unknown) {
-      const requestError = err as {
-        response?: { data?: { error?: string } };
-        message?: string;
-      };
-      setError(
-        requestError.response?.data?.error
-        || requestError.message
-        || 'Error al generar el pago. Intenta de nuevo.',
-      );
-      setLoading(false);
-    }
-  };
-
-  const base = 'w-full font-bold rounded-[12px] py-3 text-[13px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50';
-  const styles = {
-    green: `${base} bg-[#22c55e] hover:bg-[#16a34a] text-black`,
-    blue: `${base} bg-[#3b82f6] hover:bg-[#2563eb] text-white`,
-    ghost: `${base} border border-[#1e1e1e] text-[#444] hover:text-[#666]`,
-  };
-
-  return (
-    <div>
-      <button onClick={handleUpgrade} disabled={loading} className={styles[color]}>
-        {loading ? <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-          : color === 'green' ? <Crown size={14} strokeWidth={2.5} />
-          : color === 'blue' ? <Zap size={14} strokeWidth={2.5} />
-          : <Star size={14} strokeWidth={2.5} />}
-        {label}
-      </button>
-      {activePlan && (
-        <div className="mt-2 rounded-[10px] border border-[#22c55e]/25 bg-[#0f2e1a] p-2.5 text-center">
-          <p className="text-[10.5px] leading-relaxed text-[#86efac]">{activePlan.message}</p>
-          <button
-            type="button"
-            onClick={() => window.location.assign(activePlan.url)}
-            className="mt-2 text-[11px] font-bold text-[#22c55e] underline underline-offset-2"
-          >
-            Continuar al sistema
-          </button>
-        </div>
-      )}
-      {error && <p className="text-[10px] text-[#f87171] mt-1.5 text-center">{error}</p>}
-    </div>
-  );
-}
+const ONBOARDING_STEPS: OnboardingStep[] = [
+  { title: 'Bienvenido a NORDER Health', body: 'Aquí encuentras tu progreso y tu plan de alimentación, y puedes resolver dudas con tu asistente nutricional.' },
+  { title: 'Tu plan, cuando lo necesites', body: 'La tarjeta "Plan activo" te muestra un resumen. Tócala para ver el detalle completo de cada tiempo de comida en la pestaña Plan.' },
+  { title: 'Resuelve tus dudas al instante', body: 'Usa la pestaña Chat (abajo) para consultar equivalencias, analizar una tabla nutricional o preguntar sobre tu plan con el asistente virtual.' },
+];
 
 // ─── Página principal ─────────────────────────────────────────────────────────
 export default function NorderHealthHome() {
   const navigate = useNavigate();
-  const { paciente: stored, token, clearPortalAuth } = usePortalAuthStore();
-  const [menuActivo, setMenuActivo] = useState(0);
+  const { paciente: stored, token } = usePortalAuthStore();
+  const openUpgradeModal = useUpgradeModal((s) => s.open);
 
-  const { data: me, isLoading: loadingMe } = useQuery({
-    queryKey: ['portal', 'me'],
-    queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
-    staleTime: 30_000,
-    refetchOnWindowFocus: true,
-    enabled: !!token,
-  });
+  const { data: me, isLoading: loadingMe } = usePortalMe();
 
   const { data: planData, isLoading: loadingPlan } = useQuery({
     queryKey: ['portal', 'plan'],
@@ -286,13 +156,23 @@ export default function NorderHealthHome() {
 
   const progreso = me?.progreso ?? null;
   const plan = planData?.plan ?? null;
-  const menus: any[] = plan?.menus ?? [];
-  const menuIdx = Math.min(menuActivo, Math.max(0, menus.length - 1));
-  const tiemposActivos: any[] = menus[menuIdx]?.tiempos ?? [];
-  const multiMenus = menus.length > 1;
+  const todosLosTiempos = (plan?.menus ?? []).flatMap((m: any) => m.tiempos ?? []);
+  const proximoTiempo = pickCurrentTiempo(todosLosTiempos);
+
+  // Nudge proactivo: una única vez por sesión, cuando un paciente gratis
+  // ya ha usado varias preguntas — señal de uso real, no un timer al cargar.
+  const preguntasHoy = Math.max(0, limiteGratis - preguntasRestantes);
+  const { hasNudged, markNudged } = useUpgradeModal();
+  useEffect(() => {
+    if (!loadingMe && isGratis && preguntasHoy >= 2 && !hasNudged) {
+      markNudged();
+      openUpgradeModal('basica');
+    }
+  }, [loadingMe, isGratis, preguntasHoy, hasNudged, markNudged, openUpgradeModal]);
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0a0a0a]">
+    <div className="flex flex-col h-full bg-[#0a0a0a]">
+      <OnboardingTour storageKey="norder_onboarding_seen" steps={ONBOARDING_STEPS} />
 
       {/* ── Header ──────────────────────────────────────────────────── */}
       <div className="flex-shrink-0 bg-[#0a0a0a] px-5 pt-6 pb-5 flex items-start justify-between border-b border-[#141414]">
@@ -334,13 +214,6 @@ export default function NorderHealthHome() {
             )}
           </div>
         </div>
-
-        <button
-          onClick={() => { clearPortalAuth(); navigate('/norder-health/login', { replace: true }); }}
-          className="w-9 h-9 rounded-full bg-[#141414] border border-[#1e1e1e] flex items-center justify-center text-[#333] hover:text-[#666] transition-colors flex-shrink-0 mt-1"
-        >
-          <LogOut size={14} strokeWidth={2} />
-        </button>
       </div>
 
       {/* ── Cuerpo scrollable ────────────────────────────────────────── */}
@@ -363,44 +236,32 @@ export default function NorderHealthHome() {
             )}
           </section>
 
-          {/* ── Plan activo ───────────────────────────────────────────── */}
+          {/* ── Plan activo (resumen, tap para ver detalle) ──────────── */}
           <section>
             <SectionLabel>Plan activo</SectionLabel>
             {loadingPlan ? (
-              <Skeleton className="h-[140px]" />
+              <Skeleton className="h-[88px]" />
             ) : plan ? (
-              <div className="bg-[#111] border border-[#1c1c1c] rounded-[18px] p-5">
-                <div className="flex items-start justify-between mb-5">
-                  <div className="flex-1 min-w-0 pr-3">
-                    <p className="text-[9px] text-[#22c55e] uppercase tracking-widest font-bold mb-1.5">Norder Health</p>
-                    <p className="text-[15px] font-bold text-white leading-tight truncate">{plan.nombre || 'Plan Nutricional'}</p>
-                    {plan.tipoPlan && <p className="text-[11px] text-[#444] mt-0.5">{plan.tipoPlan}</p>}
-                  </div>
-                  <div className="text-right flex-shrink-0">
+              <button
+                onClick={() => navigate('/norder-health/plan')}
+                className="w-full bg-[#111] border border-[#1c1c1c] rounded-[18px] p-5 flex items-center justify-between text-left active:scale-[0.98] transition-transform"
+              >
+                <div className="flex-1 min-w-0 pr-3">
+                  <p className="text-[9px] text-[#22c55e] uppercase tracking-widest font-bold mb-1.5">Norder Health</p>
+                  <p className="text-[15px] font-bold text-white leading-tight truncate">{plan.nombre || 'Plan Nutricional'}</p>
+                  {plan.tipoPlan && <p className="text-[11px] text-[#444] mt-0.5">{plan.tipoPlan}</p>}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-right">
                     <div className="flex items-center justify-end gap-1.5">
-                      <Flame size={14} className="text-[#f59e0b]" strokeWidth={2} />
-                      <p className="text-[30px] font-black text-white leading-none">{plan.calorias}</p>
+                      <Flame size={13} className="text-[#f59e0b]" strokeWidth={2} />
+                      <p className="text-[20px] font-black text-white leading-none">{plan.calorias}</p>
                     </div>
-                    <p className="text-[9px] text-[#333] mt-0.5 uppercase tracking-wider">kcal / día</p>
+                    <p className="text-[8px] text-[#333] mt-0.5 uppercase tracking-wider">kcal / día</p>
                   </div>
+                  <ChevronRight size={16} className="text-[#333]" />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  {([
-                    { label: 'Proteínas', pct: plan.proteinasPct, gr: plan.proteinasGr, color: '#22c55e' },
-                    { label: 'Carbos', pct: plan.carbohidratosPct, gr: plan.carbohidratosGr, color: '#60a5fa' },
-                    { label: 'Grasas', pct: plan.grasasPct, gr: plan.grasasGr, color: '#f59e0b' },
-                  ] as const).map(m => (
-                    <div key={m.label}>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[9px] text-[#333] font-semibold uppercase tracking-wider">{m.label}</span>
-                        <span className="text-[11px] font-bold" style={{ color: m.color }}>{m.pct}%</span>
-                      </div>
-                      <MacroBar pct={Number(m.pct) || 0} color={m.color} />
-                      {m.gr && <p className="text-[9px] text-[#2a2a2a] mt-1">{parseFloat(String(m.gr)).toFixed(0)}g</p>}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              </button>
             ) : (
               <div className="bg-[#111] border border-[#1c1c1c] rounded-[18px] p-5 flex items-center gap-4">
                 <div className="w-10 h-10 rounded-full bg-[#161616] flex items-center justify-center flex-shrink-0">
@@ -414,66 +275,44 @@ export default function NorderHealthHome() {
             )}
           </section>
 
-          {/* ── Menús ─────────────────────────────────────────────────── */}
-          {!loadingPlan && menus.length > 0 && (
+          {/* ── Qué toca ahora (preview, tap lleva al detalle) ───────── */}
+          {isPremium && plan && proximoTiempo && (
             <section>
-              <SectionLabel right={multiMenus ? `${menus.length} opciones` : undefined}>
-                Menús del plan
-              </SectionLabel>
-
-              {/* Tabs de menú */}
-              {multiMenus && (
-                <div className="flex gap-2 overflow-x-auto mb-4 pb-0.5" style={{ scrollbarWidth: 'none' }}>
-                  {menus.map((m: any, i: number) => (
-                    <button
-                      key={i}
-                      onClick={() => isPremium && setMenuActivo(i)}
-                      className={`flex-shrink-0 px-4 py-2 rounded-full text-[11px] font-bold border transition-all ${
-                        menuIdx === i
-                          ? 'bg-[#22c55e] border-transparent text-black'
-                          : 'bg-[#111] border-[#1c1c1c] text-[#444] hover:text-[#666]'
-                      }`}
-                    >
-                      {m.nombre || `Menú ${i + 1}`}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {multiMenus && (
-                <div className="flex items-center gap-2 mb-3">
-                  <span className="w-1.5 h-1.5 rounded-full bg-[#22c55e]" />
-                  <p className="text-[12px] text-white font-semibold">{menus[menuIdx]?.nombre || `Menú ${menuIdx + 1}`}</p>
-                  <ChevronRight size={10} className="text-[#2a2a2a]" />
-                  <p className="text-[10px] text-[#333]">{tiemposActivos.length} tiempos</p>
-                </div>
-              )}
-
-              {/* Grid 2 columnas */}
-              <div
-                className="grid grid-cols-2 gap-2.5"
-                style={!isPremium ? { filter: 'blur(4px)', userSelect: 'none', pointerEvents: 'none' } : undefined}
+              <SectionLabel>Ahora toca</SectionLabel>
+              <button
+                onClick={() => navigate('/norder-health/plan')}
+                className="w-full bg-[#111] border border-[#1c1c1c] rounded-[18px] p-4 flex items-center gap-3 text-left active:scale-[0.98] transition-transform"
               >
-                {tiemposActivos.map((t: any, i: number) => (
-                  <TiempoCard key={`${menuIdx}-${i}`} t={t} />
-                ))}
-              </div>
-
-              {!isPremium && menus.length > 0 && (
-                <div className="mt-3 flex items-center justify-center gap-1.5">
-                  <Lock size={10} className="text-[#333]" />
-                  <p className="text-[10px] text-[#333]">Activa Premium para ver tu plan completo</p>
+                <div className="w-10 h-10 rounded-[10px] bg-[#0f2e1a] border border-[#22c55e]/20 flex items-center justify-center flex-shrink-0">
+                  {(() => { const Icon = mealIcon(proximoTiempo.nombre); return <Icon size={17} className="text-[#22c55e]" strokeWidth={2} />; })()}
                 </div>
-              )}
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-white capitalize leading-tight truncate">
+                    {proximoTiempo.nombre.charAt(0) + proximoTiempo.nombre.slice(1).toLowerCase()}
+                  </p>
+                  <p className="text-[11px] text-[#555] mt-0.5 truncate">
+                    {(proximoTiempo.ingredientes || []).slice(0, 2).map((i: any) => i.descripcion).join(' · ') || 'Ver detalle'}
+                  </p>
+                </div>
+                <ChevronRight size={15} className="text-[#333] flex-shrink-0" />
+              </button>
             </section>
           )}
 
-          {/* ── Notas del nutriólogo (solo premium) ─────────────────── */}
-          {plan?.notasGenerales && isPremium && (
+          {/* ── Próxima consulta ──────────────────────────────────────── */}
+          {plan?.proximaSesion && (
             <section>
-              <SectionLabel>Notas de tu nutriólogo</SectionLabel>
-              <div className="bg-[#111] border border-[#1c1c1c] rounded-[14px] px-4 py-4">
-                <p className="text-[13px] text-[#666] leading-relaxed">{plan.notasGenerales}</p>
+              <SectionLabel>Próxima consulta</SectionLabel>
+              <div className="bg-[#111] border border-[#1c1c1c] rounded-[18px] p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-[10px] bg-[#161616] flex items-center justify-center flex-shrink-0">
+                  <CalendarClock size={17} className="text-[#60a5fa]" strokeWidth={2} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[13px] font-bold text-white leading-tight">
+                    {new Date(plan.proximaSesion).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </p>
+                  <p className="text-[11px] text-[#555] mt-0.5">Con tu nutriólogo</p>
+                </div>
               </div>
             </section>
           )}
@@ -540,14 +379,14 @@ export default function NorderHealthHome() {
       </div>
 
       {/* ── Footer fijo ──────────────────────────────────────────────── */}
-      <div className="flex-shrink-0 bg-[#0a0a0a] border-t border-[#141414] px-5 py-4 pb-8">
+      <div className="flex-shrink-0 bg-[#0a0a0a] border-t border-[#141414] px-5 py-4">
         {isPremium ? (
           <button
             onClick={() => navigate('/norder-health/chat')}
             className="w-full bg-[#22c55e] hover:bg-[#16a34a] active:scale-[0.98] text-black rounded-[14px] py-4 flex items-center justify-center gap-2.5 transition-all shadow-lg shadow-[#22c55e]/15"
           >
             <Crown size={16} strokeWidth={2.5} />
-            <span className="text-[15px] font-bold">Chat con Eyder</span>
+            <span className="text-[15px] font-bold">Preguntar al asistente</span>
           </button>
         ) : isBasica ? (
           <button

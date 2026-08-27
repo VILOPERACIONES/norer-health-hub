@@ -1,14 +1,18 @@
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import {
-  Camera, X, ArrowLeft, Send, Loader2, Crown,
-  Activity, Zap, ChevronDown, Sparkles, Lock,
+  Camera, X, ArrowLeft, Send, Loader2,
+  ChevronDown, Sparkles, Lock, RotateCcw, WifiOff,
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import portalApi from '@/lib/portalApi';
 import { usePortalAuthStore } from '@/store/portalAuth';
+import { getTier, TIER_META, type Tier } from '@/lib/norderhealth/theme';
+import { useChatSend, useChatHealth, classifyChatError, type ChatSendPayload } from '@/hooks/norderhealth/useChatSend';
+import { usePortalMe } from '@/hooks/norderhealth/usePortalMe';
 
 interface ChatMessage {
   id: string;
@@ -18,50 +22,8 @@ interface ChatMessage {
   error?: boolean;
   pending?: boolean;
   imagePreview?: string;
+  retryPayload?: ChatSendPayload;
 }
-
-// ── Tier system ────────────────────────────────────────────────────────────────
-
-type Tier = 'gratis' | 'basico' | 'premium';
-
-function getTier(nivel: string): Tier {
-  if (['premium', 'norder_health'].includes(nivel)) return 'premium';
-  if (nivel === 'basica' || nivel === 'basico') return 'basico';
-  return 'gratis';
-}
-
-const TIER_META = {
-  gratis: {
-    label: 'Gratis',
-    accent: '#f59e0b',
-    accentDim: '#92400e',
-    headerBorder: 'border-[#2a1800]',
-    badge: 'bg-[#1c1000] text-[#f59e0b] border-[#f59e0b]/30',
-    userBubble: 'bg-[#92400e]',
-    eyderBorder: 'border-l-[#f59e0b]/40',
-    Icon: Zap,
-  },
-  basico: {
-    label: 'Básico',
-    accent: '#60a5fa',
-    accentDim: '#1e40af',
-    headerBorder: 'border-[#0a1628]',
-    badge: 'bg-[#0a1628] text-[#60a5fa] border-[#60a5fa]/30',
-    userBubble: 'bg-[#1d4ed8]',
-    eyderBorder: 'border-l-[#60a5fa]/40',
-    Icon: Activity,
-  },
-  premium: {
-    label: 'Premium',
-    accent: '#22c55e',
-    accentDim: '#15803d',
-    headerBorder: 'border-[#1c1c1c]',
-    badge: 'bg-[#0f2e1a] text-[#22c55e] border-[#22c55e]/30',
-    userBubble: 'bg-[#15803d]',
-    eyderBorder: 'border-l-[#22c55e]/40',
-    Icon: Crown,
-  },
-};
 
 const CHIPS: Record<Tier, string[]> = {
   gratis: [
@@ -90,10 +52,10 @@ const CHIPS: Record<Tier, string[]> = {
 function welcomeMsg(tier: Tier, nombre: string, restantes?: number): string {
   const n = nombre ? nombre.split(' ')[0] : '';
   if (tier === 'gratis')
-    return `Hola ${n}, soy **Eyder** tu asesor nutricional.\n\nCon tu cuenta gratuita puedo ayudarte con:\n• Equivalencias SMAE y NORDER\n• Consultas nutricionales generales\n• Análisis de tablas nutricionales\n\n${restantes !== undefined ? `Tienes **${restantes} pregunta${restantes !== 1 ? 's' : ''}** disponible${restantes !== 1 ? 's' : ''} hoy.` : 'Tienes **5 preguntas** al día.'} ¿En qué te ayudo?`;
+    return `Hola ${n}, soy tu **asistente nutricional** de NORDER.\n\nCon tu cuenta gratuita puedo ayudarte con:\n• Equivalencias SMAE y NORDER\n• Consultas nutricionales generales\n• Análisis de tablas nutricionales\n\n${restantes !== undefined ? `Tienes **${restantes} pregunta${restantes !== 1 ? 's' : ''}** disponible${restantes !== 1 ? 's' : ''} hoy.` : 'Tienes **5 preguntas** al día.'} ¿En qué te ayudo?`;
   if (tier === 'basico')
-    return `Hola ${n}, soy **Eyder** tu asesor nutricional.\n\nCon tu **Plan Básico** puedo ayudarte con equivalencias SMAE, consultas generales y análisis de tablas nutricionales.\n\n¿En qué te ayudo hoy?`;
-  return `Hola ${n}, soy **Eyder** tu nutriólogo digital.\n\nCon tu **Plan Premium** tengo acceso a tu plan personalizado y puedo ayudarte con recomendaciones específicas para tu día.\n\n¿Qué quieres consultar?`;
+    return `Hola ${n}, soy tu **asistente nutricional** de NORDER.\n\nCon tu **Plan Básico** puedo ayudarte con equivalencias SMAE, consultas generales y análisis de tablas nutricionales.\n\n¿En qué te ayudo hoy?`;
+  return `Hola ${n}, soy tu **asistente nutricional** de NORDER.\n\nCon tu **Plan Premium** tengo acceso a tu plan personalizado y puedo ayudarte con recomendaciones específicas para tu día. Si necesitas hablar directamente con tu nutriólogo, agenda tu consulta.\n\n¿Qué quieres consultar?`;
 }
 
 // ── Utilities ──────────────────────────────────────────────────────────────────
@@ -122,7 +84,7 @@ async function compressImage(file: File, maxWidth = 1024, quality = 0.8): Promis
 
 // ── Bubble ─────────────────────────────────────────────────────────────────────
 
-function Bubble({ msg, tier }: { msg: ChatMessage; tier: Tier }) {
+function Bubble({ msg, tier, onRetry }: { msg: ChatMessage; tier: Tier; onRetry?: (payload: ChatSendPayload) => void }) {
   const isUser = msg.sender === 'user';
   const meta = TIER_META[tier];
 
@@ -133,7 +95,7 @@ function Bubble({ msg, tier }: { msg: ChatMessage; tier: Tier }) {
           className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center mb-0.5 shadow-sm"
           style={{ background: `linear-gradient(135deg, ${meta.accent}cc, ${meta.accentDim})` }}
         >
-          <span className="text-[10px] font-bold text-white">E</span>
+          <span className="text-[10px] font-bold text-white">N</span>
         </div>
       )}
       <div className={`max-w-[80%] flex flex-col ${isUser ? 'items-end' : 'items-start'}`}>
@@ -193,6 +155,15 @@ function Bubble({ msg, tier }: { msg: ChatMessage; tier: Tier }) {
             )}
           </div>
         )}
+        {msg.error && msg.retryPayload && onRetry && (
+          <button
+            onClick={() => onRetry(msg.retryPayload!)}
+            className="flex items-center gap-1.5 mt-1.5 px-2.5 py-1 rounded-full bg-[#1a0f0f] border border-[#3a1515] text-[#f87171] text-[11px] font-semibold active:scale-95 transition-transform"
+          >
+            <RotateCcw size={11} strokeWidth={2.5} />
+            Reintentar
+          </button>
+        )}
         <span className="text-[10px] mt-1 px-1 text-[#3a3a3a]">{formatTime(msg.timestamp)}</span>
       </div>
     </div>
@@ -207,12 +178,12 @@ export default function NorderHealthChat() {
   const { paciente: authPaciente } = usePortalAuthStore();
   const [sessionMessages, setSessionMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
-  const [sending, setSending] = useState(false);
   const [pendingImage, setPendingImage] = useState<{ base64: string; preview: string } | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
   // Optimistic counter for gratis tier (updates without waiting for /me refetch)
   const [localRestantes, setLocalRestantes] = useState<number | null>(null);
+  const [consecutiveFailures, setConsecutiveFailures] = useState(0);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -222,12 +193,11 @@ export default function NorderHealthChat() {
   const prevScrollHeightRef = useRef(0);
   const initialScrollDoneRef = useRef(false);
 
-  const { data: me } = useQuery({
-    queryKey: ['portal', 'me'],
-    queryFn: () => portalApi.get('/api/portal/me').then(r => r.data),
-    staleTime: 30_000,
-    refetchOnWindowFocus: true,
-  });
+  const { data: me, isLoading: loadingMe } = usePortalMe();
+
+  const chatMutation = useChatSend();
+  const chatHealth = useChatHealth(consecutiveFailures >= 1);
+  const degraded = consecutiveFailures >= 2 || chatHealth.data?.healthy === false;
 
   const {
     data: historialPages,
@@ -340,17 +310,53 @@ export default function NorderHealthChat() {
     el.style.height = Math.min(el.scrollHeight, 100) + 'px';
   };
 
+  const sending = chatMutation.isPending;
+
   const handleImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const base64 = await compressImage(file);
       setPendingImage({ base64, preview: `data:image/jpeg;base64,${base64}` });
-    } catch { /* ignore */ }
+    } catch {
+      toast.error('No se pudo procesar la imagen, intenta con otra.');
+    }
     e.target.value = '';
   };
 
-  const sendMessage = async (overrideText?: string) => {
+  const sendPayload = (payload: ChatSendPayload) => {
+    chatMutation.mutate(payload, {
+      onSuccess: (data) => {
+        setConsecutiveFailures(0);
+        setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
+          id: crypto.randomUUID(), content: data.respuesta, sender: 'eyder', timestamp: new Date(),
+        }));
+        if (data.preguntasRestantes != null) {
+          setLocalRestantes(data.preguntasRestantes);
+          queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
+        }
+      },
+      onError: (err) => {
+        const { message, terminal, restantesOverride } = classifyChatError(err);
+        setConsecutiveFailures(n => n + 1);
+        if (restantesOverride != null) setLocalRestantes(restantesOverride);
+        if (!terminal) toast.error(message);
+        setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
+          id: crypto.randomUUID(),
+          content: message,
+          sender: 'eyder',
+          timestamp: new Date(),
+          error: true,
+          retryPayload: terminal ? undefined : payload,
+        }));
+      },
+      onSettled: () => {
+        setTimeout(() => textareaRef.current?.focus(), 100);
+      },
+    });
+  };
+
+  const sendMessage = (overrideText?: string) => {
     const text = (overrideText ?? input).trim();
     if ((!text && !pendingImage) || sending) return;
 
@@ -367,38 +373,16 @@ export default function NorderHealthChat() {
     setInput('');
     setPendingImage(null);
     if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    setSending(true);
 
-    try {
-      const body: Record<string, string> = {};
-      if (text) body.mensaje = text;
-      if (userMsg.imagePreview) body.imagen_base64 = userMsg.imagePreview.split(',')[1];
-      const res = await portalApi.post('/api/portal/chat', body, { timeout: 180_000 });
-      setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
-        id: crypto.randomUUID(), content: res.data.respuesta, sender: 'eyder', timestamp: new Date(),
-      }));
-      // Update gratis counter optimistically without waiting for /me refetch
-      if (res.data.preguntasRestantes != null) {
-        setLocalRestantes(res.data.preguntasRestantes);
-        queryClient.invalidateQueries({ queryKey: ['portal', 'me'] });
-      }
-    } catch (err: any) {
-      const codigo = err.response?.data?.codigo;
-      const msg = err.response?.status === 429
-        ? 'Demasiados mensajes seguidos. Espera un momento.'
-        : codigo === 'limite_gratis_diario'
-          ? '⚠️ Límite diario alcanzado. Regresa mañana o activa un plan.'
-          : err.response?.status === 403
-            ? (err.response?.data?.error || 'No tienes acceso a esta función.')
-            : 'No pude conectarme. Intenta de nuevo.';
-      if (codigo === 'limite_gratis_diario') setLocalRestantes(0);
-      setSessionMessages(prev => prev.filter(m => m.id !== 'pending').concat({
-        id: crypto.randomUUID(), content: msg, sender: 'eyder', timestamp: new Date(), error: true,
-      }));
-    } finally {
-      setSending(false);
-      setTimeout(() => textareaRef.current?.focus(), 100);
-    }
+    const payload: ChatSendPayload = {};
+    if (text) payload.mensaje = text;
+    if (userMsg.imagePreview) payload.imagen_base64 = userMsg.imagePreview.split(',')[1];
+    sendPayload(payload);
+  };
+
+  const retryMessage = (payload: ChatSendPayload) => {
+    setSessionMessages(prev => [...prev, { id: 'pending', content: '', sender: 'eyder', timestamp: new Date(), pending: true }]);
+    sendPayload(payload);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -406,7 +390,7 @@ export default function NorderHealthChat() {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-[#0a0a0a] select-none overflow-hidden">
+    <div className="flex flex-col h-full bg-[#0a0a0a] select-none overflow-hidden">
 
       {/* ── Header ── */}
       <div className={`flex-shrink-0 bg-[#0d0d0d] border-b ${meta.headerBorder} px-4 pt-6 pb-3`}>
@@ -423,24 +407,44 @@ export default function NorderHealthChat() {
             className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 shadow-lg"
             style={{ background: `linear-gradient(135deg, ${meta.accent}cc, ${meta.accentDim})` }}
           >
-            <span className="text-[13px] font-bold text-white">E</span>
+            <span className="text-[13px] font-bold text-white">N</span>
           </div>
 
           <div className="flex-1 min-w-0">
-            <p className="text-[15px] font-semibold text-white leading-none">Eyder</p>
+            <p className="text-[15px] font-semibold text-white leading-none">Asistente NORDER</p>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="w-[5px] h-[5px] rounded-full flex-shrink-0" style={{ background: meta.accent }} />
-              <p className="text-[11px] text-[#484848] leading-none">Nutriólogo Digital</p>
+              <p className="text-[11px] text-[#484848] leading-none">Asistente virtual · IA</p>
             </div>
           </div>
 
           {/* Tier badge */}
-          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9.5px] font-bold uppercase tracking-widest flex-shrink-0 ${meta.badge}`}>
-            <meta.Icon size={8} strokeWidth={2.5} />
-            {meta.label}
-          </span>
+          {loadingMe ? (
+            <div className="w-16 h-[22px] rounded-full bg-[#161616] animate-pulse flex-shrink-0" />
+          ) : (
+            <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full border text-[9.5px] font-bold uppercase tracking-widest flex-shrink-0 ${meta.badge}`}>
+              <meta.Icon size={8} strokeWidth={2.5} />
+              {meta.label}
+            </span>
+          )}
         </div>
       </div>
+
+      {/* ── Degraded service banner ── */}
+      {degraded && (
+        <div className="flex-shrink-0 px-4 py-2.5 bg-[#1a0f0f] border-b border-[#3a1515] flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <WifiOff size={13} className="text-[#f87171] flex-shrink-0" strokeWidth={2} />
+            <span className="text-[11px] text-[#f87171] truncate">Servicio temporalmente no disponible</span>
+          </div>
+          <button
+            onClick={() => { setConsecutiveFailures(0); chatHealth.refetch(); }}
+            className="flex-shrink-0 text-[11px] font-semibold text-[#f87171] underline underline-offset-2"
+          >
+            Reintentar
+          </button>
+        </div>
+      )}
 
       {/* ── Gratis daily limit banner ── */}
       {tier === 'gratis' && (
@@ -512,7 +516,7 @@ export default function NorderHealthChat() {
                 />
               </div>
             )}
-            {displayMessages.map(msg => <Bubble key={msg.id} msg={msg} tier={tier} />)}
+            {displayMessages.map(msg => <Bubble key={msg.id} msg={msg} tier={tier} onRetry={retryMessage} />)}
           </>
         )}
 

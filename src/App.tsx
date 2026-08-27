@@ -8,6 +8,7 @@ import { useAuthStore } from "@/store/auth";
 import { usePortalAuthStore } from "@/store/portalAuth";
 import { useThemeStore } from "@/store/theme";
 import Layout from "@/components/Layout";
+import { ChatErrorBoundary } from "@/components/norderhealth/ChatErrorBoundary";
 
 // El diccionario ortográfico es pesado; se carga después del shell principal
 // para no bloquear la primera pintura ni inflar el bundle inicial.
@@ -31,8 +32,10 @@ const NotFound = React.lazy(() => import("@/pages/NotFound"));
 const NorderHealthLogin = React.lazy(() => import("@/pages/norderhealth/Login"));
 const NorderHealthHome = React.lazy(() => import("@/pages/norderhealth/Home"));
 const NorderHealthChat = React.lazy(() => import("@/pages/norderhealth/Chat"));
+const NorderHealthPlanDetail = React.lazy(() => import("@/pages/norderhealth/PlanDetail"));
 const PaymentSuccess = React.lazy(() => import("@/pages/norderhealth/PaymentSuccess"));
 const PaymentError = React.lazy(() => import("@/pages/norderhealth/PaymentError"));
+const PortalLayout = React.lazy(() => import("@/components/norderhealth/PortalLayout"));
 
 const RouteFallback = () => (
   <div className="flex min-h-screen items-center justify-center bg-bg-base text-sm text-text-muted">
@@ -154,8 +157,25 @@ const App = () => {
             <Route path="/norder-health/login" element={<NorderHealthLogin />} />
             <Route path="/norder-health/activado" element={<PaymentSuccess />} />
             <Route path="/norder-health/cancelado" element={<PaymentError />} />
-            <Route path="/norder-health" element={<PortalRoute><NorderHealthHome /></PortalRoute>} />
-            <Route path="/norder-health/chat" element={<PortalRoute><NorderHealthChat /></PortalRoute>} />
+            <Route
+              path="/norder-health"
+              element={
+                <PortalRoute>
+                  <PortalLayout />
+                </PortalRoute>
+              }
+            >
+              <Route index element={<NorderHealthHome />} />
+              <Route path="plan" element={<NorderHealthPlanDetail />} />
+              <Route
+                path="chat"
+                element={
+                  <ChatErrorBoundary>
+                    <NorderHealthChat />
+                  </ChatErrorBoundary>
+                }
+              />
+            </Route>
 
             <Route path="*" element={<NotFound />} />
             </Routes>
