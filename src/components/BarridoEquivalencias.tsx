@@ -42,6 +42,7 @@ interface BarridoEquivalenciasProps {
   onTiempoAdded?: (nombre: string) => void;
   onTiempoRenamed?: (idx: number, nombre: string) => void;
   onTiempoRemoved?: (idx: number) => void;
+  onTiempoReordered?: (fromIdx: number, toIdx: number) => void;
 }
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -224,7 +225,7 @@ const cellCls =
   '[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none';
 
 // ─── Componente ───────────────────────────────────────────────────────────────
-const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved }: BarridoEquivalenciasProps) => {
+const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved, onTiempoReordered }: BarridoEquivalenciasProps) => {
   const [state, setState] = useState<BarridoData>(() => buildInitial(value));
   const [newTiempoName, setNewTiempoName] = useState('');
   const [energiaInputStr, setEnergiaInputStr] = useState(value?.kcalTotal ? String(value.kcalTotal) : '');
@@ -393,6 +394,7 @@ const BarridoEquivalencias = ({ value, onChange, habitos, tiemposEnUso, onTiempo
     newTiempos.splice(idx, 0, moved);
 
     commit({ ...state, tiempos: newTiempos });
+    onTiempoReordered?.(draggedColIdx, idx);
     setDraggedColIdx(null);
   };
 

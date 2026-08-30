@@ -210,6 +210,16 @@ const NewAssessment = () => {
     });
     setExpedienteModified(true);
   };
+  const handleTiempoReorderedFromBarrido = (fromIdx: number, toIdx: number) => {
+    setHabitos((current) => {
+      if (fromIdx < 0 || fromIdx >= current.length || toIdx < 0 || toIdx >= current.length) return current;
+      const next = [...current];
+      const [moved] = next.splice(fromIdx, 1);
+      next.splice(toIdx, 0, moved);
+      return next;
+    });
+    setExpedienteModified(true);
+  };
   const [showSuplemantacion, setShowSuplemantacion] = useState(true);
   const [showMedidas, setShowMedidas] = useState(true);
   const [showAgendarCita, setShowAgendarCita] = useState(true);
@@ -1937,6 +1947,7 @@ const NewAssessment = () => {
                     onTiempoAdded={handleTiempoAddedFromBarrido}
                     onTiempoRenamed={handleTiempoRenamedFromBarrido}
                     onTiempoRemoved={handleTiempoRemovedFromBarrido}
+                    onTiempoReordered={handleTiempoReorderedFromBarrido}
                   />
                 </div>
               </div>

@@ -54,9 +54,10 @@ interface Props {
   onTiempoAdded?: (nombre: string) => void;
   onTiempoRenamed?: (idx: number, nombre: string) => void;
   onTiempoRemoved?: (idx: number) => void;
+  onTiempoReordered?: (fromIdx: number, toIdx: number) => void;
 }
 
-const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved }: Props) => {
+const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2, habitos, tiemposEnUso, onTiempoAdded, onTiempoRenamed, onTiempoRemoved, onTiempoReordered }: Props) => {
   const initialVariantsRef = useRef<BarridoVariante[] | null>(null);
   if (!initialVariantsRef.current) initialVariantsRef.current = getBarridoVariantes(value);
   const variants = value ? getBarridoVariantes(value) : initialVariantsRef.current;
@@ -146,6 +147,7 @@ const BarridosEquivalenciasManager = ({ value, onChange, maxVariants = 2, habito
               onTiempoAdded={onTiempoAdded}
               onTiempoRenamed={onTiempoRenamed}
               onTiempoRemoved={onTiempoRemoved}
+              onTiempoReordered={onTiempoReordered}
             />
           </div>
         </div>

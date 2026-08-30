@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity, Calendar as CalendarIcon, Trash2 } from 'lucide-react';
+import { ArrowLeft, Brain, Plus, X, FileText, Layers, ChevronDown, ChevronUp, Check, AlertCircle, Edit2, Clock, Activity, Calendar as CalendarIcon, Trash2, Search } from 'lucide-react';
 import api from '@/lib/api';
 import CalcomScheduling from '@/components/CalcomScheduling';
 import { formatDate } from '@/lib/format';
@@ -14,6 +14,9 @@ import { useConfirm } from '@/components/ui/ConfirmDialog';
 import { AppointmentSummary } from '@/components/AppointmentSummary';
 import { PacienteResumenSidebar } from '@/components/PacienteResumenSidebar';
 import { buildAvoidFoods } from '@/lib/avoidFoods';
+import { PreviousConsultationMenuPreview } from '@/components/PreviousConsultationMenuPreview';
+import { findPreviousConsultationPlan } from '@/lib/previousConsultationPlan';
+import { resolveAssessmentDietetica } from '@/lib/recall24';
 
 // ─── Módulo Plan de la Consulta ───────────────────────────────────────────────
 const PlanSection = ({
@@ -165,6 +168,21 @@ const AssessmentDetail = () => {
   const [initialBarridoData, setInitialBarridoData] = useState<string | null>(null);
   const [showBarrido, setShowBarrido] = useState(true);
   const [savingBarrido, setSavingBarrido] = useState(false);
+  const [showPreviousMenus, setShowPreviousMenus] = useState(false);
+
+  const previousConsultationPlan = useMemo(
+    () => findPreviousConsultationPlan(pacienteInfo?.valoraciones, valoracionId),
+    [pacienteInfo?.valoraciones, valoracionId],
+  );
+
+  useEffect(() => {
+    if (!previousConsultationPlan) setShowPreviousMenus(false);
+  }, [previousConsultationPlan]);
+
+  const assessmentDietetica = useMemo(
+    () => resolveAssessmentDietetica(val, pacienteInfo?.habitos),
+    [val, pacienteInfo?.habitos],
+  );
 
   // A1: Soft delete
   const [deletingConsulta, setDeletingConsulta] = useState(false);
@@ -714,30 +732,53 @@ const AssessmentDetail = () => {
 
       {/* BARRIDO DE EQUIVALENCIAS — componente compartido */}
       <div className="bg-bg-surface border border-border-subtle rounded-[12px] overflow-hidden">
-        <button
-          onClick={() => setShowBarrido(!showBarrido)}
-          className="w-full flex items-center justify-between p-6 hover:bg-bg-elevated/50 transition-colors"
-        >
-          <div className="flex items-center gap-3">
-            <div className={`p-2 rounded-[8px] transition-all ${showBarrido ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-elevated text-text-muted'}`}>
-              <Layers className="w-4 h-4" />
+        <div className="flex items-center gap-3 p-6 hover:bg-bg-elevated/50 transition-colors">
+          <button
+            type="button"
+            onClick={() => setShowBarrido(!showBarrido)}
+            className="flex min-w-0 flex-1 items-center justify-between text-left"
+            aria-expanded={showBarrido}
+          >
+            <div className="flex min-w-0 items-center gap-3">
+              <div className={`p-2 rounded-[8px] transition-all ${showBarrido ? 'bg-brand-primary/20 text-brand-primary' : 'bg-bg-elevated text-text-muted'}`}>
+                <Layers className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 text-left">
+                <h3 className="text-[15px] font-semibold text-text-primary m-0">Barrido de Equivalencias</h3>
+                <p className="text-[12px] text-text-muted m-0">
+                  {barridoData ? `${Math.round(barridoData.kcalTotal || 0).toLocaleString()} kcal totales` : "Sin datos - haz clic para ingresar"}
+                </p>
+              </div>
             </div>
-            <div className="text-left">
-              <h3 className="text-[15px] font-semibold text-text-primary m-0">Barrido de Equivalencias</h3>
-              <p className="text-[12px] text-text-muted m-0">
-                {barridoData ? `${Math.round(barridoData.kcalTotal || 0).toLocaleString()} kcal totales` : "Sin datos - haz clic para ingresar"}
-              </p>
-            </div>
-          </div>
-          {showBarrido ? <ChevronUp className="w-5 h-5 text-text-muted" /> : <ChevronDown className="w-5 h-5 text-text-muted" />}
-        </button>
+            {showBarrido ? <ChevronUp className="w-5 h-5 shrink-0 text-text-muted" /> : <ChevronDown className="w-5 h-5 shrink-0 text-text-muted" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowPreviousMenus((open) => !open)}
+            disabled={!previousConsultationPlan}
+            className="flex shrink-0 items-center gap-1.5 rounded-[7px] border border-[#333] bg-[#1b1b1b] px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-[#90c2ff] transition-colors hover:border-[#90c2ff]/50 hover:bg-[#90c2ff]/10 disabled:cursor-not-allowed disabled:opacity-35"
+            title={previousConsultationPlan ? 'Comparar con los menús enviados en la consulta anterior' : 'No hay un plan anterior disponible'}
+            aria-label="Ver menús de la consulta anterior"
+          >
+            <Search className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Menú anterior</span>
+          </button>
+        </div>
+
+        <PreviousConsultationMenuPreview
+          isOpen={showPreviousMenus}
+          planId={previousConsultationPlan?.planId}
+          consultationDate={previousConsultationPlan?.fecha}
+          onClose={() => setShowPreviousMenus(false)}
+        />
 
         {showBarrido && (
           <div className="p-6 border-t border-border-subtle animate-fade-in space-y-4">
             <BarridosEquivalenciasManager
               value={barridoData}
               onChange={(data) => setBarridoData(data)}
-              habitos={pacienteInfo?.habitos}
+              habitos={assessmentDietetica}
             />
             {/* Botón "Guardar barrido" separado — POST upsert */}
             <div className="flex items-center justify-between pt-4 mt-2 border-t border-border-subtle">

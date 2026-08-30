@@ -44,4 +44,20 @@ describe('recordatorio de 24 horas', () => {
     expect(serializeRecall24([{ id: 'temporal', label: 'Cena', hora: '20:00', notas: 'Ligera' }]))
       .toEqual([{ label: 'Cena', hora: '20:00', notas: 'Ligera' }]);
   });
+
+  it('usa el ajuste de una consulta como base exacta de la siguiente', () => {
+    const adjusted = [
+      { id: 'ui-1', label: 'Desayuno', hora: '09:00', notas: 'Huevos' },
+      { id: 'ui-2', label: 'Cena', hora: '19:30', notas: 'Ligera' },
+      { id: 'ui-3', label: 'Colación', hora: '21:00', notas: 'Yogurt' },
+    ];
+    const savedSnapshot = serializeRecall24(adjusted);
+    const nextAssessment = resolveAssessmentDietetica(
+      { dietetica: savedSnapshot },
+      [{ label: 'Desayuno', hora: '07:00', notas: 'Base antigua' }],
+    );
+
+    expect(nextAssessment.map(({ label, hora, notas }) => ({ label, hora, notas })))
+      .toEqual(savedSnapshot);
+  });
 });

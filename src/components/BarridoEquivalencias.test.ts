@@ -57,4 +57,30 @@ describe('syncTiemposFromHabitos', () => {
     expect(result[0].id).toBe('desayuno-previo');
     expect(result.some(({ id }) => id === 'colacion-vieja' || id === 'cena-previa')).toBe(false);
   });
+
+  it('respeta exactamente el orden de Dietética y distingue tiempos repetidos', () => {
+    const result = syncTiemposFromHabitos(
+      [
+        { id: 'desayuno', nombre: 'Desayuno' },
+        { id: 'colacion-am', nombre: 'Colación' },
+        { id: 'almuerzo', nombre: 'Almuerzo' },
+        { id: 'colacion-pm', nombre: 'Colación' },
+        { id: 'cena', nombre: 'Cena' },
+      ],
+      [
+        { label: 'Desayuno', hora: '08:00', notas: '' },
+        { label: 'Almuerzo', hora: '13:00', notas: '' },
+        { label: 'Colación', hora: '17:00', notas: '' },
+        { label: 'Cena', hora: '20:00', notas: '' },
+        { label: 'Colación', hora: '22:00', notas: '' },
+      ],
+    );
+
+    expect(result.map(({ nombre }) => nombre)).toEqual([
+      'Desayuno', 'Almuerzo', 'Colación', 'Cena', 'Colación',
+    ]);
+    expect(result.map(({ id }) => id)).toEqual([
+      'desayuno', 'almuerzo', 'colacion-am', 'cena', 'colacion-pm',
+    ]);
+  });
 });
