@@ -12,9 +12,11 @@ interface Phase4DeliveryProps {
   pacienteId: string;
   planId: string;
   onFinish: () => void;
+  context?: 'assessment' | 'plan-detail';
 }
 
-export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryProps) {
+export function Phase4Delivery({ pacienteId, planId, onFinish, context = 'assessment' }: Phase4DeliveryProps) {
+  const isPlanDetail = context === 'plan-detail';
   const { toast } = useToast();
   const [meta, setMeta] = useState<any>(() => {
     const defaultPrefs = parsePdfPreferences(localStorage.getItem('norder_pdfCustomMetaPrefs'));
@@ -195,8 +197,14 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
       {/* Columna Izquierda: Controles */}
       <div className="w-full lg:w-[380px] shrink-0 flex flex-col gap-6">
         <div>
-          <h2 className="text-[20px] font-bold text-white tracking-tight leading-none mb-1">Configurar y Enviar Resultantes</h2>
-          <p className="text-[13px] text-[#8a8a8a] m-0">Ajusta lo que quieres enviarle al paciente en tiempo real y finaliza.</p>
+          <h2 className="text-[20px] font-bold text-white tracking-tight leading-none mb-1">
+            {isPlanDetail ? 'Configurar y enviar PDF' : 'Configurar y Enviar Resultantes'}
+          </h2>
+          <p className="text-[13px] text-[#8a8a8a] m-0">
+            {isPlanDetail
+              ? 'Ajusta el documento, revisa la vista previa y envíalo directamente al paciente.'
+              : 'Ajusta lo que quieres enviarle al paciente en tiempo real y finaliza.'}
+          </p>
         </div>
 
         <div className="flex-1 space-y-6 overflow-y-auto custom-scrollbar pr-2">
@@ -223,12 +231,14 @@ export function Phase4Delivery({ pacienteId, planId, onFinish }: Phase4DeliveryP
           </button>
           
           <div className="flex gap-3">
-             <button onClick={onFinish} className="flex-1 bg-[#1a1a1a] border border-[#333] hover:bg-[#222] text-[#8a8a8a] hover:text-white font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all flex items-center justify-center text-center leading-tight">
-               Omitir y<br/>Finalizar Consulta
-             </button>
-             <button onClick={() => setShowDeliveryDialog(true)} disabled={sending || saving} className="flex-[1.5] bg-gradient-to-r from-[#90c2ff] to-[#60a5fa] hover:from-[#a6cdff] hover:to-[#90c2ff] text-black font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all shadow-[0_0_20px_rgba(144,194,255,0.2)] flex items-center justify-center gap-2">
+             {!isPlanDetail && (
+               <button onClick={onFinish} className="flex-1 bg-[#1a1a1a] border border-[#333] hover:bg-[#222] text-[#8a8a8a] hover:text-white font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all flex items-center justify-center text-center leading-tight">
+                 Omitir y<br/>Finalizar Consulta
+               </button>
+             )}
+             <button onClick={() => setShowDeliveryDialog(true)} disabled={sending || saving} className={`${isPlanDetail ? 'w-full' : 'flex-[1.5]'} bg-gradient-to-r from-[#90c2ff] to-[#60a5fa] hover:from-[#a6cdff] hover:to-[#90c2ff] text-black font-semibold rounded-[12px] py-3.5 px-4 text-[14px] transition-all shadow-[0_0_20px_rgba(144,194,255,0.2)] flex items-center justify-center gap-2`}>
                {sending ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" /> : <Send className="w-5 h-5" />}
-               Enviar y Finalizar
+               {isPlanDetail ? 'Enviar al paciente' : 'Enviar y Finalizar'}
              </button>
           </div>
         </div>

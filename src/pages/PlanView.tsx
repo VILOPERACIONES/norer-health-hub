@@ -4,7 +4,6 @@ import { format } from 'date-fns';
 import { ArrowLeft, Edit2, FileText, Send, Lock, Trash2, Clock, Settings2, Activity } from 'lucide-react';
 import api from '@/lib/api';
 import type { Plan } from '@/types';
-import { PDFPreviewModal } from '@/components/PDFPreviewModal';
 import { formatDate, formatDecimal } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
@@ -14,6 +13,7 @@ import { formatMealTimeName } from '@/lib/mealTimes';
 import { getMenuTimesForDisplay } from '@/lib/menuEquivalencias';
 import { PlanDeliveryDialog } from '@/components/PlanDeliveryDialog';
 import { getPlanDeliveryFeedback, type PlanDeliveryChannels } from '@/lib/planDelivery';
+import { Phase4Delivery } from './Phase4Delivery';
 
 export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, onFinish }: { pacienteId?: string, planId?: string, onFinish?: () => void }) => {
     const navigate = useNavigate();
@@ -116,22 +116,7 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
         fetch();
     }, [pacienteId, planId]);
 
-    const [showConfig, setShowConfig] = useState(false);
-    const [savingMeta, setSavingMeta] = useState(false);
-
-    const handleSaveMeta = async (meta: any) => {
-        setSavingMeta(true);
-        try {
-            await api.put(`/api/planes/${planId}/pdf-meta`, meta);
-            setPlan(prev => prev ? { ...prev, pdfCustomMeta: meta } as Plan : prev);
-            toast({ title: 'Configuración PDF guardada', description: 'Los ajustes se aplicarán al generar o enviar.' });
-            setShowConfig(false);
-        } catch (err) {
-            toast({ title: 'Error', description: 'No se pudo guardar la configuración.', variant: 'destructive' });
-        } finally {
-            setSavingMeta(false);
-        }
-    };
+    const deliverySectionRef = useRef<HTMLDivElement>(null);
 
     const handlePdf = async () => {
         try {
@@ -251,10 +236,10 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                                 <Edit2 className="h-[18px] w-[18px]" /> Editar
                             </button>
                             <button
-                                onClick={() => setShowConfig(true)}
+                                onClick={() => deliverySectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                                 className="flex items-center justify-center gap-2 px-[18px] py-[10px] bg-[#111111] text-white border border-[#2a2a2a] rounded-[8px] text-[14px] font-medium transition-colors hover:bg-[#181818] w-full sm:w-auto"
                             >
-                                <Settings2 className="h-[18px] w-[18px]" /> Configurar PDF
+                                <Settings2 className="h-[18px] w-[18px]" /> Preparar envío
                             </button>
                             <button
                                 onClick={handlePdf}
@@ -469,15 +454,19 @@ export const PlanEnvioForm = ({ pacienteId: propPacienteId, planId: propPlanId, 
                     </div>
                 )}
 
-                <PDFPreviewModal
-                    isOpen={showConfig}
-                    onClose={() => setShowConfig(false)}
-                    planId={planId}
-                    planCustomMeta={plan.pdfCustomMeta || {}}
-                    onSaveMeta={handleSaveMeta}
-                    loading={savingMeta}
-                    planMenus={plan.menus}
-                />
+                <div
+                    ref={deliverySectionRef}
+                    id="preparar-envio"
+                    className="scroll-mt-6 border-t border-[#2a2a2a] pt-10"
+                    data-testid="plan-pdf-delivery-panel"
+                >
+                    <Phase4Delivery
+                        pacienteId={pacienteId || ''}
+                        planId={planId || ''}
+                        onFinish={() => onFinish ? onFinish() : navigate(`/pacientes/${pacienteId}`)}
+                        context="plan-detail"
+                    />
+                </div>
                 <PlanDeliveryDialog
                     open={showDeliveryDialog}
                     patientName={pacienteNombre}
