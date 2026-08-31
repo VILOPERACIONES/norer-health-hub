@@ -4,6 +4,10 @@ import { Plus, Trash2, Shield, Calendar as CalendarIcon, BookOpen, ChevronDown, 
 import { useQueryClient } from '@tanstack/react-query';
 import { invalidateAfterValoracionChange } from '@/lib/invalidation';
 import api from '@/lib/api';
+import {
+  APPOINTMENT_REQUEST_TIMEOUT_MS,
+  getBookingFailureCopy
+} from '@/lib/appointmentScheduling';
 import { useToast } from '@/hooks/use-toast';
 import BarridosEquivalenciasManager, {
   getBarridoVariantes,
@@ -961,26 +965,26 @@ const NewAssessment = () => {
       if (calcomData) {
         // AGENDAR CITA SINCRÓNICAMENTE PARA EVITAR RACE CONDITIONS EN LA SIGUIENTE PANTALLA
         try {
-          await api.post('/api/citas/agendar', {
-            pacienteId,
-            valoracionId: valoracionResId,
-            ...calcomData
-          });
+          await api.post(
+            '/api/citas/agendar',
+            {
+              pacienteId,
+              valoracionId: valoracionResId,
+              ...calcomData
+            },
+            {
+              timeout: APPOINTMENT_REQUEST_TIMEOUT_MS,
+              skipRetry: true
+            }
+          );
           toast({ title: 'Cita agendada', description: 'Se ha agendado la próxima cita y notificado al paciente.' });
           setCalcomData(null);
         } catch (bookingErr: any) {
           console.error('Error al agendar cita:', bookingErr);
-          let errorMsg = 'Intenta agendar manualmente o revisa la configuración de Cal.com.';
-          if (bookingErr.response?.data?.details) {
-            errorMsg = typeof bookingErr.response.data.details === 'string'
-              ? bookingErr.response.data.details
-              : JSON.stringify(bookingErr.response.data.details);
-          } else if (bookingErr.response?.data?.error) {
-            errorMsg = bookingErr.response.data.error;
-          }
+          const failureCopy = getBookingFailureCopy(bookingErr);
           toast({
-            title: 'Valoración guardada, pero la cita falló',
-            description: errorMsg,
+            title: failureCopy.title,
+            description: failureCopy.description,
             variant: 'destructive',
             duration: 8000
           });

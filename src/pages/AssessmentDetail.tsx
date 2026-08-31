@@ -17,6 +17,10 @@ import { buildAvoidFoods } from '@/lib/avoidFoods';
 import { PreviousConsultationMenuPreview } from '@/components/PreviousConsultationMenuPreview';
 import { findPreviousConsultationPlan } from '@/lib/previousConsultationPlan';
 import { resolveAssessmentDietetica } from '@/lib/recall24';
+import {
+  APPOINTMENT_REQUEST_TIMEOUT_MS,
+  getBookingFailureCopy
+} from '@/lib/appointmentScheduling';
 
 // ─── Módulo Plan de la Consulta ───────────────────────────────────────────────
 const PlanSection = ({
@@ -248,16 +252,23 @@ const AssessmentDetail = () => {
     if (!confirmed) return;
     setIsScheduling(true);
     try {
-      await api.post('/api/citas/agendar', {
-        pacienteId,
-        valoracionId, // Vincula la cita a la valoración de la cual se origina
-        name: calcomData.name,
-        email: calcomData.email,
-        phone: calcomData.phone,
-        eventTypeId: calcomData.eventTypeId,
-        modalidad: calcomData.modalidad,
-        fecha: calcomData.fecha
-      });
+      await api.post(
+        '/api/citas/agendar',
+        {
+          pacienteId,
+          valoracionId, // Vincula la cita a la valoración de la cual se origina
+          name: calcomData.name,
+          email: calcomData.email,
+          phone: calcomData.phone,
+          eventTypeId: calcomData.eventTypeId,
+          modalidad: calcomData.modalidad,
+          fecha: calcomData.fecha
+        },
+        {
+          timeout: APPOINTMENT_REQUEST_TIMEOUT_MS,
+          skipRetry: true
+        }
+      );
       toast({ title: 'Cita agendada correctamente', description: 'El paciente recibirá una invitación por correo.' });
       setCalcomData(null);
 
@@ -269,19 +280,10 @@ const AssessmentDetail = () => {
       setVal(valRes.data?.data || valRes.data);
 
     } catch (err: any) {
-      let errorMsg = 'Hubo un problema al contactar con la API.';
-      if (err.response?.data?.details) {
-        errorMsg = typeof err.response.data.details === 'string'
-          ? err.response.data.details
-          : JSON.stringify(err.response.data.details);
-      } else if (err.response?.data?.error) {
-        errorMsg = err.response.data.error;
-      } else if (err.response?.data?.message) {
-        errorMsg = err.response.data.message;
-      }
+      const failureCopy = getBookingFailureCopy(err);
       toast({
-        title: 'Error al agendar',
-        description: errorMsg,
+        title: failureCopy.title,
+        description: failureCopy.description,
         variant: 'destructive',
         duration: 8000
       });
