@@ -31,13 +31,51 @@ describe('recordatorio de 24 horas', () => {
     expect(rows[0]).toMatchObject({ label: 'Post-entreno', hora: '10:30', notas: 'Licuado' });
   });
 
-  it('usa el expediente solo como compatibilidad si la última valoración no tiene fotografía', () => {
+  it('para una valoración histórica usa solo los tiempos de su barrido y conserva el orden', () => {
     const rows = resolveAssessmentDietetica(
-      { dietetica: null },
-      [{ label: 'Desayuno', hora: '07:00', notas: 'Base' }],
+      {
+        dietetica: null,
+        barrido: {
+          tiempos: [
+            { id: 'pre', nombre: 'Pre-entreno' },
+            { id: 'des', nombre: 'Desayuno' },
+            { id: 'col-1', nombre: 'Colación' },
+            { id: 'alm', nombre: 'Almuerzo' },
+            { id: 'col-2', nombre: 'Colación' },
+            { id: 'cen', nombre: 'Cena' },
+          ],
+        },
+      },
+      [
+        { label: 'Ante-entreno', hora: '04:00', notas: 'No debe heredarse' },
+        { label: 'Post-ante-entreno', hora: '05:00', notas: 'No debe heredarse' },
+        { label: 'Pre-entreno', hora: '06:00', notas: 'Pre' },
+        { label: 'Colación', hora: '08:00', notas: 'Primera' },
+        { label: 'Desayuno', hora: '07:00', notas: 'Desayuno' },
+        { label: 'Almuerzo', hora: '13:00', notas: 'Almuerzo' },
+        { label: 'Colación', hora: '16:00', notas: 'Segunda' },
+        { label: 'Cena', hora: '20:00', notas: 'Cena' },
+      ],
     );
 
-    expect(rows[0]).toMatchObject({ label: 'Desayuno', hora: '07:00', notas: 'Base' });
+    expect(rows.map(({ label, hora }) => ({ label, hora }))).toEqual([
+      { label: 'Pre-entreno', hora: '06:00' },
+      { label: 'Desayuno', hora: '07:00' },
+      { label: 'Colación', hora: '08:00' },
+      { label: 'Almuerzo', hora: '13:00' },
+      { label: 'Colación', hora: '16:00' },
+      { label: 'Cena', hora: '20:00' },
+    ]);
+  });
+
+  it('usa el expediente como base únicamente cuando todavía no existe una consulta', () => {
+    const rows = resolveAssessmentDietetica(
+      null,
+      [{ label: 'Desayuno', hora: '07:00', notas: 'Base inicial' }],
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ label: 'Desayuno', hora: '07:00', notas: 'Base inicial' });
   });
 
   it('serializa la fotografía sin IDs temporales de interfaz', () => {

@@ -33,6 +33,7 @@ import { PreviousConsultationMenuPreview } from '@/components/PreviousConsultati
 import { findPreviousConsultationPlan } from '@/lib/previousConsultationPlan';
 
 const COMP_NOTES_MARKER = '__COMPETENCIA_NOTES__';
+const DIETETICA_DRAFT_VERSION = 2;
 type MeasurementStatus = 'REGISTRADA' | 'NO_APLICA' | 'NO_CAPTURADA';
 type CompositionMethod = 'ANTROPOMETRIA' | 'BIOIMPEDANCIA';
 
@@ -328,7 +329,12 @@ const NewAssessment = () => {
     if (d.suplementosDetalle) setSuplementosDetalle(d.suplementosDetalle);
     if (d.tieneSuplementos !== undefined) setTieneSuplementos(d.tieneSuplementos);
     if (d.suplementos) setSuplementos(d.suplementos);
-    if (Array.isArray(d.habitos)) setHabitos(normalizeRecall24(d.habitos));
+    // Los borradores anteriores a la herencia por valoración contienen la vieja
+    // lista acumulada del expediente. Se restauran sus demás campos, pero no esa
+    // Dietética obsoleta; la base correcta ya fue cargada desde la última consulta.
+    if (d.dieteticaInheritanceVersion === DIETETICA_DRAFT_VERSION && Array.isArray(d.habitos)) {
+      setHabitos(normalizeRecall24(d.habitos));
+    }
     if (d.notasLibres) setNotasLibres(d.notasLibres);
     if (d.adjuntos) setAdjuntos(d.adjuntos);
     setIsGrasaModified(true);
@@ -413,7 +419,7 @@ const NewAssessment = () => {
       ? [...temario, { id: '__comp__', tema: COMP_NOTES_MARKER, detalle: JSON.stringify(competencia) }]
       : temario;
     // adjuntos se excluyen del draft — base64 agota localStorage (5MB). Se pierden al recargar antes de guardar.
-    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, habitos: serializeRecall24(habitos), fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
+    const draft = { step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario: temarioParaDraft, barridoData, habitos: serializeRecall24(habitos), dieteticaInheritanceVersion: DIETETICA_DRAFT_VERSION, fecha, hora, proximaSesion, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres };
     localStorage.setItem(`draft_assessment_${pacienteId}`, JSON.stringify(draft));
   }, [step, peso, estatura, pctGrasa, consultaEnLinea, compositionMethod, bioimpedancia, onlineMeasurements, comentarios, temario, competencia, barridoData, habitos, fecha, hora, proximaSesion, pacienteId, isGrasaModified, tieneSuplementos, suplementos, suplementacionActiva, suplementosDetalle, notasLibres, isEdit]);
 
@@ -576,8 +582,9 @@ const NewAssessment = () => {
           } catch {
             toast({ title: 'Error', description: 'No se pudo cargar la valoración a editar.', variant: 'destructive' });
           }
-        } else if (!localStorage.getItem(`draft_assessment_${pacienteId}`)) {
-          // Solo pre-llenar nueva valoración si no hay borrador activo
+        } else {
+          // Siempre carga primero la consulta anterior. Si existe un borrador
+          // compatible, el usuario puede restaurarlo encima explícitamente.
           const vals = p?.valoraciones || [];
           let lastVal = null;
           if (vals.length > 0) {

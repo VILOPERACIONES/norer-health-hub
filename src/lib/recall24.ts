@@ -65,17 +65,80 @@ export function serializeRecall24(rows: Recall24Row[]): Omit<Recall24Row, 'id'>[
   return rows.map(({ label, hora, notas }) => ({ label, hora, notas }));
 }
 
+type AssessmentBarrido = {
+  tiempos?: unknown;
+};
+
+function parseBarridoTiempos(value: unknown): Array<{ nombre?: unknown; label?: unknown }> {
+  try {
+    const parsed = typeof value === 'string' ? JSON.parse(value) : value;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function normalizeComparableLabel(value: unknown): string {
+  return normalizeMealLabel(value, '')
+    .trim()
+    .replace(/^colaci[oó]n\s+\d+$/i, 'Colación')
+    .toLocaleLowerCase('es-MX');
+}
+
+/**
+ * Las valoraciones anteriores a la fotografía de Dietética solo conservan los
+ * tiempos dentro de su Barrido. Reconstruye exactamente esa lista y ese orden,
+ * reutilizando hora/notas del expediente únicamente para las filas coincidentes;
+ * nunca agrega las filas restantes del expediente.
+ */
+function dieteticaFromHistoricalBarrido(
+  barrido: AssessmentBarrido | null | undefined,
+  patientDietetica: unknown,
+): Recall24Row[] | null {
+  const tiempos = parseBarridoTiempos(barrido?.tiempos);
+  if (tiempos.length === 0) return null;
+
+  const patientRows = normalizeRecall24(patientDietetica);
+  const usedPatientRows = new Set<number>();
+
+  return tiempos.map((tiempo, index) => {
+    const label = normalizeMealLabel(tiempo?.nombre ?? tiempo?.label, `Tiempo ${index + 1}`);
+    const comparable = normalizeComparableLabel(label);
+    const matchIndex = patientRows.findIndex((row, patientIndex) => (
+      !usedPatientRows.has(patientIndex)
+      && normalizeComparableLabel(row.label) === comparable
+    ));
+    if (matchIndex !== -1) usedPatientRows.add(matchIndex);
+    const match = matchIndex !== -1 ? patientRows[matchIndex] : null;
+
+    return {
+      id: `diet-historical-${index + 1}`,
+      label,
+      hora: match?.hora || '',
+      notas: match?.notas || '',
+    };
+  });
+}
+
 /**
  * Una nueva valoración parte exclusivamente de la Dietética de la última valoración.
  * Para pacientes históricos cuya última valoración todavía no tenga fotografía propia,
- * se usa la Dietética del expediente como compatibilidad inicial.
+ * se usa exactamente la lista de tiempos de su Barrido, sin acumular el expediente.
  */
 export function resolveAssessmentDietetica(
-  latestAssessment: { dietetica?: unknown } | null | undefined,
+  latestAssessment: { dietetica?: unknown; barrido?: AssessmentBarrido | null } | null | undefined,
   patientDietetica: unknown,
 ): Recall24Row[] {
   if (Array.isArray(latestAssessment?.dietetica)) {
     return normalizeRecall24(latestAssessment.dietetica);
   }
+
+  if (latestAssessment) {
+    return dieteticaFromHistoricalBarrido(latestAssessment.barrido, patientDietetica)
+      || normalizeRecall24(undefined);
+  }
+
+  // En la primera consulta no existe una valoración anterior. El expediente es
+  // únicamente la base inicial; a partir de la segunda manda la fotografía previa.
   return normalizeRecall24(patientDietetica);
 }
